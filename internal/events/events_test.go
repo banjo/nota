@@ -83,3 +83,31 @@ func TestNilBusAndTimestamps(t *testing.T) {
 		t.Fatal("Time not set")
 	}
 }
+
+func TestFollow(t *testing.T) {
+	b := New()
+	where, stop := b.Follow()
+	b.Emit(Event{Type: NoteMoved, OldPath: "Inbox/a.md", Path: "Work/a.md"})
+	b.Emit(Event{Type: NoteMoved, OldPath: "Work/a.md", Path: "Archive/a.md"})
+	b.Emit(Event{Type: NoteSaved, Path: "Inbox/b.md"})
+	if got := where("Inbox/a.md"); got != "Archive/a.md" {
+		t.Fatalf("where(a) = %q", got)
+	}
+	if got := where("Inbox/b.md"); got != "Inbox/b.md" {
+		t.Fatalf("where(b) = %q", got)
+	}
+	// A move back and forth must not loop.
+	b.Emit(Event{Type: NoteMoved, OldPath: "Archive/a.md", Path: "Inbox/a.md"})
+	_ = where("Inbox/a.md")
+	stop()
+	b.Emit(Event{Type: NoteMoved, OldPath: "Inbox/b.md", Path: "X/b.md"})
+	if got := where("Inbox/b.md"); got != "Inbox/b.md" {
+		t.Fatalf("after stop: %q", got)
+	}
+	var nilBus *Bus
+	w, s := nilBus.Follow()
+	s()
+	if w("x") != "x" {
+		t.Fatal("nil bus")
+	}
+}

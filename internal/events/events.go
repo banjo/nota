@@ -153,6 +153,36 @@ func (b *Bus) Close() {
 	b.wg.Wait()
 }
 
+// Follow records the moves emitted on the bus from now on. where returns
+// the path a note at p ended up at after those moves (p itself when it
+// did not move), so a caller can find a note that a hook moved while the
+// caller's write was being handled. stop ends the recording.
+func (b *Bus) Follow() (where func(p string) string, stop func()) {
+	if b == nil {
+		return func(p string) string { return p }, func() {}
+	}
+	var mu sync.Mutex
+	moves := map[string]string{}
+	stop = b.Subscribe(func(e Event) {
+		mu.Lock()
+		moves[e.OldPath] = e.Path
+		mu.Unlock()
+	}, NoteMoved)
+	where = func(p string) string {
+		mu.Lock()
+		defer mu.Unlock()
+		for range len(moves) { // a chain visits each move at most once
+			next, ok := moves[p]
+			if !ok || next == p {
+				break
+			}
+			p = next
+		}
+		return p
+	}
+	return where, stop
+}
+
 // call runs a handler and keeps a panicking subscriber from taking the
 // emitter (a CLI command, the app) down with it.
 func call(fn Handler, e Event) {

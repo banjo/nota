@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
 
+	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/frontmatter"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/markdown"
@@ -111,7 +113,7 @@ the vault root.`,
 			if !cmd.Flags().Changed("folder") {
 				folder = a.vault.Inbox()
 			}
-			content, err := newNoteContent(text, tags, a.vault.Now())
+			content, err := edit.New(text, tags, nil, a.vault.Now())
 			if err != nil {
 				return err
 			}
@@ -161,41 +163,6 @@ func (a *app) addText(args []string) (string, error) {
 		return "", usageErr("nothing to add: stdin was empty")
 	}
 	return string(b), nil
-}
-
-// newNoteContent builds the file for `nota add`: the text, plus tags and a
-// created timestamp in the frontmatter (added to frontmatter the text
-// already has, if any).
-func newNoteContent(text string, tags []string, now time.Time) ([]byte, error) {
-	if !strings.HasSuffix(text, "\n") {
-		text += "\n"
-	}
-	src := []byte(text)
-	if len(tags) > 0 {
-		props, _ := frontmatter.Split(src).Properties()
-		list := tagList(props["tags"])
-		for _, t := range tags {
-			for _, one := range strings.Split(t, ",") {
-				if c := markdown.CleanTag(one); c != "" {
-					list = addTag(list, c)
-				} else if strings.TrimSpace(one) != "" {
-					return nil, usageErr("invalid tag %q", one)
-				}
-			}
-		}
-		var err error
-		if src, err = frontmatter.Set(src, "tags", list); err != nil {
-			return nil, err
-		}
-	}
-	props, _ := frontmatter.Split(src).Properties()
-	if _, ok := props["created"]; !ok {
-		var err error
-		if src, err = frontmatter.Set(src, "created", now.Format(time.RFC3339)); err != nil {
-			return nil, err
-		}
-	}
-	return src, nil
 }
 
 func (a *app) lsCmd() *cobra.Command {
@@ -494,7 +461,7 @@ Flags must come before the note: nota tag --json Plan +a -b.`,
 			if err := checkFrontmatter(n); err != nil {
 				return err
 			}
-			before := tagList(n.Props["tags"])
+			before := edit.TagList(n.Props["tags"])
 			after := append([]string{}, before...)
 			for _, op := range rest {
 				switch {
@@ -503,16 +470,16 @@ Flags must come before the note: nota tag --json Plan +a -b.`,
 					if t == "" {
 						return usageErr("invalid tag %q", op)
 					}
-					after = removeTag(after, t)
+					after = edit.RemoveTag(after, t)
 				default:
 					t := markdown.CleanTag(strings.TrimPrefix(op, "+"))
 					if t == "" {
 						return usageErr("invalid tag %q", op)
 					}
-					after = addTag(after, t)
+					after = edit.AddTag(after, t)
 				}
 			}
-			if !equalStrings(before, after) {
+			if !slices.Equal(before, after) {
 				src := n.Raw
 				if len(after) == 0 {
 					src = frontmatter.Delete(src, "tags")
@@ -577,58 +544,6 @@ func checkFrontmatter(n *vault.Note) error {
 		return fmt.Errorf("%s: frontmatter is not valid YAML, fix it first: %w", n.Path, err)
 	}
 	return nil
-}
-
-// tagList reads the tags property as Obsidian does: a list, or a string
-// of comma or space separated tags.
-func tagList(v any) []string {
-	var raw []string
-	switch x := v.(type) {
-	case []any:
-		for _, t := range x {
-			raw = append(raw, fmt.Sprint(t))
-		}
-	case string:
-		raw = strings.FieldsFunc(x, func(r rune) bool { return r == ',' || r == ' ' })
-	}
-	out := []string{}
-	for _, t := range raw {
-		if c := markdown.CleanTag(t); c != "" {
-			out = addTag(out, c)
-		}
-	}
-	return out
-}
-
-func addTag(ts []string, t string) []string {
-	for _, x := range ts {
-		if strings.EqualFold(x, t) {
-			return ts
-		}
-	}
-	return append(ts, t)
-}
-
-func removeTag(ts []string, t string) []string {
-	out := ts[:0:0]
-	for _, x := range ts {
-		if !strings.EqualFold(x, t) {
-			out = append(out, x)
-		}
-	}
-	return out
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func (a *app) setCmd() *cobra.Command {

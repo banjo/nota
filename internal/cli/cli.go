@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/vault"
@@ -61,6 +62,8 @@ func classify(err error) *Error {
 		return &Error{Code: ExitConflict, Kind: "case_collision", Message: msg}
 	case errors.Is(err, vault.ErrExists):
 		return &Error{Code: ExitConflict, Kind: "exists", Message: msg}
+	case errors.Is(err, edit.ErrInvalidTag):
+		return &Error{Code: ExitUsage, Kind: "usage", Message: msg}
 	case errors.Is(err, vault.ErrInvalidPath), errors.Is(err, index.ErrEmptyQuery):
 		return &Error{Code: ExitUsage, Kind: "invalid", Message: msg}
 	case strings.HasPrefix(msg, "unknown command"), strings.HasPrefix(msg, "unknown flag"),
@@ -168,7 +171,7 @@ Every command prints JSON with --json.`,
 	root.AddCommand(
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(),
 		a.rmCmd(), a.tagCmd(), a.setCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(),
-		a.backlinksCmd(), a.tagsCmd(),
+		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(),
 	)
 	return root
 }
