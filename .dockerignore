@@ -1,0 +1,16 @@
+.git
+**/node_modules
+**/dist
+**/build
+**/.mygo
+apps/desktop/src
+apps/*/node_modules
+packages
+prototypes
+bun.lock
+*.log
+.env
+.env.*
+**/.nota
+Dockerfile
+.dockerignore

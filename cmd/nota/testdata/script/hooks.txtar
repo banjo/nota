@@ -1,0 +1,140 @@
+# Hooks from .nota/hooks.toml run real shell scripts with the vault as
+# working directory: after hooks in the background (nota waits for them),
+# transform hooks inside the write.
+env NOTA_NOW=2026-11-22T10:42:00+01:00
+[windows] skip 'hooks use sh'
+
+nota hooks list
+cmp stdout list.txt
+
+# A transform hook files #jobb notes from the inbox and tags them; the
+# printed path is where the note ended up. The after hook saw the
+# hook's own save, marked with its origin.
+nota add 'Ring Anna #jobb'
+stdout '^Jobb/Ring Anna jobb.md$'
+! exists 'vault/Inbox/Ring Anna jobb.md'
+cmp 'vault/Jobb/Ring Anna jobb.md' want/filed.md
+exists vault/.nota/saved.log
+grep '^note.saved Jobb/Ring Anna jobb.md hook:sort$' vault/.nota/saved.log
+grep '"event":"note.saved"' vault/.nota/last.json
+grep '"body":"Ring Anna #jobb\\n"' vault/.nota/last.json
+grep '"vault":".*vault"' vault/.nota/last.json
+
+# The index knows the new place and tag.
+nota ls --tag sorterad
+stdout '^Jobb/Ring Anna jobb.md'
+
+# Other notes stay in the inbox.
+nota add 'Köp mjölk'
+stdout '^Inbox/Köp mjölk.md$'
+
+# Moving a note into the inbox runs inbox.added hooks too.
+nota add --folder Arkiv 'Gammalt #jobb'
+nota mv 'Arkiv/Gammalt jobb' Inbox
+stdout '^Jobb/Gammalt jobb.md$'
+
+# A slow transform hook is killed at its timeout; the note stays as it was.
+nota add 'Långsam #slow'
+stdout '^Inbox/Långsam slow.md$'
+stderr 'transform hook failed; note left unchanged.*hook=slow.*timed out after 300ms'
+cmp 'vault/Inbox/Långsam slow.md' want/slow.md
+
+# Output that is not a JSON patch is logged and ignored.
+nota add 'Trasig #bad'
+stdout '^Inbox/Trasig bad.md$'
+stderr 'hook=bad.*bad patch JSON'
+
+# A failing after hook is logged; the command still succeeds.
+nota set 'Köp mjölk' status=x
+stderr 'hook failed.*hook=fail.*exit status 7: nope'
+
+# hooks test runs the matching hooks without applying the patch (the
+# note was put in place behind nota's back, so no hook has seen it).
+cp direkt.md vault/Inbox/Direkt.md
+nota hooks test inbox.added Inbox/Direkt
+stdout '^sort \(transform, \d+\.\d\ds\): ok$'
+stdout '^  patch: folder=Jobb \+sorterad$'
+cmp vault/Inbox/Direkt.md direkt.md
+nota hooks test inbox.added 'Inbox/Köp mjölk'
+stdout '^no hooks for inbox.added on Inbox/Köp mjölk.md$'
+nota hooks test --json note.saved 'Köp mjölk'
+stdout '"hook": "fail"'
+stdout '"error": "exit status 7: nope"'
+exitcode 2 nota hooks test note.typed 'Köp mjölk'
+
+# A broken hooks file disables hooks with a warning; hooks list fails.
+cp broken.toml vault/.nota/hooks.toml
+nota add 'Utan hooks #jobb'
+stdout '^Inbox/Utan hooks jobb.md$'
+stderr 'hooks disabled.*transform hooks run only on'
+exitcode 1 nota hooks list
+stderr 'hook #1: transform hooks run only on note.created, inbox.added, not note.saved'
+
+-- vault/.nota/hooks.toml --
+[[hook]]
+name = "sort"
+event = "inbox.added"
+mode = "transform"
+run = "sh scripts/sort.sh"
+match = { folder = "Inbox", tag = "jobb" }
+
+[[hook]]
+name = "log"
+event = "note.saved"
+run = "sh scripts/log.sh"
+
+[[hook]]
+name = "slow"
+event = "inbox.added"
+mode = "transform"
+timeout = "300ms"
+run = "sleep 5; echo '{}'"
+match = { tag = "slow" }
+
+[[hook]]
+name = "bad"
+event = "inbox.added"
+mode = "transform"
+run = "echo not json"
+match = { tag = "bad" }
+
+[[hook]]
+name = "fail"
+event = "note.saved"
+run = "echo nope >&2; exit 7"
+match = { folder = "Inbox" }
+-- vault/scripts/sort.sh --
+# Reads the event on stdin and files the note under Jobb/.
+payload=$(cat)
+case "$payload" in
+*'"event":"inbox.added"'*) echo '{"folder": "Jobb", "tags": {"add": ["sorterad"]}}' ;;
+esac
+-- vault/scripts/log.sh --
+cat > .nota/last.json
+origin=$(sed -n 's/.*"origin":"\([^"]*\)".*/\1/p' .nota/last.json)
+echo "$NOTA_EVENT $NOTA_NOTE $origin" >> .nota/saved.log
+-- broken.toml --
+[[hook]]
+event = "note.saved"
+mode = "transform"
+run = "x"
+-- list.txt --
+sort  inbox.added  transform  2s     folder=Inbox,tag=jobb  sh scripts/sort.sh
+log   note.saved   after      30s                           sh scripts/log.sh
+slow  inbox.added  transform  300ms  tag=slow               sleep 5; echo '{}'
+bad   inbox.added  transform  2s     tag=bad                echo not json
+fail  note.saved   after      30s    folder=Inbox           echo nope >&2; exit 7
+-- direkt.md --
+Direkt #jobb
+-- want/filed.md --
+---
+created: 2026-11-22T10:42:00+01:00
+tags: [sorterad]
+updated: 2026-11-22T10:42:00+01:00
+---
+Ring Anna #jobb
+-- want/slow.md --
+---
+created: 2026-11-22T10:42:00+01:00
+---
+Långsam #slow

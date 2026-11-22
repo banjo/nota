@@ -1,0 +1,110 @@
+import { describe, expect, test } from "vite-plus/test";
+import { readFileSync } from "node:fs";
+import { registerBuiltins } from "../src/builtins/index.tsx";
+import { createRegistry } from "../src/registry.ts";
+import { BUILTIN_THEMES, type ColorTheme, contrast } from "../src/theme/themes.ts";
+
+// Read from disk: the test runner turns CSS imports into empty modules.
+const css = (name: string) =>
+  readFileSync(new URL(`../../ui/src/${name}`, import.meta.url), "utf8");
+const tokensCss = css("tokens.css");
+const palettesCss = css("palettes.css");
+
+/** The custom properties of the first rule whose selector is exactly `selector`. */
+function block(css: string, selector: string): Record<string, string> {
+  const at = css.indexOf(`${selector} {`);
+  if (at < 0) return {};
+  const body = css.slice(css.indexOf("{", at) + 1, css.indexOf("}", at));
+  const out: Record<string, string> = {};
+  for (const m of body.matchAll(/(--[\w-]+):\s*([^;]+);/g)) out[m[1]!] = m[2]!.trim();
+  return out;
+}
+
+/** What a theme's CSS resolves to in a mode: tokens.css, then its palette rule. */
+function cssColors(id: string, mode: "light" | "dark") {
+  const base =
+    mode === "light"
+      ? block(tokensCss, ":root")
+      : block(tokensCss, ':root[data-theme="dark"],\n:root[data-mode="dark"]');
+  const sel =
+    mode === "light"
+      ? `:root[data-palette="${id}"]:not([data-mode="dark"])`
+      : `:root[data-palette="${id}"][data-mode="dark"]`;
+  return { ...base, ...(id === "nota" ? {} : block(palettesCss, sel)) };
+}
+
+describe("colour themes", () => {
+  const cases: [string, "light" | "dark"][] = BUILTIN_THEMES.flatMap((t) => [
+    [t.id, "light"],
+    [t.id, "dark"],
+  ]);
+  test.each(cases)("%s %s is readable and matches its CSS", (id, mode) => {
+    const theme = BUILTIN_THEMES.find((t) => t.id === id)!;
+    const c = theme[mode];
+    const vars = cssColors(id, mode);
+    // The swatch draws what the CSS paints.
+    expect(vars["--background"]).toBe(c.background);
+    expect(vars["--sidebar"]).toBe(c.sidebar);
+    expect(vars["--text"]).toBe(c.text);
+    expect(vars["--ink"]).toBe(c.ink);
+    expect(vars["--ink-foreground"]).toBe(c.inkForeground);
+    // Body text ≥ 4.5:1 (AA); ink, as links and accents, ≥ 3:1 on both
+    // the page and the sidebar; button labels on ink ≥ 4.5:1.
+    expect(contrast(c.text, c.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(c.ink, c.background)).toBeGreaterThanOrEqual(3);
+    expect(contrast(c.ink, c.sidebar)).toBeGreaterThanOrEqual(3);
+    expect(contrast(c.inkForeground, c.ink)).toBeGreaterThanOrEqual(4.5);
+    // Muted labels too, where the theme sets them.
+    if (vars["--muted-foreground"]?.startsWith("#"))
+      expect(contrast(vars["--muted-foreground"], c.background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test("contrast is WCAG's", () => {
+    expect(contrast("#000000", "#ffffff")).toBeCloseTo(21);
+    expect(contrast("#ffffff", "#ffffff")).toBe(1);
+    expect(contrast("#4256d6", "#ffffff")).toBeCloseTo(5.94, 1);
+  });
+
+  test("ids are valid data-palette values and unique", () => {
+    const ids = BUILTIN_THEMES.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(id).toMatch(/^[a-z0-9][a-z0-9.-]*$/);
+  });
+
+  test("themes are registry contributions, sorted, and a plugin can add one", () => {
+    const r = createRegistry();
+    const off = registerBuiltins(r);
+    expect(r.get("theme").map((t) => t.id)).toEqual([
+      "nota",
+      "graphite",
+      "paper",
+      "forest",
+      "rose",
+    ]);
+    const mine: ColorTheme = {
+      id: "plugin.sea",
+      name: "Sea",
+      order: 25,
+      light: { ...BUILTIN_THEMES[0]!.light, ink: "#1d6f8a" },
+      dark: { ...BUILTIN_THEMES[0]!.dark, ink: "#7cc4dc" },
+      tokens: { light: { "--ink": "#1d6f8a" }, dark: { "--ink": "#7cc4dc" } },
+    };
+    const offMine = r.register("theme", mine);
+    expect(r.get("theme").map((t) => t.id)).toEqual([
+      "nota",
+      "graphite",
+      "paper",
+      "plugin.sea",
+      "forest",
+      "rose",
+    ]);
+    offMine();
+    expect(r.get("theme")).toHaveLength(5);
+    // ⌘K: one toggle and a command per built-in theme.
+    expect(r.command("theme.toggleDark")?.title).toBe("Toggle dark mode");
+    expect(r.command("theme.toggleDark")?.shortcut).toBeUndefined();
+    expect(r.command("theme.palette.paper")?.title).toBe("Theme: Paper");
+    off();
+    expect(r.get("theme")).toHaveLength(0);
+  });
+});

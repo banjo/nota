@@ -1,0 +1,83 @@
+# Edits through nota keep "updated" current, but only in notes that
+# already have frontmatter; "created" never changes and moves leave the
+# file alone. Everything but the updated line stays byte for byte.
+env NOTA_NOW=2026-11-20T08:00:00+01:00
+nota add --tag a 'Ny anteckning'
+cmp 'vault/Inbox/Ny anteckning.md' want/1-added.md
+
+env NOTA_NOW=2026-11-21T09:30:00+01:00
+nota set 'Ny anteckning' status=draft
+cmp 'vault/Inbox/Ny anteckning.md' want/2-set.md
+
+env NOTA_NOW=2026-11-22T10:42:00+01:00
+nota tag 'Ny anteckning' +b
+cmp 'vault/Inbox/Ny anteckning.md' want/3-tag.md
+
+# Setting what is already there writes nothing, so updated stays. The date
+# is far enough ahead that a note without frontmatter, whose updated time is
+# its file's mtime, can never outrank it however late the suite runs.
+env NOTA_NOW=2099-01-01T00:00:00Z
+nota set 'Ny anteckning' status=draft
+nota tag 'Ny anteckning' +a
+cmp 'vault/Inbox/Ny anteckning.md' want/3-tag.md
+
+# Moving does not touch the content.
+nota mv 'Ny anteckning' Projekt
+cmp 'vault/Projekt/Ny anteckning.md' want/3-tag.md
+
+# An existing updated line is replaced in place; comments around it stay.
+nota set Gammal status=ok
+cmp vault/Gammal.md want/gammal.md
+
+# A note without frontmatter gets the edited keys only, no timestamp.
+nota tag Plain +x
+cmp vault/Plain.md want/plain.md
+
+# The index sorts by the new value.
+nota ls --sort 'updated desc' --limit 1
+stdout '^Gammal.md'
+
+-- want/1-added.md --
+---
+tags: [a]
+created: 2026-11-20T08:00:00+01:00
+---
+Ny anteckning
+-- want/2-set.md --
+---
+tags: [a]
+created: 2026-11-20T08:00:00+01:00
+status: draft
+updated: 2026-11-21T09:30:00+01:00
+---
+Ny anteckning
+-- want/3-tag.md --
+---
+tags: [a, b]
+created: 2026-11-20T08:00:00+01:00
+status: draft
+updated: 2026-11-22T10:42:00+01:00
+---
+Ny anteckning
+-- vault/Gammal.md --
+---
+# kommentar
+updated: 2020-01-01T00:00:00Z # gammal
+created: 2019-01-01
+---
+Gammal
+-- want/gammal.md --
+---
+# kommentar
+updated: 2099-01-01T00:00:00Z
+created: 2019-01-01
+status: ok
+---
+Gammal
+-- vault/Plain.md --
+Plain
+-- want/plain.md --
+---
+tags: [x]
+---
+Plain

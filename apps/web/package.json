@@ -1,0 +1,33 @@
+{
+  "name": "@nota/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "preview": "vp preview",
+    "test": "vp test --passWithNoTests"
+  },
+  "dependencies": {
+    "@nota/app": "workspace:*",
+    "@nota/client": "workspace:*",
+    "@nota/ui": "workspace:*",
+    "@tanstack/react-query": "^5.90.11",
+    "lucide-react": "^0.555.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@rolldown/plugin-babel": "^0.2.0",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "tailwindcss": "^4.1.17",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

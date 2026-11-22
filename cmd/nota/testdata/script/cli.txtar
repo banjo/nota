@@ -1,0 +1,67 @@
+# Help, version, completion and usage errors.
+nota --help
+stdout 'nota manages a vault of plain markdown notes'
+stdout '^  add\s+Create a note'
+stdout '^  search\s+Full-text search'
+stdout '--json\s+print JSON'
+nota --version
+stdout '^nota version dev$'
+nota help set
+stdout 'Only the edited'
+
+exitcode 2 nota bogus
+stderr 'unknown command "bogus"'
+exitcode 2 nota ls --bogus
+stderr 'unknown flag: --bogus'
+stderr 'Run ''nota --help'' for usage.'
+exitcode 2 nota --json ls --bogus
+stderr '^\{"error":\{"code":"usage","message":"unknown flag: --bogus"\}\}$'
+
+nota completion bash
+stdout 'complete -o default -F __start_nota nota'
+nota completion zsh
+stdout '^#compdef nota'
+nota completion fish
+stdout 'complete -c nota'
+
+# Note arguments complete to paths.
+nota __complete cat Pro
+stdout '^Projekt/Plan.md$'
+stdout '^:4$'
+
+# backlinks and tags.
+nota backlinks Plan
+cmp stdout backlinks.txt
+nota backlinks --json Plan
+stdout '"from": "Idé.md"'
+stdout '"to": "Projekt/Plan.md"'
+stdout '"alias": "planen"'
+nota tags
+cmp stdout tags.txt
+nota tags --json
+stdout '"tag": "nota/sync"'
+
+# --verbose logs one debug event per command to stderr.
+nota -v ls
+stderr 'level=DEBUG msg=command cmd="nota ls" vault=.*vault vault_source=env exit=0'
+nota ls
+! stderr .
+
+-- vault/Projekt/Plan.md --
+---
+tags: [projekt]
+aliases: [planen]
+---
+# Plan
+-- vault/Idé.md --
+Idé #nota/sync, see [[Plan|planen]] and [[Projekt/Plan#Mål]].
+-- vault/Möte.md --
+Möte about [[planen]] #projekt ![[Plan]]
+-- backlinks.txt --
+Idé.md	[[Plan]]
+Idé.md	[[Projekt/Plan]]
+Möte.md	[[planen]]
+Möte.md	![[Plan]]
+-- tags.txt --
+#nota/sync  1
+#projekt    2

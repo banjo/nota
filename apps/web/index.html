@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)" />
+    <meta name="robots" content="noindex" />
+    <title>Nota</title>
+    <script>
+      // Appearance before the first paint (packages/app/src/theme/store.ts
+      // takes over once the app runs; the keys are the landing page's too).
+      (function () {
+        var d = document.documentElement;
+        var t = null;
+        var p = null;
+        try {
+          t = localStorage.getItem("nota:theme");
+          p = localStorage.getItem("nota:palette");
+        } catch (e) {}
+        if (t === "light" || t === "dark") d.dataset.theme = t;
+        else t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        d.dataset.mode = t;
+        d.dataset.palette = p && /^[a-z0-9][a-z0-9.-]*$/.test(p) ? p : "nota";
+      })();
+    </script>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

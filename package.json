@@ -1,0 +1,46 @@
+{
+  "name": "nota",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "ready": "vp check && vp run -r test && vp run go:test",
+    "dev": "vp run @nota/desktop#dev",
+    "dev:web": "vp run @nota/web#dev",
+    "dev:landing": "vp run @nota/landing#dev",
+    "build": "vp run @nota/desktop#build",
+    "web:build": "vp run @nota/web#build",
+    "site:build": "vp run @nota/landing#build && vp run @nota/web#build",
+    "go:test": "go test ./...",
+    "go:vet": "go vet ./...",
+    "go:build": "go build -o bin/nota ./cmd/nota"
+  },
+  "devDependencies": {
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "overrides": {
+    "vite": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "bun",
+      "version": "1.4.5",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "catalog": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@8.3.8000",
+    "vite-plus": "1.7.0",
+    "typescript": "^7.0.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}

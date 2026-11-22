@@ -1,0 +1,56 @@
+# nota login signs a device in with a device code; here the admin
+# approves it instead of the web app. The token then syncs a vault,
+# nota devices lists it and nota logout revokes it.
+[windows] skip 'stops the server with SIGINT'
+env NOTA_SERVER_DATA=$WORK/data
+env NOTA_SERVER_WEB_ORIGIN=https://notes.example.com
+env NOTA_SERVER_POLL_INTERVAL=1s
+nota serve user add anton@example.com
+exec nota serve --addr 127.0.0.1:0 --addr-file addr &srv&
+waitaddr addr URL
+
+nota login $URL --device laptop --no-browser &login&
+nota serve auth approve anton@example.com --device laptop --wait 10s
+stdout '^approved sign-in 1 of laptop for anton@example.com$'
+wait login
+stdout '^signed in to http://127.0.0.1:\d+ as anton@example.com \(device laptop\)$'
+stderr 'https://notes.example.com/app/connect\?code=[A-Z2-9]{4}-[A-Z2-9]{4}'
+stderr 'check that it shows the code [A-Z2-9]{4}-[A-Z2-9]{4}'
+grep 'nota_' .config/nota/credentials
+
+# A denied sign-in fails.
+! nota login $URL --device phone --no-browser &deny&
+nota serve auth approve anton@example.com --device phone --wait 10s --deny
+stdout '^denied sign-in 2 of phone for anton@example.com$'
+wait deny
+stderr 'the sign-in was denied in the browser'
+
+# remote add finds the stored token; the vault syncs.
+mkdir vault
+nota add 'Hello from the CLI'
+nota remote add $URL --device laptop
+stdout 'vault main \(created\), device laptop'
+nota sync
+stdout 'pushed +Inbox/Hello from the CLI.md'
+
+nota devices --server $URL --device laptop
+stdout '^1 +laptop +.*\(this device\)$'
+nota devices --server $URL --device laptop --json
+stdout '"current": true'
+exitcode 3 nota devices revoke 99 --server $URL --device laptop
+
+nota logout $URL --device laptop
+stdout '^signed out of http://127.0.0.1:\d+ \(device laptop\)$'
+! grep 'nota_' .config/nota/credentials
+exitcode 3 nota devices --server $URL --device laptop
+stderr 'not signed in to http://127.0.0.1:\d+ as device laptop'
+exitcode 1 nota sync
+stderr 'no token stored'
+nota serve token list
+stdout '^1 +anton@example.com +laptop .* revoked '
+
+exitcode 3 nota serve auth approve anton@example.com --device nobody
+exitcode 2 nota serve auth approve anton@example.com
+
+kill -INT srv
+wait srv

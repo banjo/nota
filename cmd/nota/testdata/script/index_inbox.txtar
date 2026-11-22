@@ -1,0 +1,89 @@
+# index brings .nota/index.db up to date; every command also does this.
+nota index
+stdout '^4 notes: 4 added, 0 updated, 0 removed'
+exists vault/.nota/index.db
+nota index
+stdout '^4 notes: 0 added, 0 updated, 0 removed'
+nota index --rebuild --json
+stdout '"notes": 4'
+stdout '"added": 4'
+stdout '"rebuilt": true'
+
+# Edits made outside nota are picked up by the next command.
+cp new.md vault/Ny.md
+cp changed.md vault/b.md
+rm vault/c.md
+nota search changedword
+stdout '^b.md'
+nota ls
+cmp stdout ls.txt
+
+# A corrupt index is replaced and rebuilt.
+cp garbage.txt vault/.nota/index.db
+rm vault/.nota/index.db-wal
+rm vault/.nota/index.db-shm
+nota ls
+cmp stdout ls.txt
+
+# inbox lists the inbox folder, newest first.
+nota inbox
+cmp stdout inbox.txt
+nota inbox --json --limit 1
+stdout '"path": "Inbox/Senast.md"'
+nota inbox --sort path
+stdout '(?s)Inbox/Senast.md.*Inbox/Tidig.md'
+
+# The config file sets the vault and the inbox folder.
+env NOTA_VAULT=
+mkdir .config/nota
+cp config.toml .config/nota/config.toml
+nota add 'Via config'
+stdout '^Inkorg/Via config.md$'
+exists 'home/cfgvault/Inkorg/Via config.md'
+nota inbox
+stdout '^Inkorg/Via config.md'
+
+# --vault beats $NOTA_VAULT, which beats the config.
+nota --vault vault ls
+stdout '^Ny.md'
+env NOTA_VAULT=$WORK/vault
+nota ls
+stdout '^Ny.md'
+nota --vault home/cfgvault ls
+stdout '^Inkorg/Via config.md'
+
+# A missing vault is exit 3 (add creates it instead).
+exitcode 3 nota --vault nowhere ls
+stderr 'no vault at .*nowhere \(from flag\)'
+
+-- vault/Inbox/Tidig.md --
+---
+created: 2026-11-01T09:00:00+01:00
+---
+Tidig
+-- vault/Inbox/Senast.md --
+---
+created: 2026-11-21T09:00:00+01:00
+---
+Senast
+-- vault/b.md --
+B
+-- vault/c.md --
+C
+-- new.md --
+Ny
+-- changed.md --
+B with changedword
+-- garbage.txt --
+this is not an sqlite database, just some text that is long enough...
+-- config.toml --
+vault = "~/cfgvault"
+inbox = "Inkorg"
+-- ls.txt --
+Inbox/Senast.md  Senast
+Inbox/Tidig.md   Tidig
+Ny.md            Ny
+b.md             B with changedword
+-- inbox.txt --
+Inbox/Senast.md  Senast
+Inbox/Tidig.md   Tidig

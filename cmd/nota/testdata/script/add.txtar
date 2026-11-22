@@ -1,0 +1,75 @@
+# nota add creates the vault, puts the note in the inbox and prints its path.
+! exists vault
+nota add 'Köp mjölk'
+stdout '^Inbox/Köp mjölk.md$'
+exists 'vault/Inbox/Köp mjölk.md'
+grep '^created: "?\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d' 'vault/Inbox/Köp mjölk.md'
+grep '^Köp mjölk$' 'vault/Inbox/Köp mjölk.md'
+
+# The same title again gets " 2".
+nota add 'Köp mjölk'
+stdout '^Inbox/Köp mjölk 2.md$'
+
+# Words are joined; characters unsafe in file names or wikilinks are dropped.
+nota add 'Möte:' 'Åsa/Örjan?' '#idé'
+stdout '^Inbox/Möte Åsa Örjan idé.md$'
+grep '^Möte: Åsa/Örjan\? #idé$' 'vault/Inbox/Möte Åsa Örjan idé.md'
+
+# --tag is repeatable and takes comma-separated lists; tags go in the frontmatter.
+nota add --folder Projekt --tag projekt -t 'nota, sync' '# Plan för v1'
+stdout '^Projekt/Plan för v1.md$'
+grep '^tags: \[projekt, nota, sync\]$' 'vault/Projekt/Plan för v1.md'
+grep '^# Plan för v1$' 'vault/Projekt/Plan för v1.md'
+nota ls --tag sync
+stdout '^Projekt/Plan för v1.md'
+
+# --folder / is the vault root.
+nota add --folder / Rot
+stdout '^Rot.md$'
+
+# "-" reads stdin; frontmatter in it is kept and extended.
+stdin note.md
+nota add -t extra -
+stdout '^Inbox/Från stdin.md$'
+grep '^status: draft # keep me$' 'vault/Inbox/Från stdin.md'
+grep '^tags: \[a, extra\]$' 'vault/Inbox/Från stdin.md'
+grep '^Body\.$' 'vault/Inbox/Från stdin.md'
+
+# Piped input without "-" works too.
+stdin plain.txt
+nota add
+stdout '^Inbox/Piped.md$'
+
+# --json prints the indexed note.
+nota add --json -t json 'JSON note'
+stdout '"path": "Inbox/JSON note.md"'
+stdout '"folder": "Inbox"'
+stdout '"title": "JSON note"'
+stdout '"tags": \[\s+"json"\s+\]'
+stdout '"created": "\d{4}-'
+
+# Empty input and bad tags are usage errors (exit 2).
+stdin empty.txt
+exitcode 2 nota add -
+stderr 'nothing to add: stdin was empty'
+exitcode 2 nota add -t 'bad tag!' x
+stderr 'invalid tag "bad tag!"'
+exitcode 2 nota add --json -t '!' x
+stderr '"code":"usage"'
+
+# Without $NOTA_VAULT or a config file the vault is ~/Notes.
+env NOTA_VAULT=
+nota add 'In home'
+exists 'home/Notes/Inbox/In home.md'
+
+-- note.md --
+---
+status: draft # keep me
+tags: [a]
+---
+# Från stdin
+
+Body.
+-- plain.txt --
+Piped
+-- empty.txt --

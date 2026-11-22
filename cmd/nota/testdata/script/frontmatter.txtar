@@ -1,0 +1,170 @@
+# nota set and nota tag change only the edited keys' lines (plus
+# "updated"); comments, quoting, key order, blank lines and the body stay
+# byte for byte.
+env NOTA_NOW=2026-11-22T10:42:00+01:00
+nota set Plan status=done
+stdout '^Plan.md$'
+cmp vault/Plan.md want/1-status.md
+
+nota tag Plan +ny -NOTA
+stdout '^Plan.md\t#projekt #ny$'
+cmp vault/Plan.md want/2-tags.md
+
+nota set Plan priority=2 'aliases=[p, q]' 'note=hello world' --unset custom
+cmp vault/Plan.md want/3-more.md
+
+# Removing the last tag removes the key.
+nota tag Plan -projekt -ny
+stdout '^Plan.md\t$'
+cmp vault/Plan.md want/4-notags.md
+
+# No changes: tag prints the tags and leaves the file alone.
+nota tag Plan
+cmp vault/Plan.md want/4-notags.md
+nota tag --json Plan +x --json
+stdout '"tags": \[\s+"x"\s+\]'
+grep '^tags: \[x\]$' vault/Plan.md
+
+# The index sees the new values.
+nota ls --where status=done --where priority=2 --tag x
+stdout '^Plan.md'
+nota ls --where aliases=q
+stdout '^Plan.md'
+
+# A note without frontmatter gets a block; dates stay strings.
+nota set Plain status=new due=2026-12-01 count=3 ok=true
+cmp vault/Plain.md want/plain.md
+nota set --json Plain 'status=a: b'
+stdout '"status": "a: b"'
+stdout '"count": 3'
+stdout '"ok": true'
+
+# Broken frontmatter is refused instead of edited.
+exitcode 1 nota set Broken k=v
+stderr 'frontmatter is not valid YAML'
+exitcode 1 nota tag Broken +x
+cmp vault/Broken.md want/broken.md
+
+# Usage errors.
+exitcode 2 nota set Plan
+stderr 'nothing to set'
+exitcode 2 nota set Plan novalue
+stderr '"novalue" is not key=value'
+exitcode 2 nota tag Plan '+bad tag'
+stderr 'invalid tag'
+
+-- vault/Plan.md --
+---
+# Projektplan
+title: 'Plan: v1'   # quoted, with a comment
+status: draft
+tags:
+  - projekt
+  - nota
+nested:
+  a: 1
+  b: [x, y]
+
+custom: "keep  me"
+---
+# Plan
+
+Body with trailing spaces   
+and an #inline tag.
+-- want/1-status.md --
+---
+# Projektplan
+title: 'Plan: v1'   # quoted, with a comment
+status: done
+tags:
+  - projekt
+  - nota
+nested:
+  a: 1
+  b: [x, y]
+
+custom: "keep  me"
+updated: 2026-11-22T10:42:00+01:00
+---
+# Plan
+
+Body with trailing spaces   
+and an #inline tag.
+-- want/2-tags.md --
+---
+# Projektplan
+title: 'Plan: v1'   # quoted, with a comment
+status: done
+tags: [projekt, ny]
+nested:
+  a: 1
+  b: [x, y]
+
+custom: "keep  me"
+updated: 2026-11-22T10:42:00+01:00
+---
+# Plan
+
+Body with trailing spaces   
+and an #inline tag.
+-- want/3-more.md --
+---
+# Projektplan
+title: 'Plan: v1'   # quoted, with a comment
+status: done
+tags: [projekt, ny]
+nested:
+  a: 1
+  b: [x, y]
+
+updated: 2026-11-22T10:42:00+01:00
+priority: 2
+aliases: [p, q]
+note: hello world
+---
+# Plan
+
+Body with trailing spaces   
+and an #inline tag.
+-- want/4-notags.md --
+---
+# Projektplan
+title: 'Plan: v1'   # quoted, with a comment
+status: done
+nested:
+  a: 1
+  b: [x, y]
+
+updated: 2026-11-22T10:42:00+01:00
+priority: 2
+aliases: [p, q]
+note: hello world
+---
+# Plan
+
+Body with trailing spaces   
+and an #inline tag.
+-- vault/Plain.md --
+# Plain
+
+No frontmatter.
+-- want/plain.md --
+---
+status: new
+due: "2026-12-01"
+count: 3
+ok: true
+---
+# Plain
+
+No frontmatter.
+-- vault/Broken.md --
+---
+tags: [unclosed
+---
+Broken
+-- want/broken.md --
+---
+tags: [unclosed
+---
+Broken
