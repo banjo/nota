@@ -219,6 +219,13 @@ func LoadToken(account, store string) (string, error) {
 	if t := os.Getenv(EnvToken); t != "" {
 		return t, nil
 	}
+	return loadStored(account, store)
+}
+
+func envKeyringFile() bool { return os.Getenv(EnvKeyring) == StoreFile }
+
+// loadStored reads a token from one store, ignoring $NOTA_TOKEN.
+func loadStored(account, store string) (string, error) {
 	if store == StoreKeyring {
 		var tok string
 		err := withTimeout(func() error {

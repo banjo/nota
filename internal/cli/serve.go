@@ -43,6 +43,8 @@ const (
 	// EnvServerTrustedProxies lists proxies (IPs, CIDRs or "private")
 	// whose X-Forwarded-For is believed.
 	EnvServerTrustedProxies = "NOTA_SERVER_TRUSTED_PROXIES"
+	// EnvServerPollInterval is the device-code poll interval (default 5s).
+	EnvServerPollInterval = "NOTA_SERVER_POLL_INTERVAL"
 )
 
 type serveFlags struct {
@@ -129,7 +131,7 @@ or SIGTERM.`,
 	fl.StringVar(&f.maxSize, "max-file-size", "", "largest file accepted, e.g. 100MB (default $NOTA_SERVER_MAX_FILE_SIZE or 100MiB)")
 	fl.StringVar(&f.logFormat, "log-format", "", "log format: text or json (default $NOTA_SERVER_LOG_FORMAT or text)")
 	fl.StringVar(&f.addrFile, "addr-file", "", "write the bound address to this file once listening (for scripts)")
-	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f))
+	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f))
 	return cmd
 }
 
@@ -216,6 +218,96 @@ that address can use it.`}
 		},
 	}
 	cmd.AddCommand(create, list, revoke)
+	return cmd
+}
+
+func (a *app) serveAuthCmd(f *serveFlags) *cobra.Command {
+	cmd := &cobra.Command{Use: "auth", Short: "Approve device sign-ins from the server side",
+		Long: `Pending sign-ins come from "nota login" on a device. Users approve them
+in the web app; an admin can approve one here instead, for example before
+the web app exists or for a user without a passkey yet.`}
+	pending := &cobra.Command{
+		Use:   "pending",
+		Short: "List pending device sign-ins",
+		Args:  exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				ds, err := st.PendingDeviceAuths(ctx)
+				if err != nil {
+					return err
+				}
+				if a.json {
+					return a.printJSON(ds)
+				}
+				tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
+				fmt.Fprintln(tw, "ID\tDEVICE\tSTARTED\tEXPIRES")
+				for _, d := range ds {
+					fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n", d.ID, d.Device, d.CreatedAt.Format(time.RFC3339), d.ExpiresAt.Format(time.RFC3339))
+				}
+				return tw.Flush()
+			})
+		},
+	}
+	var id int64
+	var device string
+	var wait time.Duration
+	var deny bool
+	approve := &cobra.Command{
+		Use:   "approve <email> (--id N | --device NAME) [--wait 30s]",
+		Short: "Approve (or --deny) a pending sign-in for a user",
+		Long: `Approve a pending "nota login" for the user with that email: the one
+with --id (see "nota serve auth pending"), or the newest one from the
+device named --device. --wait keeps looking for that long.`,
+		Args: exactArgs(1, "an email address"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if (id == 0) == (device == "") {
+				return usageErr("give --id or --device")
+			}
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				u, err := st.UserByEmail(ctx, args[0])
+				if err != nil {
+					return serverErr(err)
+				}
+				deadline := time.Now().Add(wait)
+				for {
+					ds, err := st.PendingDeviceAuths(ctx)
+					if err != nil {
+						return err
+					}
+					for _, d := range ds {
+						if (id != 0 && d.ID == id) || (id == 0 && d.Device == device) {
+							if err := st.DecideDeviceAuth(ctx, d.ID, u.ID, !deny); err != nil {
+								return serverErr(err)
+							}
+							verb := "approved"
+							if deny {
+								verb = "denied"
+							}
+							if a.json {
+								return a.printJSON(map[string]any{verb: d, "user": u.Email})
+							}
+							fmt.Fprintf(a.stdout, "%s sign-in %d of %s for %s\n", verb, d.ID, d.Device, u.Email)
+							return nil
+						}
+					}
+					if !time.Now().Before(deadline) {
+						return &Error{Code: ExitNotFound, Kind: "not_found", Message: "no matching pending sign-in"}
+					}
+					select {
+					case <-cmd.Context().Done():
+						return cmd.Context().Err()
+					case <-time.After(200 * time.Millisecond):
+					}
+				}
+			})
+		},
+	}
+	fl := approve.Flags()
+	fl.Int64Var(&id, "id", 0, "the pending sign-in's id")
+	fl.StringVar(&device, "device", "", "the newest pending sign-in from this device name")
+	fl.DurationVar(&wait, "wait", 0, "keep looking for a matching sign-in this long")
+	fl.BoolVar(&deny, "deny", false, "deny instead of approving")
+	cmd.AddCommand(pending, approve)
 	return cmd
 }
 
@@ -327,6 +419,11 @@ func serverConfigFromEnv() (server.Config, error) {
 	}
 	if cfg.TrustedProxies, err = server.ParseProxies(os.Getenv(EnvServerTrustedProxies)); err != nil {
 		return cfg, err
+	}
+	if v := os.Getenv(EnvServerPollInterval); v != "" {
+		if cfg.PollInterval, err = time.ParseDuration(v); err != nil {
+			return cfg, fmt.Errorf("$%s: %w", EnvServerPollInterval, err)
+		}
 	}
 	return cfg, nil
 }

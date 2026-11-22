@@ -174,7 +174,7 @@ Every command prints JSON with --json.`,
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(),
 		a.rmCmd(), a.tagCmd(), a.setCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(),
 		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(), a.serveCmd(),
-		a.syncCmd(), a.remoteCmd(),
+		a.syncCmd(), a.remoteCmd(), a.loginCmd(), a.logoutCmd(), a.devicesCmd(),
 	)
 	return root
 }

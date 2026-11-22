@@ -41,11 +41,12 @@ func defaultDevice() string {
 func (a *app) remoteAddCmd() *cobra.Command {
 	var token, vaultName, device string
 	cmd := &cobra.Command{
-		Use:   "add <url> --token <token> [--remote-vault name]",
+		Use:   "add <url> [--token <token>] [--remote-vault name]",
 		Short: "Connect the vault to a sync server",
 		Long: `Connect the vault to a vault on a sync server. The server vault is
-created when it does not exist yet. Get a token from the server admin:
-nota serve token create <email> --device <name>.`,
+created when it does not exist yet. The token is the one "nota login"
+stored for this server and device, or --token (from the server admin:
+nota serve token create <email> --device <name>).`,
 		Args: exactArgs(1, "the server URL"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := a.openVault(false); err != nil {
@@ -59,7 +60,11 @@ nota serve token create <email> --device <name>.`,
 				token = os.Getenv(nsync.EnvToken)
 			}
 			if token == "" {
-				return usageErr("--token is required")
+				// A token from `nota login` for this server and device.
+				token, _, _ = nsync.FindToken(nsync.Remote{URL: u, Device: device}.Account())
+			}
+			if token == "" {
+				return usageErr("no token: sign in with `nota login %s` or pass --token", u)
 			}
 			if !protocol.ValidVaultName(vaultName) {
 				return usageErr("bad --remote-vault %q: use 1-64 letters, digits, '.', '_' or '-'", vaultName)

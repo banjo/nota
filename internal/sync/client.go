@@ -91,7 +91,9 @@ func (c *Client) do(ctx context.Context, method, path string, hdr http.Header, b
 		req.Header[k] = v
 	}
 	req.Header.Set(protocol.HeaderProtocol, strconv.Itoa(protocol.Version))
-	req.Header.Set("Authorization", "Bearer "+c.Token)
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
 	}

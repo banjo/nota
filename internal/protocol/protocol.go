@@ -189,6 +189,9 @@ type Error struct {
 	// Supported lists the protocol majors the server speaks, for
 	// unsupported_protocol.
 	Supported []int `json:"supported,omitempty"`
+	// Interval is the poll interval in seconds, for slow_down and
+	// authorization_pending (device sign-in).
+	Interval int `json:"interval,omitempty"`
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }

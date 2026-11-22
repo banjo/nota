@@ -77,6 +77,9 @@ type Config struct {
 	// AuthRateLimit is how many sign-in attempts one IP may make per
 	// minute (default 30, burst 20); negative turns the limit off.
 	AuthRateLimit int
+	// PollInterval is the minimum interval between device-code polls
+	// (DefaultPollInterval if 0).
+	PollInterval time.Duration
 	// Now is the clock (time.Now if nil); tests move it.
 	Now func() time.Time
 }
@@ -125,6 +128,10 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	if cfg.Signup == "" {
 		cfg.Signup = SignupInvite
 	}
+	if cfg.PollInterval <= 0 {
+		cfg.PollInterval = DefaultPollInterval
+	}
+	cfg.PollInterval = max(cfg.PollInterval.Round(time.Second), time.Second)
 	if cfg.SessionTTL <= 0 {
 		cfg.SessionTTL = DefaultSessionTTL
 	}
@@ -204,6 +211,7 @@ func (s *Server) routes() {
 	v1("GET /v1/vaults/{vault}/history/{path...}", s.history)
 	v1("GET /v1/vaults/{vault}/events", s.events)
 	s.authRoutes()
+	s.flowRoutes()
 	s.mux.Handle("/v1/", s.v1(func(http.ResponseWriter, *http.Request, Principal) error {
 		return &apiErr{http.StatusNotFound, protocol.Error{Code: protocol.CodeNotFound, Message: "no such route"}}
 	}))
