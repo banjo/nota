@@ -139,7 +139,7 @@ or SIGTERM.`,
 	fl.StringVar(&f.maxSize, "max-file-size", "", "largest file accepted, e.g. 100MB (default $NOTA_SERVER_MAX_FILE_SIZE or 100MiB)")
 	fl.StringVar(&f.logFormat, "log-format", "", "log format: text or json (default $NOTA_SERVER_LOG_FORMAT or text)")
 	fl.StringVar(&f.addrFile, "addr-file", "", "write the bound address to this file once listening (for scripts)")
-	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f), a.serveRebuildCmd(f), a.serveVaultCmd(f))
+	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f), a.serveRebuildCmd(f), a.serveVaultCmd(f), a.serveBlobsCmd(f))
 	return cmd
 }
 
@@ -410,6 +410,64 @@ until they connect to another vault. This cannot be undone.`,
 	}
 	rm.Flags().BoolVar(&yes, "yes", false, "really delete")
 	cmd.AddCommand(list, rm)
+	return cmd
+}
+
+func (a *app) serveBlobsCmd(f *serveFlags) *cobra.Command {
+	cmd := &cobra.Command{Use: "blobs", Short: "Manage the content-addressed blob store"}
+	var dryRun bool
+	var minAge time.Duration
+	gc := &cobra.Command{
+		Use:   "gc [--dry-run]",
+		Short: "Delete blobs nothing references and report the bytes",
+		Long: `Remove what nothing references any more: rows of the blobs table whose
+hash is in no version and no file (a deleted vault or account), and files
+in <data>/blobs the database does not know (an upload that failed between
+writing its bytes and committing, or a leftover of a deleted vault).
+Versions keep their content alive, so the history of a deleted note and
+"nota restore" still work after this.
+
+Safe next to a running server: the rows go in one write transaction (the
+same serialised path every other mutation takes), a file is only removed
+when no version and no row references it, and unreferenced files younger
+than --min-age (1h by default) are left alone so an upload in flight is
+never swept.
+
+It is not run at startup: walking the whole blob store on every boot
+costs time proportional to its size to reclaim nothing most of the time.
+Run it from a timer or by hand.`,
+		Args: exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			dir, err := f.dataDir()
+			if err != nil {
+				return err
+			}
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				res, err := st.CollectBlobs(ctx, filepath.Join(dir, "blobs"), server.BlobGC{DryRun: dryRun, MinAge: minAge})
+				if err != nil {
+					return err
+				}
+				if a.json {
+					return a.printJSON(res)
+				}
+				verb := "reclaimed"
+				if res.DryRun {
+					verb = "would reclaim"
+				}
+				if res.Files == 0 {
+					fmt.Fprintf(a.stdout, "%s nothing: no unreferenced blobs (%d row(s) stale, %d young file(s) kept)\n",
+						verb, res.Rows, res.Young)
+				} else {
+					fmt.Fprintf(a.stdout, "%s %d blob file(s) and %d database row(s): %d bytes (%d file(s) had no row at all); %d young file(s) kept\n",
+						verb, res.Files, res.Rows, res.Bytes, res.Orphans, res.Young)
+				}
+				return nil
+			})
+		},
+	}
+	gc.Flags().BoolVar(&dryRun, "dry-run", false, "report what would go without removing anything")
+	gc.Flags().DurationVar(&minAge, "min-age", server.DefaultBlobGrace, "leave unreferenced files younger than this alone")
+	cmd.AddCommand(gc)
 	return cmd
 }
 

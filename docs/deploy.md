@@ -80,6 +80,44 @@ More: `nota serve invite create [--email]`, `nota serve token list|revoke`,
 `nota serve auth pending`, `nota serve rebuild` (drop the working copies;
 stop the server first).
 
+Delete an account with everything the server keeps for it:
+
+```sh
+docker exec nota nota serve user rm you@example.com          # prints the plan
+docker exec nota nota serve user rm you@example.com --yes
+```
+
+It removes the user in one transaction (device tokens, web sessions,
+passkeys, recovery codes, invites bound to the address, vaults with their
+files and version log) and then the vaults' working copies plus the blob
+files only that user referenced. Blob bytes are content addressed and
+shared, so a file goes only when its last reference does.
+
+## Blob garbage collection
+
+Deleting a vault or an account, or an upload that failed between writing
+its bytes and committing, leaves blob content that nothing references.
+`nota serve blobs gc` reclaims it:
+
+```sh
+docker exec nota nota serve blobs gc --dry-run   # what would go, in bytes
+docker exec nota nota serve blobs gc             # remove it
+```
+
+Rows of `blobs` whose hash is in no `versions` and no `files` row go
+first, in one write transaction (the same serialised path as every other
+mutation, so it is safe next to a running server). A file in `/data/blobs`
+is removed only when no version and no row references it — versions keep
+their content alive, so `nota history` and `nota restore` still work —
+and unreferenced files younger than `--min-age` (1h by default) are left
+alone so an upload in flight is never swept. The command prints the bytes
+reclaimed.
+
+It is deliberately not run at startup: walking the whole blob store on
+every boot costs time proportional to its size, to reclaim nothing most
+of the time. Put it on a timer (a Coolify scheduled task or a host cron
+calling `docker exec`) or run it by hand after deleting accounts.
+
 ## Coolify
 
 The production server runs on Coolify as the application `nota` (project
