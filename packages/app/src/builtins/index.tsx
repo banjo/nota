@@ -4,6 +4,7 @@ import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
 
 import { suggestFolders } from "../lib/suggest.ts";
+import { BUILTIN_THEMES } from "../theme/themes.ts";
 import { useUI } from "../state.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
 import { FoldersSection, NavSection, ViewsSection } from "./sections.tsx";
@@ -24,6 +25,8 @@ export function registerBuiltins(r: Registry): () => void {
       id: "nota.rules",
       suggest: (note, { tree }) => suggestFolders(note, tree),
     }),
+
+    ...BUILTIN_THEMES.map((t) => r.register("theme", t)),
 
     // No default tree decoration: a status is read in the page, and the
     // tree stays quiet. Plugins get the same hook through the registry.

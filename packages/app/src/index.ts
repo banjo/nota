@@ -38,3 +38,4 @@ export {
   type ThemeStore,
 } from "./theme/store.ts";
 export { useTheme } from "./theme/useTheme.ts";
+export { BUILTIN_THEMES, contrast, type ColorTheme, type ThemeColors } from "./theme/themes.ts";

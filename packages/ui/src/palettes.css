@@ -1,0 +1,149 @@
+/*
+ * Colour themes ("palettes"), on top of tokens.css. Each has a light and a
+ * dark variant and overrides only what it needs: the ink family, and for
+ * graphite and paper the surfaces too. The app sets data-palette and
+ * data-mode on <html> before the first paint (index.html), so these key
+ * on data-mode only; "nota" is tokens.css itself. The list of themes the
+ * UI offers lives in packages/app/src/theme/themes.ts, and its swatch
+ * colours mirror the values here. Contrast (WCAG) of every variant is
+ * checked in packages/app/tests/themes.test.ts.
+ */
+
+/* Graphite: monochrome. Near-black ink on white, near-white on charcoal. */
+:root[data-palette="graphite"]:not([data-mode="dark"]) {
+  --background: #ffffff;
+  --foreground: #1b1b1d;
+  --text: #2a2a2c;
+  --text-soft: #3a3a3d;
+  --muted-foreground: #6c6c70;
+  --faint: #9e9ea2;
+
+  --sidebar: #f6f6f6;
+  --hairline: #e5e5e5;
+  --divider: #eeeeee;
+  --hover: #ececec;
+  --selected: #e6e6e6;
+  --chip: #eeeeee;
+  --chip-foreground: #48484c;
+  --file: #545458;
+  --code: #f2f2f2;
+  --surface: #ffffff;
+
+  --ink: #18181b;
+  --ink-soft: #ededed;
+  --ink-soft-hover: #e3e3e3;
+  --ink-strong: #000000;
+  --ink-foreground: #ffffff;
+}
+:root[data-palette="graphite"][data-mode="dark"] {
+  --background: #171718;
+  --foreground: #f0f0f0;
+  --text: #dcdcdc;
+  --text-soft: #cbcbcb;
+  --muted-foreground: #9c9ca0;
+  --faint: #6e6e72;
+
+  --sidebar: #1e1e20;
+  --hairline: #2f2f31;
+  --divider: #29292b;
+  --hover: #2a2a2c;
+  --selected: #323234;
+  --chip: #2c2c2e;
+  --chip-foreground: #c6c6ca;
+  --file: #b5b5b5;
+  --code: #262628;
+  --surface: #222224;
+
+  --ink: #f4f4f5;
+  --ink-soft: rgba(255, 255, 255, 0.1);
+  --ink-soft-hover: rgba(255, 255, 255, 0.16);
+  --ink-strong: #ffffff;
+  --ink-foreground: #171718;
+}
+
+/* Paper: warm off-white and brown ink, for reading; warm dark brown-gray at night. */
+:root[data-palette="paper"]:not([data-mode="dark"]) {
+  --background: #f8f4ec;
+  --foreground: #2b231b;
+  --text: #3b3026;
+  --text-soft: #4a3e33;
+  --muted-foreground: #76685a;
+  --faint: #a3968a;
+
+  --sidebar: #f1ebdf;
+  --hairline: #e3dacb;
+  --divider: #ebe3d5;
+  --hover: #ebe4d6;
+  --selected: #e5dccb;
+  --chip: #ece4d5;
+  --chip-foreground: #5a4c3c;
+  --file: #5e5145;
+  --code: #efe8da;
+  --surface: #fbf8f2;
+  --overlay: rgba(43, 35, 27, 0.26);
+
+  --ink: #8a5a2b;
+  --ink-soft: #f0e4d2;
+  --ink-soft-hover: #e9dac3;
+  --ink-strong: #6e4520;
+  --ink-foreground: #ffffff;
+
+  --shadow-card: 0 0 0 1px var(--hairline), 0 1px 2px rgba(60, 40, 20, 0.05);
+}
+:root[data-palette="paper"][data-mode="dark"] {
+  --background: #221e1a;
+  --foreground: #efe6d9;
+  --text: #e0d5c6;
+  --text-soft: #d2c6b6;
+  --muted-foreground: #a3968a;
+  --faint: #776b60;
+
+  --sidebar: #29241f;
+  --hairline: #3a332c;
+  --divider: #322c26;
+  --hover: #332d27;
+  --selected: #3b342d;
+  --chip: #362f29;
+  --chip-foreground: #d0c3b3;
+  --file: #c2b5a5;
+  --code: #2f2924;
+  --surface: #2c2722;
+
+  --ink: #d9a46a;
+  --ink-soft: rgba(217, 164, 106, 0.14);
+  --ink-soft-hover: rgba(217, 164, 106, 0.22);
+  --ink-strong: #ebc396;
+  --ink-foreground: #221e1a;
+}
+
+/* Forest: muted green ink on Nota's neutrals. */
+:root[data-palette="forest"]:not([data-mode="dark"]) {
+  --ink: #2f7a52;
+  --ink-soft: #e6f2eb;
+  --ink-soft-hover: #d8eadf;
+  --ink-strong: #22603f;
+  --ink-foreground: #ffffff;
+}
+:root[data-palette="forest"][data-mode="dark"] {
+  --ink: #7fc79d;
+  --ink-soft: rgba(127, 199, 157, 0.14);
+  --ink-soft-hover: rgba(127, 199, 157, 0.22);
+  --ink-strong: #a8dcbd;
+  --ink-foreground: #15161a;
+}
+
+/* Rose: muted berry ink on Nota's neutrals. */
+:root[data-palette="rose"]:not([data-mode="dark"]) {
+  --ink: #b03a62;
+  --ink-soft: #fbe9ef;
+  --ink-soft-hover: #f6dbe5;
+  --ink-strong: #8e2a4c;
+  --ink-foreground: #ffffff;
+}
+:root[data-palette="rose"][data-mode="dark"] {
+  --ink: #f08fb0;
+  --ink-soft: rgba(240, 143, 176, 0.14);
+  --ink-soft-hover: rgba(240, 143, 176, 0.22);
+  --ink-strong: #f7b8cd;
+  --ink-foreground: #15161a;
+}

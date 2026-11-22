@@ -3,9 +3,11 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { type ComponentType, createContext, useContext, useSyncExternalStore } from "react";
 import type { Route } from "./state.ts";
+import type { ColorTheme } from "./theme/themes.ts";
 
 // The frontend contribution registry (decision 13): commands, sidebar
-// sections, tree decorations, note panels and inbox suggestions. The
+// sections, tree decorations, note panels, inbox suggestions and colour
+// themes. The
 // built-in features register through it exactly as UI plugins will, so
 // the API is dogfooded before anyone else depends on it.
 
@@ -86,6 +88,8 @@ interface Kinds {
   treeDecorator: TreeDecorator;
   panel: Panel;
   inboxSuggester: InboxSuggester;
+  /** A colour theme for Settings › Appearance (theme/themes.ts). */
+  theme: ColorTheme;
 }
 export type ContributionKind = keyof Kinds;
 
@@ -96,6 +100,7 @@ export class Registry {
     treeDecorator: new Map(),
     panel: new Map(),
     inboxSuggester: new Map(),
+    theme: new Map(),
   };
   private snapshots = new Map<ContributionKind, unknown[]>();
   private listeners = new Set<() => void>();

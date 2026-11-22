@@ -8,8 +8,8 @@ import { Shell } from "./components/Shell.tsx";
 import { ClientContext } from "./context.ts";
 import { isMac } from "./lib/shortcuts.ts";
 import { useChangeSubscription } from "./queries.ts";
-import { createRegistry, type Registry, RegistryContext } from "./registry.ts";
-import { useTheme, useThemeChrome } from "./theme/useTheme.ts";
+import { createRegistry, type Registry, RegistryContext, useContributions } from "./registry.ts";
+import { useTheme, useThemeChrome, useThemeTokens } from "./theme/useTheme.ts";
 
 // Apple platforms get their system font; others Inter (see styles.css).
 if (typeof document !== "undefined")
@@ -32,6 +32,7 @@ function Changes({ client }: { client: NotesClient }) {
 /** Toasts in the mode in effect, and the chrome around the page with it. */
 function Themed() {
   const theme = useTheme();
+  useThemeTokens(theme, useContributions("theme"));
   useThemeChrome(theme);
   return <Toaster theme={theme.resolved} />;
 }

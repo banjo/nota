@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { type ThemeState, themeStore } from "./store.ts";
+import type { ColorTheme } from "./themes.ts";
 
 /** The appearance in effect, live. */
 export function useTheme(): ThemeState {
@@ -25,4 +26,22 @@ export function useThemeChrome(theme: ThemeState) {
       m.setAttribute("content", bg);
     }
   }, [theme.mode, theme.palette, theme.resolved]);
+}
+
+/**
+ * Sets a contributed theme's tokens on <html> while it is chosen (built-in
+ * themes have theirs in palettes.css), and takes them off again.
+ */
+export function useThemeTokens(theme: ThemeState, themes: ColorTheme[]) {
+  const chosen = themes.find((t) => t.id === theme.palette);
+  const tokens = chosen?.tokens?.[theme.resolved];
+  useEffect(() => {
+    if (!tokens) return;
+    const style = document.documentElement.style;
+    const names = Object.keys(tokens).filter((k) => k.startsWith("--"));
+    for (const k of names) style.setProperty(k, tokens[k]!);
+    return () => {
+      for (const k of names) style.removeProperty(k);
+    };
+  }, [tokens]);
 }
