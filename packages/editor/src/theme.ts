@@ -5,6 +5,8 @@ import { EditorView } from "@codemirror/view";
 
 const v = (name: string, fallback: string) => `var(--${name}, ${fallback})`;
 const mono = 'ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace';
+const check =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E\")";
 
 export const notaTheme = EditorView.theme({
   "&": {
@@ -133,14 +135,26 @@ export const notaTheme = EditorView.theme({
     textIndent: "0",
     transition: "background-color 120ms ease-out, border-color 120ms ease-out",
   },
+  // The check is a mask painted in --ink-foreground, so it stays visible
+  // on every theme's ink (near-white in Graphite dark).
   '.cm-task-checkbox[data-checked="true"]': {
+    position: "relative",
     backgroundColor: v("ink", "#4256d6"),
     borderColor: v("ink", "#4256d6"),
-    backgroundImage:
-      "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E\")",
-    backgroundSize: "11px 11px",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
+  },
+  '.cm-task-checkbox[data-checked="true"]::after': {
+    content: '""',
+    position: "absolute",
+    inset: "0",
+    backgroundColor: v("ink-foreground", "#ffffff"),
+    maskImage: check,
+    maskSize: "11px 11px",
+    maskPosition: "center",
+    maskRepeat: "no-repeat",
+    WebkitMaskImage: check,
+    WebkitMaskSize: "11px 11px",
+    WebkitMaskPosition: "center",
+    WebkitMaskRepeat: "no-repeat",
   },
   ".cm-task-done": { color: v("faint", "#9ca0a8"), textDecoration: "line-through" },
 });

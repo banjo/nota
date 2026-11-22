@@ -84,7 +84,7 @@ function Appearance() {
                 className={cn(
                   "flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150",
                   on
-                    ? "bg-surface text-foreground shadow-card"
+                    ? "bg-surface text-foreground shadow-card dark:bg-foreground/12"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
