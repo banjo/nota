@@ -65,6 +65,17 @@ view), `create_note` (inbox by default), `append_to_note`, `update_note`
 errors. Each note is also a resource at `nota://note/<path>` (percent-encode
 non-ASCII names, e.g. `nota://note/M%C3%B6ten/Plan.md`).
 
+The sync server offers the same tools over HTTP at `/mcp` (Streamable
+HTTP, stateless), on the server's copy of a synced vault. Authenticate
+with a device token; pick the vault with `?vault=name` or the
+`Nota-Vault` header (default: your first vault). Writes become versions
+of that token's device and sync to every machine:
+
+```sh
+claude mcp add --transport http nota https://nota.app.banjoanton.com/mcp \
+  --header "Authorization: Bearer $NOTA_TOKEN"
+```
+
 ## Hooks
 
 Scripts in `.nota/hooks.toml` run when notes change, like git hooks. They
@@ -149,6 +160,10 @@ With an account (see [docs/api.md](docs/api.md)) a device signs in
 without an admin: `nota login [url]` shows a code to approve in the web
 app, `nota remote add <url>` then needs no `--token`, `nota devices`
 lists the signed-in devices and `nota logout` revokes this one.
+
+The server keeps every version: `nota history <note>` lists them (through
+renames, `--version N` prints one) and `nota restore <note> <version>`
+makes an old one the newest version and syncs it here.
 
 The server keeps a working copy of each vault with an index in
 `<data>/vaults/` (rebuilt from the version log when missing; `nota serve

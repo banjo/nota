@@ -415,7 +415,7 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	cfg.Logger = log
+	cfg.Logger, cfg.Version = log, Version
 	srv, err := server.New(ctx, cfg)
 	if err != nil {
 		return err

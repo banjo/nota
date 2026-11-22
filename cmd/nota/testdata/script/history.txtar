@@ -1,0 +1,59 @@
+# nota history lists a note's versions on the sync server; nota restore
+# brings an old one back as a new version and syncs it here.
+[windows] skip 'stops the server with SIGINT'
+env NOTA_NOW=2026-11-22T10:42:00+01:00
+exec nota serve --addr 127.0.0.1:0 --data data --addr-file addr &srv&
+waitaddr addr SERVER
+nota serve --data data user add anton@example.com
+nota serve --data data token create anton@example.com --device laptop
+envstdout TOK
+
+exitcode 3 nota history Plan
+stderr 'no sync remote'
+nota remote add $SERVER --token $TOK --device laptop
+nota sync
+cp plan-v2.md vault/Plan.md
+nota sync
+nota mv Plan Projekt
+nota sync
+
+nota history Plan
+stdout '^VERSION +MODIFIED +DEVICE +SIZE +CHANGE$'
+stdout '^4 +2026-11-22T09:42:00Z +laptop +20 +moved from Plan.md$'
+! stdout '^3 '
+stdout '^2 +\S+ +laptop +20 +as Plan.md$'
+stdout '^1 +\S+ +laptop +14 +as Plan.md$'
+nota history --json Projekt/Plan.md
+stdout '"path": "Projekt/Plan.md"'
+nota history Plan --version 1
+cmp stdout plan-v1.md
+
+nota restore Plan 1
+stdout '^restored Projekt/Plan.md to version 1 \(now version 5\)$'
+stdout '^  pulled    Projekt/Plan.md$'
+cmp vault/Projekt/Plan.md plan-v1.md
+nota history Plan
+stdout '^5 +\S+ +laptop +14 *$'
+
+exitcode 3 nota restore Plan 99
+stderr 'has no version 99'
+exitcode 2 nota restore Plan x
+exitcode 3 nota history Gone.md
+stderr 'Gone.md has no history'
+
+kill -INT srv
+wait srv
+
+-- vault/Plan.md --
+# Plan
+
+- one
+-- plan-v1.md --
+# Plan
+
+- one
+-- plan-v2.md --
+# Plan
+
+- one
+- two

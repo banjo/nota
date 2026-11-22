@@ -28,7 +28,7 @@ const URIPrefix = "nota://note/"
 // Service runs the MCP tools against one vault and its index. It is safe
 // for concurrent use; calls are serialized.
 type Service struct {
-	mu sync.Mutex
+	mu sync.Locker
 	v  *vault.Vault
 	ix *index.Index
 }
@@ -37,7 +37,14 @@ type Service struct {
 // brings it up to date with the files before every call, so edits made
 // outside (an editor, sync, the CLI) are seen.
 func NewService(v *vault.Vault, ix *index.Index) *Service {
-	return &Service{v: v, ix: ix}
+	return &Service{mu: &sync.Mutex{}, v: v, ix: ix}
+}
+
+// NewServiceLocked is NewService with calls serialized by mu, a lock the
+// caller shares with other writers of the vault (the sync server holds
+// it for every change to a vault's working copy).
+func NewServiceLocked(v *vault.Vault, ix *index.Index, mu sync.Locker) *Service {
+	return &Service{mu: mu, v: v, ix: ix}
 }
 
 // Errors the tools return. They reach the client as tool errors.

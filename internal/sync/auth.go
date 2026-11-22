@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -148,4 +149,25 @@ func lookupToken(account, store string) string {
 		return ""
 	}
 	return t
+}
+
+// HistoryVersion fetches one version of a path from its history with its
+// content (nil for a delete). Unlike GetVersion it follows renames.
+func (c *Client) HistoryVersion(ctx context.Context, p string, version int64) (protocol.Entry, *string, error) {
+	var out struct {
+		protocol.Entry
+		Content *string `json:"content"`
+	}
+	err := c.json(ctx, "GET", "/v1/api/vaults/"+url.PathEscape(c.Vault)+"/history/"+protocol.EscapePath(p)+
+		"?version="+strconv.FormatInt(version, 10), nil, nil, &out)
+	return out.Entry, out.Content, err
+}
+
+// Restore makes an old version of a path its newest version on the
+// server (history is kept) and returns the new entry.
+func (c *Client) Restore(ctx context.Context, p string, version int64) (protocol.Entry, error) {
+	body, _ := json.Marshal(map[string]int64{"version": version})
+	var out protocol.Entry
+	err := c.json(ctx, "POST", "/v1/api/vaults/"+url.PathEscape(c.Vault)+"/history/"+protocol.EscapePath(p)+"/restore", nil, body, &out)
+	return out, err
 }

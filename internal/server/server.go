@@ -86,6 +86,8 @@ type Config struct {
 	// hooks are shell commands from the synced vault, run by the server
 	// process with its permissions.
 	Hooks bool
+	// Version is the server's build version (shown to MCP clients).
+	Version string
 	// Now is the clock (time.Now if nil); tests move it.
 	Now func() time.Time
 }
@@ -224,6 +226,7 @@ func (s *Server) routes() {
 	s.authRoutes()
 	s.flowRoutes()
 	s.apiRoutes()
+	s.mcpRoutes()
 	s.mux.Handle("/v1/", s.v1(func(http.ResponseWriter, *http.Request, Principal) error {
 		return &apiErr{http.StatusNotFound, protocol.Error{Code: protocol.CodeNotFound, Message: "no such route"}}
 	}))
