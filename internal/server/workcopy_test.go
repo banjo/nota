@@ -285,3 +285,34 @@ func TestHealthAndReady(t *testing.T) {
 		t.Fatalf("readyz on a read-only data dir: %d", res.StatusCode)
 	}
 }
+
+func TestDeletedVaultIDReuse(t *testing.T) {
+	e := newEnv(t, Config{})
+	tok := e.user("anton@example.com")
+	uid := e.userID("anton@example.com")
+	e.put(tok, "old.md", 0, "old\n")
+	old := e.ws("main", uid)
+	if err := e.srv.Store().DeleteVault(context.Background(), uid, "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.srv.Store().DeleteVault(context.Background(), uid, "main"); err == nil {
+		t.Fatal("deleted twice")
+	}
+	if res, body := e.do(tok, "POST", protocol.VaultsPath(), nil, `{"name":"main"}`); res.StatusCode != 201 {
+		t.Fatalf("recreate: %d %s", res.StatusCode, body)
+	}
+	e.put(tok, "new.md", 0, "new\n")
+	ws := e.ws("main", uid)
+	if ws == old {
+		t.Fatal("stale working copy reused")
+	}
+	if _, ok := readWork(t, ws, "old.md"); ok {
+		t.Fatal("the deleted vault's file is in the new one")
+	}
+	if _, ok := readWork(t, ws, "new.md"); !ok {
+		t.Fatal("new file missing")
+	}
+	if c := e.changes(tok, 0, 10); len(c.Entries) != 1 || c.Entries[0].Path != "new.md" {
+		t.Fatalf("changes: %+v", c.Entries)
+	}
+}

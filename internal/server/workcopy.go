@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/hooks"
@@ -64,13 +65,14 @@ func workPath(p string) bool {
 
 // workspace is the working copy of one vault.
 type workspace struct {
-	mu     sync.Mutex // held for every change and every index read
-	srv    *Server
-	userID int64
-	id     int64
-	name   string
-	dir    string
-	log    *slog.Logger
+	mu      sync.Mutex // held for every change and every index read
+	srv     *Server
+	userID  int64
+	id      int64
+	name    string
+	created time.Time
+	dir     string
+	log     *slog.Logger
 
 	bus    *events.Bus
 	client *nvault.Vault // materializes client changes (origin "client")
@@ -90,7 +92,14 @@ func (s *Server) workspace(ctx context.Context, userID int64, name string) (*wor
 	s.wsMu.Lock()
 	defer s.wsMu.Unlock()
 	if ws := s.workspaces[v.ID]; ws != nil {
-		return ws, nil
+		if ws.userID == v.UserID && ws.name == v.Name && ws.created.Equal(v.CreatedAt) {
+			return ws, nil
+		}
+		// The vault was deleted (by the admin, from another process) and
+		// its id reused: drop the stale copy; reconcile cleans the disk.
+		ws.close()
+		_ = os.Remove(filepath.Join(ws.dir, filepath.FromSlash(stateFile)))
+		delete(s.workspaces, v.ID)
 	}
 	ws, err := s.openWorkspace(ctx, v)
 	if err != nil {
@@ -105,7 +114,7 @@ func (s *Server) openWorkspace(ctx context.Context, v vault) (*workspace, error)
 	if err := os.MkdirAll(filepath.Join(dir, nvault.MetaDirName), 0o700); err != nil {
 		return nil, err
 	}
-	ws := &workspace{srv: s, userID: v.UserID, id: v.ID, name: v.Name, dir: dir, bus: events.New(),
+	ws := &workspace{srv: s, userID: v.UserID, id: v.ID, name: v.Name, created: v.CreatedAt, dir: dir, bus: events.New(),
 		log: s.log.With("vault", v.Name, "vault_id", v.ID, "user_id", v.UserID)}
 	cv, err := nvault.Open(dir, nvault.Options{Bus: ws.bus, Now: s.cfg.Now})
 	if err != nil {

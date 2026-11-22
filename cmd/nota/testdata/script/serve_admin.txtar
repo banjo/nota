@@ -46,3 +46,12 @@ stdout '^1 .*revoked '
 stdout '^2 .*active$'
 exitcode 3 nota serve token revoke 99
 exists data/nota.db
+
+# Vaults: list and delete (with --yes).
+nota serve vault list anton@example.com
+! stdout .
+exitcode 2 nota serve vault rm anton@example.com main
+stderr 'pass --yes'
+exitcode 3 nota serve vault rm anton@example.com main --yes
+stderr 'vault main: not found'
+exitcode 3 nota serve vault list nobody@example.com

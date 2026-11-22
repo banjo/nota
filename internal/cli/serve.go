@@ -139,7 +139,7 @@ or SIGTERM.`,
 	fl.StringVar(&f.maxSize, "max-file-size", "", "largest file accepted, e.g. 100MB (default $NOTA_SERVER_MAX_FILE_SIZE or 100MiB)")
 	fl.StringVar(&f.logFormat, "log-format", "", "log format: text or json (default $NOTA_SERVER_LOG_FORMAT or text)")
 	fl.StringVar(&f.addrFile, "addr-file", "", "write the bound address to this file once listening (for scripts)")
-	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f), a.serveRebuildCmd(f))
+	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f), a.serveRebuildCmd(f), a.serveVaultCmd(f))
 	return cmd
 }
 
@@ -343,6 +343,74 @@ Stop the server first.`,
 			return nil
 		},
 	}
+}
+
+func (a *app) serveVaultCmd(f *serveFlags) *cobra.Command {
+	cmd := &cobra.Command{Use: "vault", Short: "List or delete users' vaults"}
+	list := &cobra.Command{
+		Use:   "list <email>",
+		Short: "List a user's vaults",
+		Args:  exactArgs(1, "an email address"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				u, err := st.UserByEmail(ctx, args[0])
+				if err != nil {
+					return serverErr(err)
+				}
+				vs, err := st.Vaults(ctx, u.ID)
+				if err != nil {
+					return err
+				}
+				if a.json {
+					return a.printJSON(vs)
+				}
+				for _, v := range vs {
+					fmt.Fprintf(a.stdout, "%s\tcursor %d\t%s\n", v.Name, v.Cursor, v.CreatedAt.Format(time.RFC3339))
+				}
+				return nil
+			})
+		},
+	}
+	var yes bool
+	rm := &cobra.Command{
+		Use:   "rm <email> <vault> --yes",
+		Short: "Delete a vault with its whole history from the server",
+		Long: `Delete a user's vault from the server: its files, every version and
+its working copy. Devices keep their local files; their next sync fails
+until they connect to another vault. This cannot be undone.`,
+		Args: exactArgs(2, "an email address and a vault name"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if !yes {
+				return usageErr("this deletes the vault and its history; pass --yes")
+			}
+			dir, err := f.dataDir()
+			if err != nil {
+				return err
+			}
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				u, err := st.UserByEmail(ctx, args[0])
+				if err != nil {
+					return serverErr(err)
+				}
+				id, err := st.VaultID(ctx, u.ID, args[1])
+				if err != nil {
+					return serverErr(err)
+				}
+				if err := st.DeleteVault(ctx, u.ID, args[1]); err != nil {
+					return serverErr(err)
+				}
+				_ = os.RemoveAll(filepath.Join(dir, "vaults", strconv.FormatInt(id, 10)))
+				if a.json {
+					return a.printJSON(map[string]any{"deleted": args[1], "user": u.Email})
+				}
+				fmt.Fprintf(a.stdout, "deleted vault %s of %s\n", args[1], u.Email)
+				return nil
+			})
+		},
+	}
+	rm.Flags().BoolVar(&yes, "yes", false, "really delete")
+	cmd.AddCommand(list, rm)
+	return cmd
 }
 
 func dash(s string) string {

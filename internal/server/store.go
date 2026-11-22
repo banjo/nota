@@ -305,6 +305,26 @@ func (s *Store) CreateVault(ctx context.Context, userID int64, name string) (pro
 	return protocol.VaultInfo{Name: name, CreatedAt: now}, nil
 }
 
+// DeleteVault deletes a user's vault with its whole history. The blobs
+// stay in the blob store. Admin only (nota serve vault rm).
+func (s *Store) DeleteVault(ctx context.Context, userID int64, name string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM vaults WHERE user_id = ? AND name = ?`, userID, name)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("vault %s: %w", name, ErrNotFound)
+	}
+	return nil
+}
+
+// VaultID returns the id of a user's vault (its working copy is
+// <data>/vaults/<id>).
+func (s *Store) VaultID(ctx context.Context, userID int64, name string) (int64, error) {
+	v, err := vaultOf(ctx, s.db, userID, name)
+	return v.ID, err
+}
+
 type querier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
