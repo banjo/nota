@@ -1,4 +1,0 @@
-# One Cloudflare Pages deploy: the landing page at /, the web app at
-# /app/. Cloudflare serves real files first; everything else under /app
-# is the SPA (history fallback).
-/app/*    /app/index.html   200

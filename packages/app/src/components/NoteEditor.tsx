@@ -45,6 +45,10 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
   const parts = useRef<TitleParts>(splitTitle(note.body));
   const saved = useRef(note.body); // the body as last written or loaded
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // One write at a time: two saves started from the same base would make
+  // the second a version conflict with our own first write.
+  const inFlight = useRef(false);
+  const queued = useRef(false);
   const inConflict = useRef(false);
   const path = note.path;
   const loadedTitle = useRef(splitTitle(note.body).title);
@@ -54,9 +58,14 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
   async function save(force?: Base) {
     clearTimeout(timer.current);
     timer.current = undefined;
+    if (inFlight.current) {
+      queued.current = true;
+      return;
+    }
     const text = body();
     if (text === saved.current && !force) return;
     if (inConflict.current && !force) return;
+    inFlight.current = true;
     try {
       const r = await client.save(path, text, force ?? noteBase(path));
       if (r.conflict) {
@@ -69,6 +78,12 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
       void qc.invalidateQueries({ queryKey: keys.tree });
     } catch (e) {
       fail("Couldn't save the note; your text is kept on this device", e);
+    } finally {
+      inFlight.current = false;
+      if (queued.current) {
+        queued.current = false;
+        void save();
+      }
     }
   }
 
@@ -243,7 +258,12 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
             view.current?.dispatch({ selection: { anchor: 0 } });
           }
         }}
-        onBlur={() => void save().then(renameToTitle)}
+        onBlur={(e) => {
+          // Moving into the body is still the same note: renaming here
+          // would remount the editor and drop the first keystrokes.
+          if (e.currentTarget.closest("article")?.contains(e.relatedTarget as Node | null)) return;
+          void save().then(renameToTitle);
+        }}
         className="mb-[18px] block w-full resize-none overflow-hidden bg-transparent text-[34px] leading-[1.15] font-bold tracking-[-0.02em] text-foreground outline-none placeholder:text-faint pointer-coarse:text-[30px]"
       />
       {between}

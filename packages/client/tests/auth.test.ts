@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
-import { createHttpAuth, fromBase64Url, toBase64Url } from "../src/index.ts";
+import {
+  createHttpAuth,
+  creationOptionsFromJSON,
+  fromBase64Url,
+  requestOptionsFromJSON,
+  toBase64Url,
+} from "../src/index.ts";
 import type { NotaError } from "../src/index.ts";
 
 const BASE = "https://nota.app.banjoanton.com";
@@ -56,6 +62,19 @@ function fakeAuthenticator() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("webauthn options", () => {
+  test("accepts the {publicKey} wrapper the server sends", () => {
+    const inner = creationOptionsFromJSON({ publicKey: options });
+    expect(new Uint8Array(inner.challenge as ArrayBuffer)).toEqual(new Uint8Array([1, 2, 3]));
+    expect(inner.rp.id).toBe("nota.banjoanton.com");
+    const request = requestOptionsFromJSON({
+      publicKey: { challenge: options.challenge, rpId: "nota.banjoanton.com", allowCredentials: [] },
+    });
+    expect(new Uint8Array(request.challenge as ArrayBuffer)).toEqual(new Uint8Array([1, 2, 3]));
+    expect(request.rpId).toBe("nota.banjoanton.com");
+  });
 });
 
 describe("base64url", () => {
@@ -139,7 +158,8 @@ describe("createHttpAuth", () => {
       name: "MacBook Air",
     });
     expect(out.recoveryCodes).toEqual(["aaaa-bbbb", "cccc-dddd"]);
-    expect(events).toEqual([1]);
+    // The recovery codes are shown once: the gate must not move on yet.
+    expect(events).toEqual([]);
     expect(f.call(0).body).toEqual({ email: "a@b.c", invite: "INV-1" });
     expect(f.call(1).body).toEqual({
       ceremony: "c1",

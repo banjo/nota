@@ -62,9 +62,15 @@ function descriptor(d: CredentialDescriptorJSON): PublicKeyCredentialDescriptor 
   };
 }
 
+/** The inner publicKey of `{publicKey: …}`, as the server sends either form. */
+function publicKey(json: unknown): unknown {
+  const o = json as { publicKey?: unknown } | null;
+  return o && typeof o === "object" && "publicKey" in o && o.publicKey ? o.publicKey : json;
+}
+
 /** The server's creation options as PublicKeyCredentialCreationOptions. */
 export function creationOptionsFromJSON(json: unknown): PublicKeyCredentialCreationOptions {
-  const o = json as CreationOptionsJSON;
+  const o = publicKey(json) as CreationOptionsJSON;
   return {
     challenge: buffer(o.challenge),
     rp: o.rp,
@@ -86,7 +92,7 @@ export function creationOptionsFromJSON(json: unknown): PublicKeyCredentialCreat
 
 /** The server's request options as PublicKeyCredentialRequestOptions. */
 export function requestOptionsFromJSON(json: unknown): PublicKeyCredentialRequestOptions {
-  const o = json as RequestOptionsJSON;
+  const o = publicKey(json) as RequestOptionsJSON;
   return {
     challenge: buffer(o.challenge),
     ...(o.rpId ? { rpId: o.rpId } : {}),

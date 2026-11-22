@@ -143,7 +143,9 @@ export function createHttpAuth(options: HttpAuthOptions): HttpAuth {
         credential,
         name: input.name,
       });
-      this.invalidate();
+      // No invalidate() here: the gate must stay on the recovery-codes
+      // screen, which is the only time the codes exist. The UI moves on
+      // itself once they are saved.
       return {
         user: { id: out.user.id, email: out.user.email, createdAt: out.user.created_at },
         recoveryCodes: out.recovery_codes,
