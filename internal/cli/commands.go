@@ -111,7 +111,7 @@ the vault root.`,
 			if !cmd.Flags().Changed("folder") {
 				folder = a.vault.Inbox()
 			}
-			content, err := newNoteContent(text, tags, time.Now())
+			content, err := newNoteContent(text, tags, a.vault.Now())
 			if err != nil {
 				return err
 			}
@@ -409,8 +409,9 @@ func (a *app) mvCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mv <note> <folder>",
 		Short: "Move a note to another folder",
-		Long:  `Move a note into a folder, keeping its file name. Use / for the vault root.`,
-		Args:  exactArgs(2, "a note and a folder"),
+		Long: `Move a note into a folder, keeping its file name. Use / for the vault root.
+The file's content is not touched, so its "updated" timestamp stays.`,
+		Args: exactArgs(2, "a note and a folder"),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, prefix string) ([]string, cobra.ShellCompDirective) {
 			return a.completeNotes(cmd, args, prefix)
 		},
@@ -461,8 +462,14 @@ func (a *app) tagCmd() *cobra.Command {
 		Use:   "tag <note> [+tag|-tag|tag]...",
 		Short: "Add or remove tags in a note's frontmatter",
 		Long: `Edit the "tags" list in a note's frontmatter: +foo or foo adds,
--foo removes (case-insensitive). Only the tags line changes; the rest of
-the file stays byte for byte. Without changes it prints the note's tags.
+-foo removes (case-insensitive). Only the tags line (and "updated", when
+the note has frontmatter) changes; the rest of the file stays byte for
+byte. Without changes it prints the note's tags.
+
+-foo only edits the frontmatter: inline #foo tags in the body are left
+alone, so the note may still show up under #foo. Edit the body to drop
+those.
+
 Flags must come before the note: nota tag --json Plan +a -b.`,
 		Args:              minArgs(1, "a note"),
 		ValidArgsFunction: a.completeNotes,
@@ -512,7 +519,7 @@ Flags must come before the note: nota tag --json Plan +a -b.`,
 				} else if src, err = frontmatter.Set(src, "tags", after); err != nil {
 					return err
 				}
-				if _, _, err := a.vault.Write(p, src); err != nil {
+				if _, _, err := a.vault.Save(p, src); err != nil {
 					return err
 				}
 			}
@@ -631,7 +638,8 @@ func (a *app) setCmd() *cobra.Command {
 		Short: "Set frontmatter properties",
 		Long: `Set frontmatter properties. Values are YAML: numbers, true/false,
 [lists] and {maps} are typed, anything else is a string. Only the edited
-keys' lines change; everything else in the file stays byte for byte.
+keys' lines change, plus "updated" (set to now) when the note already had
+frontmatter; everything else in the file stays byte for byte.
 --unset removes a key.`,
 		Example: `  nota set Plan status=done priority=2
   nota set Plan "aliases=[plan, planen]" --unset draft`,
@@ -678,7 +686,7 @@ keys' lines change; everything else in the file stays byte for byte.
 				src = frontmatter.Delete(src, k)
 			}
 			if !bytes.Equal(src, n.Raw) {
-				if _, _, err := a.vault.Write(p, src); err != nil {
+				if _, _, err := a.vault.Save(p, src); err != nil {
 					return err
 				}
 			}

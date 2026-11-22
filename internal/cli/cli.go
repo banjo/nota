@@ -190,8 +190,12 @@ func (a *app) openVault(create bool) error {
 				Message: fmt.Sprintf("no vault at %s (from %s); set --vault or $NOTA_VAULT, or create it with `nota add`", loc.Dir, loc.Source)}
 		}
 	}
+	now, err := clock()
+	if err != nil {
+		return err
+	}
 	a.bus = events.New()
-	v, err := vault.Open(loc.Dir, vault.Options{Inbox: loc.Config.Inbox, Create: create, Bus: a.bus})
+	v, err := vault.Open(loc.Dir, vault.Options{Inbox: loc.Config.Inbox, Create: create, Bus: a.bus, Now: now})
 	if err != nil {
 		return err
 	}
@@ -200,6 +204,23 @@ func (a *app) openVault(create bool) error {
 	a.bus.Subscribe(a.onEvent)
 	a.log.Debug("vault", "dir", loc.Dir, "source", loc.Source, "inbox", v.Inbox())
 	return nil
+}
+
+// EnvNow fixes the clock for timestamps written into notes (RFC 3339).
+// It exists for tests and reproducible scripts.
+const EnvNow = "NOTA_NOW"
+
+// clock returns the time source: $NOTA_NOW when set, else the real clock.
+func clock() (func() time.Time, error) {
+	s := os.Getenv(EnvNow)
+	if s == "" {
+		return time.Now, nil
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil, usageErr("$%s: %v", EnvNow, err)
+	}
+	return func() time.Time { return t }, nil
 }
 
 // index opens the vault's index and brings it up to date with the files.

@@ -11,6 +11,7 @@
 package vault
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -36,6 +37,8 @@ type Options struct {
 	Create bool
 	// Bus receives the vault's events. Nil drops them.
 	Bus *events.Bus
+	// Now is the clock for timestamps written into notes; time.Now when nil.
+	Now func() time.Time
 }
 
 // Vault is an open vault.
@@ -45,6 +48,7 @@ type Vault struct {
 	inbox  string
 	ignore *Ignore
 	bus    *events.Bus
+	now    func() time.Time
 }
 
 // Open opens the vault in the OS directory dir and loads its .notaignore.
@@ -83,7 +87,11 @@ func open(fsys FS, root string, opts Options) (*Vault, error) {
 	if err != nil {
 		return nil, fmt.Errorf("vault: inbox: %w", err)
 	}
-	v := &Vault{fs: fsys, root: root, inbox: inbox, bus: opts.Bus}
+	now := opts.Now
+	if now == nil {
+		now = time.Now
+	}
+	v := &Vault{fs: fsys, root: root, inbox: inbox, bus: opts.Bus, now: now}
 	if err := v.ReloadIgnore(); err != nil {
 		return nil, err
 	}
@@ -99,6 +107,9 @@ func (v *Vault) FS() FS { return v.fs }
 
 // Inbox returns the vault-relative inbox folder.
 func (v *Vault) Inbox() string { return v.inbox }
+
+// Now returns the current time from the vault's clock.
+func (v *Vault) Now() time.Time { return v.now() }
 
 // Bus returns the event bus the vault emits on (possibly nil).
 func (v *Vault) Bus() *events.Bus { return v.bus }
@@ -363,6 +374,55 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 	}
 	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
 	return rel, true, nil
+}
+
+// UpdatedKey is the frontmatter key Save keeps current.
+const UpdatedKey = "updated"
+
+// Save is Write for edits made through Nota (the CLI, the app, MCP,
+// hooks): when the note on disk already has frontmatter and the new
+// content keeps it, `updated` is set to the current local time (RFC 3339).
+// Notes without frontmatter are not given one just for the timestamp.
+// Saving the content the note already has writes nothing and emits no
+// event. A note that does not exist yet is written as is.
+func (v *Vault) Save(rel string, data []byte) (string, bool, error) {
+	rel, err := NotePath(rel)
+	if err != nil {
+		return "", false, err
+	}
+	old, err := v.Read(rel)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return v.Write(rel, data)
+	case err != nil:
+		return "", false, err
+	}
+	if bytes.Equal(old.Raw, data) {
+		return old.Path, false, nil
+	}
+	data = Stamp(old.Raw, data, v.now())
+	return v.Write(old.Path, data)
+}
+
+// Stamp returns data with `updated` set to now, when both the old and the
+// new content have a frontmatter block that parses. Otherwise data is
+// returned unchanged. Only the `updated` line changes.
+func Stamp(old, data []byte, now time.Time) []byte {
+	if !frontmatter.Split(old).Has() {
+		return data
+	}
+	doc := frontmatter.Split(data)
+	if !doc.Has() {
+		return data
+	}
+	if _, err := doc.Properties(); err != nil {
+		return data
+	}
+	out, err := frontmatter.Set(data, UpdatedKey, now.Format(time.RFC3339))
+	if err != nil {
+		return data
+	}
+	return out
 }
 
 // Create writes a new note into folder ("" for the vault root). The file

@@ -1,5 +1,7 @@
-# nota set and nota tag change only the edited keys' lines; comments,
-# quoting, key order, blank lines and the body stay byte for byte.
+# nota set and nota tag change only the edited keys' lines (plus
+# "updated"); comments, quoting, key order, blank lines and the body stay
+# byte for byte.
+env NOTA_NOW=2026-11-22T10:42:00+01:00
 nota set Plan status=done
 stdout '^Plan.md$'
 cmp vault/Plan.md want/1-status.md
@@ -82,6 +84,7 @@ nested:
   b: [x, y]
 
 custom: "keep  me"
+updated: "2026-11-22T10:42:00+01:00"
 ---
 # Plan
 
@@ -98,6 +101,7 @@ nested:
   b: [x, y]
 
 custom: "keep  me"
+updated: "2026-11-22T10:42:00+01:00"
 ---
 # Plan
 
@@ -113,6 +117,7 @@ nested:
   a: 1
   b: [x, y]
 
+updated: "2026-11-22T10:42:00+01:00"
 priority: 2
 aliases: [p, q]
 note: hello world
@@ -130,6 +135,7 @@ nested:
   a: 1
   b: [x, y]
 
+updated: "2026-11-22T10:42:00+01:00"
 priority: 2
 aliases: [p, q]
 note: hello world

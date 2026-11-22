@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/banjo/nota/internal/events"
 )
@@ -99,4 +100,51 @@ func TestVaultOnMemFS(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatalf("events %q, want %q", got, want)
 	}
+}
+
+func TestSaveStampsUpdated(t *testing.T) {
+	now := time.Date(2026, 11, 22, 10, 42, 0, 0, time.FixedZone("CET", 3600))
+	m := NewMemFS(map[string]string{
+		"Fm.md":    "---\ncreated: 2026-01-01\n---\nBody\n",
+		"Plain.md": "Body\n",
+		"Bad.md":   "---\ntags: [x\n---\nBody\n",
+	})
+	bus := events.New()
+	var saved int
+	bus.Subscribe(func(events.Event) { saved++ }, events.NoteSaved)
+	v, err := OpenFS(m, "mem", Options{Bus: bus, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(name, want string) {
+		t.Helper()
+		b, _ := m.ReadFile(name)
+		if string(b) != want {
+			t.Fatalf("%s =\n%s\nwant\n%s", name, b, want)
+		}
+	}
+	if _, _, err := v.Save("Fm", []byte("---\ncreated: 2026-01-01\n---\nNew body\n")); err != nil {
+		t.Fatal(err)
+	}
+	check("Fm.md", "---\ncreated: 2026-01-01\nupdated: \"2026-11-22T10:42:00+01:00\"\n---\nNew body\n")
+	// The same content again: no write, no event.
+	b, _ := m.ReadFile("Fm.md")
+	if _, _, err := v.Save("Fm", b); err != nil || saved != 1 {
+		t.Fatalf("no-op save: saved=%d err=%v", saved, err)
+	}
+	// No frontmatter before: none is added for the timestamp.
+	if _, _, err := v.Save("Plain", []byte("Body 2\n")); err != nil {
+		t.Fatal(err)
+	}
+	check("Plain.md", "Body 2\n")
+	// Frontmatter that does not parse is not edited.
+	if _, _, err := v.Save("Bad", []byte("---\ntags: [x\n---\nBody 2\n")); err != nil {
+		t.Fatal(err)
+	}
+	check("Bad.md", "---\ntags: [x\n---\nBody 2\n")
+	// A new note is written as given.
+	if _, created, err := v.Save("New", []byte("---\na: 1\n---\n")); err != nil || !created {
+		t.Fatalf("new: %v %v", created, err)
+	}
+	check("New.md", "---\na: 1\n---\n")
 }

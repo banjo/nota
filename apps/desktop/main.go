@@ -86,7 +86,9 @@ func (s *Vault) List() ([]Note, error) {
 	return out, nil
 }
 
-// Save writes a note's body back, keeping its frontmatter byte for byte.
+// Save writes a note's body back, keeping its frontmatter byte for byte
+// apart from "updated", which the vault sets to now when the note has
+// frontmatter.
 func (s *Vault) Save(path, body string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -95,7 +97,7 @@ func (s *Vault) Save(path, body string) error {
 		return err
 	}
 	head := n.Raw[:len(n.Raw)-len(n.Body)]
-	_, _, err = s.v.Write(n.Path, append(append([]byte{}, head...), body...))
+	_, _, err = s.v.Save(n.Path, append(append([]byte{}, head...), body...))
 	return err
 }
 
