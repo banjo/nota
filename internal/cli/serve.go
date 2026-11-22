@@ -648,8 +648,65 @@ func (a *app) serveUserCmd(f *serveFlags) *cobra.Command {
 			})
 		},
 	}
-	cmd.AddCommand(add, list)
+	var yes bool
+	rm := &cobra.Command{
+		Use:   "rm <email> --yes",
+		Short: "Delete a user with everything the server keeps for it",
+		Long: `Delete a user and everything owned by it: device tokens, the web app's
+sessions, passkeys, recovery codes, invites bound to the address, every
+vault with its files, version log and working copy, and the blob files no
+other user references (the bytes are content addressed and shared).
+Devices keep their local notes; their tokens stop working. Without --yes
+it only prints what it would remove. This cannot be undone.`,
+		Args: exactArgs(1, "an email address"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			dir, err := f.dataDir()
+			if err != nil {
+				return err
+			}
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				rmv, err := st.PlanUserRemoval(ctx, args[0])
+				if err != nil {
+					return serverErr(err)
+				}
+				if !yes {
+					a.printRemoval(rmv, false)
+					return usageErr("this deletes the user and everything owned by it; pass --yes")
+				}
+				if rmv, err = st.DeleteUser(ctx, args[0]); err != nil {
+					return serverErr(err)
+				}
+				files, bytes, err := server.RemoveUserData(ctx, st, dir, rmv)
+				rmv.BlobsReclaimed, rmv.BytesReclaimed = files, bytes
+				a.printRemoval(rmv, true)
+				return err
+			})
+		},
+	}
+	rm.Flags().BoolVar(&yes, "yes", false, "really delete")
+	cmd.AddCommand(add, list, rm)
 	return cmd
+}
+
+// printRemoval shows what deleting a user removes (deleted=false: what it
+// would remove).
+func (a *app) printRemoval(rm server.UserRemoval, deleted bool) {
+	if a.json {
+		_ = a.printJSON(rm)
+		return
+	}
+	verb := "would delete"
+	if deleted {
+		verb = "deleted"
+	}
+	fmt.Fprintf(a.stdout, "%s user %s (created %s)\n", verb, rm.User.Email, rm.User.CreatedAt.Format(time.RFC3339))
+	for _, v := range rm.Vaults {
+		fmt.Fprintf(a.stdout, "  vault %s (id %d, cursor %d)\n", v.Name, v.ID, v.Cursor)
+	}
+	fmt.Fprintf(a.stdout, "  %d token(s), %d session(s), %d passkey(s), %d recovery code(s), %d invite(s)\n",
+		rm.Tokens, rm.Sessions, rm.Passkeys, rm.RecoveryCodes, rm.Invites)
+	fmt.Fprintf(a.stdout, "  %d blob(s), %d bytes referenced; %d blob file(s), %d bytes reclaimed from disk\n",
+		rm.Blobs, rm.BlobBytes, rm.BlobsReclaimed, rm.BytesReclaimed)
 }
 
 func (a *app) serveTokenCmd(f *serveFlags) *cobra.Command {
