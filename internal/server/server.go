@@ -196,6 +196,23 @@ func (s *Server) Close() error {
 	return s.store.Close()
 }
 
+// ready checks that the database answers and the data directory takes
+// writes.
+func (s *Server) ready(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var one int
+	if err := s.store.db.QueryRowContext(ctx, `SELECT 1`).Scan(&one); err != nil {
+		return fmt.Errorf("database: %w", err)
+	}
+	f, err := os.CreateTemp(s.cfg.DataDir, ".ready-*")
+	if err != nil {
+		return fmt.Errorf("data directory: %w", err)
+	}
+	f.Close()
+	return os.Remove(f.Name())
+}
+
 // Handle registers a handler on the server's mux, for routes added by
 // other packages (web API, auth, HTTP MCP). It gets the request logging
 // but no authentication: wrap it with RequireToken when needed.
@@ -209,9 +226,21 @@ func (s *Server) Handler() http.Handler { return s.logged(s.cors(s.mux)) }
 type handlerFunc func(w http.ResponseWriter, r *http.Request, p Principal) error
 
 func (s *Server) routes() {
+	// /healthz says the process serves HTTP (liveness); /readyz also
+	// checks the database and the data directory (readiness).
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("ok\n"))
+	})
+	s.mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		if err := s.ready(r.Context()); err != nil {
+			info(r).attrs = append(info(r).attrs, "err", err.Error())
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("not ready\n"))
+			return
+		}
+		_, _ = w.Write([]byte("ready\n"))
 	})
 	v1 := func(pattern string, h handlerFunc) { s.mux.Handle(pattern, s.v1(h)) }
 	v1("GET /v1/vaults", s.listVaults)

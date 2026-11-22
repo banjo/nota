@@ -264,3 +264,24 @@ func TestServerHooksOffByDefault(t *testing.T) {
 		t.Fatal("hook script ran")
 	}
 }
+
+func TestHealthAndReady(t *testing.T) {
+	e := newEnv(t, Config{})
+	for _, p := range []string{"/healthz", "/readyz"} {
+		res, body := e.do("", "GET", p, map[string]string{protocol.HeaderProtocol: ""}, "")
+		if res.StatusCode != 200 {
+			t.Fatalf("%s: %d %s", p, res.StatusCode, body)
+		}
+	}
+	// A data directory that takes no writes is not ready.
+	if err := os.Chmod(e.srv.cfg.DataDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(e.srv.cfg.DataDir, 0o700)
+	if os.Getuid() == 0 {
+		t.Skip("root can write anywhere")
+	}
+	if res, _ := e.do("", "GET", "/readyz", nil, ""); res.StatusCode != 503 {
+		t.Fatalf("readyz on a read-only data dir: %d", res.StatusCode)
+	}
+}
