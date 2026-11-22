@@ -8,12 +8,12 @@ The plan is in [issue #1](https://github.com/banjo/nota/issues/1).
 
 ## Four ways in
 
-| | |
-| --- | --- |
-| **The app** | The desktop app (mygo + React, a few megabytes) opens any folder of `.md` files. Tree, properties, backlinks, inbox triage, ⌘K palette, live-preview editor. Sign in only if you want sync. |
-| **The web** | [nota.banjoanton.com/app](https://nota.banjoanton.com/app) is the same UI over the HTTP client, against a vault on your own server. E-mail + passkey, no password. |
-| **The CLI** | Everything exists as a command before it exists as a button: `nota add`, `ls`, `search`, `set`, `tag`, `mv`, `inbox`, `sync`, `history`, `restore`. `--json` everywhere. |
-| **Your agents** | `nota mcp` speaks MCP over stdio, `nota serve` serves the same tools over HTTP at `/mcp`, so an agent can read and write the same vault you type in. |
+|                 |                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The app**     | The desktop app (mygo + React, a few megabytes) opens any folder of `.md` files. Tree, properties, backlinks, inbox triage, ⌘K palette, live-preview editor. Sign in only if you want sync. |
+| **The web**     | [nota.banjoanton.com/app](https://nota.banjoanton.com/app) is the same UI over the HTTP client, against a vault on your own server. E-mail + passkey, no password.                          |
+| **The CLI**     | Everything exists as a command before it exists as a button: `nota add`, `ls`, `search`, `set`, `tag`, `mv`, `inbox`, `sync`, `history`, `restore`. `--json` everywhere.                    |
+| **Your agents** | `nota mcp` speaks MCP over stdio, `nota serve` serves the same tools over HTTP at `/mcp`, so an agent can read and write the same vault you type in.                                        |
 
 ## Accounts and sync
 
@@ -243,12 +243,12 @@ go test ./cmd/nota   # CLI scripts in cmd/nota/testdata/script
 
 The desktop app (macOS/Linux, MyGo + React), from `scripts/demo-vault.sh`:
 
-| | |
-| --- | --- |
-| ![Main](docs/screenshots/main.png) | ![Inbox](docs/screenshots/inbox.png) |
-| Tree, properties and live preview | Inbox triage with one-click filing |
+|                                          |                                            |
+| ---------------------------------------- | ------------------------------------------ |
+| ![Main](docs/screenshots/main.png)       | ![Inbox](docs/screenshots/inbox.png)       |
+| Tree, properties and live preview        | Inbox triage with one-click filing         |
 | ![Palette](docs/screenshots/palette.png) | ![Settings](docs/screenshots/settings.png) |
-| Command palette (⌘K) | Settings and sync sign-in |
+| Command palette (⌘K)                     | Settings and sync sign-in                  |
 
 Narrow windows switch to a navigation stack (`docs/screenshots/narrow.png`), and ⌃⌥N opens quick capture (`docs/screenshots/capture.png`).
 

@@ -23,3 +23,18 @@ export {
   type TreeItem,
 } from "./registry.ts";
 export { useUI, type ListSpec, type Route } from "./state.ts";
+export {
+  createThemeStore,
+  DEFAULT_PALETTE,
+  PALETTE_KEY,
+  readMode,
+  resolveMode,
+  THEME_KEY,
+  themeStore,
+  type ResolvedMode,
+  type ThemeEnv,
+  type ThemeMode,
+  type ThemeState,
+  type ThemeStore,
+} from "./theme/store.ts";
+export { useTheme } from "./theme/useTheme.ts";

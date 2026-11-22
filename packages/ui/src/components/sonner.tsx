@@ -2,7 +2,7 @@ import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 export { toast } from "sonner";
 
-/** The app's toasts: quiet surface, follows the system theme. */
+/** The app's toasts: quiet surface. Pass theme (the mode in effect); system by default. */
 export function Toaster(props: ToasterProps) {
   return (
     <Sonner

@@ -9,6 +9,7 @@ import { ClientContext } from "./context.ts";
 import { isMac } from "./lib/shortcuts.ts";
 import { useChangeSubscription } from "./queries.ts";
 import { createRegistry, type Registry, RegistryContext } from "./registry.ts";
+import { useTheme, useThemeChrome } from "./theme/useTheme.ts";
 
 // Apple platforms get their system font; others Inter (see styles.css).
 if (typeof document !== "undefined")
@@ -26,6 +27,13 @@ function makeQueryClient() {
 function Changes({ client }: { client: NotesClient }) {
   useChangeSubscription(client);
   return null;
+}
+
+/** Toasts in the mode in effect, and the chrome around the page with it. */
+function Themed() {
+  const theme = useTheme();
+  useThemeChrome(theme);
+  return <Toaster theme={theme.resolved} />;
 }
 
 /** Providers shared by the main window and the quick-capture window. */
@@ -52,7 +60,7 @@ export function NotaProviders({
           <TooltipProvider>
             <Changes client={client} />
             {children}
-            <Toaster />
+            <Themed />
           </TooltipProvider>
         </RegistryContext.Provider>
       </ClientContext.Provider>

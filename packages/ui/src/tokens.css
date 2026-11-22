@@ -1,9 +1,12 @@
 /*
  * Nota's tokens, from prototypes/app-shell.html ("Träd"): warm neutral
  * grays, hairline borders, one indigo ink used sparingly. Light and dark
- * follow the system, or an explicit data-theme (the landing page's
- * toggle). The app imports this from styles.css (Tailwind); the landing
- * page imports it on its own.
+ * follow the system, or an explicit data-theme ("light" | "dark", the
+ * landing page's toggle and the app's Appearance setting). The app also
+ * sets data-mode, the mode in effect, before the first paint; where it is
+ * present it wins over the media query. The app imports this from
+ * styles.css (Tailwind, with the colour themes in palettes.css); the
+ * landing page imports it on its own.
  */
 :root {
   color-scheme: light dark;
@@ -52,8 +55,15 @@
   --app-font: "Inter", "Inter Variable", "Segoe UI", system-ui, sans-serif;
 }
 
-/* The landing page's toggle; the app follows the system. */
-:root[data-theme="dark"] {
+:root[data-theme="light"],
+:root[data-mode="light"] {
+  color-scheme: light;
+}
+
+/* An explicit choice, or the mode the app resolved. */
+:root[data-theme="dark"],
+:root[data-mode="dark"] {
+  color-scheme: dark;
   --background: #1c1c1e;
   --foreground: #ecebe8;
   --text: #d9d8d4;
@@ -86,7 +96,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-mode="light"]) {
+    color-scheme: dark;
     --background: #1c1c1e;
     --foreground: #ecebe8;
     --text: #d9d8d4;
