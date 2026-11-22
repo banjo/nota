@@ -184,7 +184,8 @@ func (s *Server) putFile(w http.ResponseWriter, r *http.Request, p Principal) er
 	}
 	name := r.PathValue("vault")
 	// Check the vault before storing anything.
-	if err := s.store.read(r.Context(), p.UserID, name, func(querier, vault) error { return nil }); err != nil {
+	ws, err := s.workspace(r.Context(), p.UserID, name)
+	if err != nil {
 		return err
 	}
 	hash, size, err := s.blobs.Put(r.Context(), r.Body, s.cfg.MaxFileSize)
@@ -195,8 +196,13 @@ func (s *Server) putFile(w http.ResponseWriter, r *http.Request, p Principal) er
 		return &apiErr{http.StatusBadRequest, protocol.Error{Code: protocol.CodeHashMismatch,
 			Message: fmt.Sprintf("body hash %s does not match %s %s", hash, protocol.HeaderHash, want)}}
 	}
+	ws.mu.Lock()
 	e, err := s.store.Put(r.Context(), p.UserID, name, base, write{Path: path, Hash: hash, Size: size,
 		Device: p.Device, ModifiedAt: mod})
+	if err == nil {
+		ws.apply(r.Context(), e)
+	}
+	ws.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -216,7 +222,16 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, p Principal)
 		return err
 	}
 	name := r.PathValue("vault")
+	ws, err := s.workspace(r.Context(), p.UserID, name)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
 	e, err := s.store.Delete(r.Context(), p.UserID, name, path, base, p.Device)
+	if err == nil {
+		ws.apply(r.Context(), e)
+	}
+	ws.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -241,7 +256,16 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request, p Principal) error
 		return badRequest("from and to are the same path")
 	}
 	name := r.PathValue("vault")
+	ws, err := s.workspace(r.Context(), p.UserID, name)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
 	res, err := s.store.Move(r.Context(), p.UserID, name, m, p.Device)
+	if err == nil {
+		ws.apply(r.Context(), res.From, res.To)
+	}
+	ws.mu.Unlock()
 	if err != nil {
 		return err
 	}

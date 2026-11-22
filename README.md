@@ -141,6 +141,23 @@ without storing it. Sync state lives in `.nota/` (`sync.toml`,
 desktop app syncs in the background when the vault has a remote. Hooks
 on `sync.completed` run after every pass; transform hooks do not run on
 notes that arrive through sync (they ran on the device that made them).
+The shared configuration in `.nota/` (`hooks.toml`, `views/`, `plugins/`)
+syncs like any file, so a hook added on one machine runs on the others
+too; Nota's own state there stays local.
+
+With an account (see [docs/api.md](docs/api.md)) a device signs in
+without an admin: `nota login [url]` shows a code to approve in the web
+app, `nota remote add <url>` then needs no `--token`, `nota devices`
+lists the signed-in devices and `nota logout` revokes this one.
+
+The server keeps a working copy of each vault with an index in
+`<data>/vaults/` (rebuilt from the version log when missing; `nota serve
+rebuild` drops them). With `NOTA_SERVER_HOOKS=on` it runs each vault's
+hooks on changes from clients, so a note captured on a phone is filed by
+the server; their edits become versions of the device `server-hook` and
+sync back everywhere. It is off by default because hooks are shell
+commands from the synced vault, run with the server's permissions
+(timeouts apply, nothing else is sandboxed).
 
 ## Notes and timestamps
 

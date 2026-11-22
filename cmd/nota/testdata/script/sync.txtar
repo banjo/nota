@@ -69,20 +69,25 @@ nota --vault a sync
 stdout '^  pulled    Möte \(conflict 2026-11-22 1042 desktop\).md$'
 cmp 'a/Möte (conflict 2026-11-22 1042 desktop).md' mote-b.md
 
-# sync.completed runs hooks; status shows the state.
+# sync.completed runs hooks; status shows the state. The hooks file is
+# shared configuration and syncs; Nota's own state in .nota/ does not.
 cp hooks.toml a/.nota/hooks.toml
 rm a/Plan.md
 nota --vault a sync status
 stdout '^synced   3 files, cursor 6, last sync '
 stdout '^server   cursor 6 \(up to date\)$'
-stdout '^local    0 changed, 0 new, 1 deleted \(not pushed yet\)$'
+stdout '^local    0 changed, 1 new, 1 deleted \(not pushed yet\)$'
+stdout '^  new     .nota/hooks.toml$'
 stdout '^daemon   not running$'
 nota --vault a sync
 stdout '^  deleted   Plan.md$'
 grep '^sync.completed$' a/.nota/synced.log
 nota --vault b sync
 stdout '^  removed   Plan.md \(moved to .trash/\)$'
+stdout '^  pulled    .nota/hooks.toml$'
 exists b/.trash/Plan.md
+cmp b/.nota/hooks.toml hooks.toml
+! stdout 'state.db|index.db|sync.toml|synced.log'
 
 # Watch mode on b picks up a's changes through the SSE nudge, and stops
 # cleanly on SIGINT.

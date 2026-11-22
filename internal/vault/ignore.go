@@ -8,7 +8,11 @@ import (
 )
 
 // DefaultIgnore lists what every vault ignores, in .notaignore syntax.
-var DefaultIgnore = []string{".git/", ".obsidian/", ".nota/", ".trash/", ".DS_Store"}
+// Nota's own state in .nota/ (index, sync state, merge bases) stays
+// local; the shared configuration in it (hooks.toml, views/, plugins/)
+// is part of the vault and syncs.
+var DefaultIgnore = []string{".git/", ".obsidian/", ".nota/*", "!.nota/hooks.toml", "!.nota/views/", "!.nota/plugins/",
+	".trash/", ".DS_Store"}
 
 // IgnoreFile is the name of the per-vault ignore file at the vault root.
 const IgnoreFile = ".notaignore"

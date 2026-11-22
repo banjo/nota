@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	gosync "sync"
 	"sync/atomic"
 	"time"
 
@@ -80,6 +81,11 @@ type Config struct {
 	// PollInterval is the minimum interval between device-code polls
 	// (DefaultPollInterval if 0).
 	PollInterval time.Duration
+	// Hooks runs the hooks in each vault's .nota/hooks.toml on changes
+	// that arrive from clients (NOTA_SERVER_HOOKS=on). Off by default:
+	// hooks are shell commands from the synced vault, run by the server
+	// process with its permissions.
+	Hooks bool
 	// Now is the clock (time.Now if nil); tests move it.
 	Now func() time.Time
 }
@@ -94,6 +100,9 @@ type Server struct {
 	broker *broker
 	wa     *webauthn.WebAuthn
 	limit  *limiter
+
+	wsMu       gosync.Mutex
+	workspaces map[int64]*workspace // by vault id
 }
 
 // DBFile is the database file name inside the data directory.
@@ -162,7 +171,8 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	s := &Server{cfg: cfg, store: st, blobs: blobs, log: cfg.Logger, mux: http.NewServeMux(), broker: newBroker(), wa: wa}
+	s := &Server{cfg: cfg, store: st, blobs: blobs, log: cfg.Logger, mux: http.NewServeMux(), broker: newBroker(), wa: wa,
+		workspaces: map[int64]*workspace{}}
 	if cfg.AuthRateLimit >= 0 {
 		n := cfg.AuthRateLimit
 		if n == 0 {
@@ -180,6 +190,7 @@ func (s *Server) Store() *Store { return s.store }
 // Close closes the database. Call it after the HTTP server has shut down.
 func (s *Server) Close() error {
 	s.broker.close()
+	s.closeWorkspaces()
 	return s.store.Close()
 }
 

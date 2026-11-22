@@ -45,6 +45,9 @@ const (
 	EnvServerTrustedProxies = "NOTA_SERVER_TRUSTED_PROXIES"
 	// EnvServerPollInterval is the device-code poll interval (default 5s).
 	EnvServerPollInterval = "NOTA_SERVER_POLL_INTERVAL"
+	// EnvServerHooks=on runs each vault's .nota/hooks.toml on the server
+	// (default off).
+	EnvServerHooks = "NOTA_SERVER_HOOKS"
 )
 
 type serveFlags struct {
@@ -112,6 +115,11 @@ $NOTA_SERVER_SIGNUP (invite, open or closed; default invite) and
 $NOTA_SERVER_TRUSTED_PROXIES (proxies whose X-Forwarded-For is trusted,
 e.g. "private"). See docs/deploy.md.
 
+The server keeps a working copy and an index of every vault in
+<data>/vaults/ (for the web API and HTTP MCP). With $NOTA_SERVER_HOOKS=on
+it also runs each vault's .nota/hooks.toml on changes from clients (off
+by default: hooks are shell commands from the synced vault).
+
 Bootstrap a user and a device token with
 
   nota serve user add you@example.com
@@ -131,7 +139,7 @@ or SIGTERM.`,
 	fl.StringVar(&f.maxSize, "max-file-size", "", "largest file accepted, e.g. 100MB (default $NOTA_SERVER_MAX_FILE_SIZE or 100MiB)")
 	fl.StringVar(&f.logFormat, "log-format", "", "log format: text or json (default $NOTA_SERVER_LOG_FORMAT or text)")
 	fl.StringVar(&f.addrFile, "addr-file", "", "write the bound address to this file once listening (for scripts)")
-	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f))
+	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f), a.serveAuthCmd(f), a.serveRebuildCmd(f))
 	return cmd
 }
 
@@ -311,6 +319,32 @@ device named --device. --wait keeps looking for that long.`,
 	return cmd
 }
 
+func (a *app) serveRebuildCmd(f *serveFlags) *cobra.Command {
+	return &cobra.Command{
+		Use:   "rebuild",
+		Short: "Delete the server's working copies and indexes (rebuilt from the log on next use)",
+		Long: `The server keeps a working copy of every vault, with an index, in
+<data>/vaults/. They are only a cache of the version log: this deletes
+them, and the server rebuilds each one the next time the vault is used.
+Stop the server first.`,
+		Args: exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			dir, err := f.dataDir()
+			if err != nil {
+				return err
+			}
+			if err := server.RebuildWorkspaces(dir); err != nil {
+				return err
+			}
+			if a.json {
+				return a.printJSON(map[string]any{"rebuilt": dir})
+			}
+			fmt.Fprintf(a.stdout, "deleted the working copies in %s; they are rebuilt on next use\n", dir)
+			return nil
+		},
+	}
+}
+
 func dash(s string) string {
 	if s == "" {
 		return "-"
@@ -390,7 +424,7 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 	err = srv.ListenAndServe(ctx, addr, 10*time.Second, func(ln net.Addr) {
 		log.Info("nota serve: listening", "addr", ln.String(), "data", dir, "max_file_size", maxSize, "version", Version,
 			"public_url", cfg.PublicURL, "web_origins", strings.Join(cfg.WebOrigins, ","), "rp_id", cfg.RPID,
-			"signup", string(cfg.Signup), "trusted_proxies", len(cfg.TrustedProxies))
+			"signup", string(cfg.Signup), "trusted_proxies", len(cfg.TrustedProxies), "hooks", cfg.Hooks)
 		if f.addrFile != "" {
 			if err := os.WriteFile(f.addrFile, []byte(ln.String()+"\n"), 0o644); err != nil {
 				log.Error("write --addr-file", "err", err)
@@ -419,6 +453,13 @@ func serverConfigFromEnv() (server.Config, error) {
 	}
 	if cfg.TrustedProxies, err = server.ParseProxies(os.Getenv(EnvServerTrustedProxies)); err != nil {
 		return cfg, err
+	}
+	switch h := strings.ToLower(strings.TrimSpace(os.Getenv(EnvServerHooks))); h {
+	case "", "off", "0", "false":
+	case "on", "1", "true":
+		cfg.Hooks = true
+	default:
+		return cfg, fmt.Errorf("$%s: want on or off, got %q", EnvServerHooks, h)
 	}
 	if v := os.Getenv(EnvServerPollInterval); v != "" {
 		if cfg.PollInterval, err = time.ParseDuration(v); err != nil {
