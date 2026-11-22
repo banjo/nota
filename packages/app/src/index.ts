@@ -1,6 +1,8 @@
 export { NotaApp, NotaProviders } from "./App.tsx";
 export { AuthGate } from "./auth/AuthGate.tsx";
+export { ConnectPage, type ConnectRequest } from "./auth/Connect.tsx";
 export { DeviceList } from "./auth/Devices.tsx";
+export { DevicesPage } from "./auth/DevicesPage.tsx";
 export { useSession } from "./auth/session.ts";
 export { type AuthMode, SignInFlow } from "./auth/SignIn.tsx";
 export { CaptureApp } from "./components/Capture.tsx";

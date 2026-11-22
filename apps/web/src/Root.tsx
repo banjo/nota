@@ -1,5 +1,12 @@
 import { type AuthApi, createHttpAuth, createHttpClient, type NotesClient } from "@nota/client";
-import { AuthGate, NotaApp, useSession } from "@nota/app";
+import {
+  AuthGate,
+  ConnectPage,
+  type ConnectRequest,
+  DevicesPage,
+  NotaApp,
+  useSession,
+} from "@nota/app";
 import { Button } from "@nota/ui/button";
 import { toast, Toaster } from "@nota/ui/sonner";
 import {
@@ -10,9 +17,9 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { CloudOff, LoaderCircle, Plus, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { connection } from "./connection.ts";
-import { href, usePath } from "./router.ts";
+import { href, navigate, usePath } from "./router.ts";
 
 /** The API is its own origin; override with VITE_NOTA_API for a local server. */
 export const API =
@@ -31,6 +38,45 @@ function makeQueryClient() {
       queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 },
     },
   });
+}
+
+/** Top-and-bottom for the pages that only need an account, not a vault. */
+function AuthPage({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <>
+      <Toaster />
+      <AuthGate auth={auth} title={title}>
+        {children}
+      </AuthGate>
+    </>
+  );
+}
+
+/** The connect URL: desktop sends a PKCE challenge, the CLI a user code. */
+function parseConnect(search: string): ConnectRequest | null {
+  const q = new URLSearchParams(search);
+  const challenge = q.get("challenge");
+  if (challenge) {
+    return {
+      kind: "desktop",
+      challenge,
+      device: q.get("device") ?? "Nota",
+      redirect: q.get("redirect") || "nota://auth",
+      state: q.get("state") ?? undefined,
+    };
+  }
+  const code = q.get("code") ?? q.get("user_code");
+  if (code) return { kind: "cli", code: code.trim().toUpperCase() };
+  return null;
+}
+
+function ConnectRoute() {
+  const request = useMemo(() => parseConnect(window.location.search), []);
+  return <ConnectPage auth={auth} request={request} />;
+}
+
+function DevicesRoute() {
+  return <DevicesPage auth={auth} onBack={() => navigate("/")} />;
 }
 
 /** A banner for a server that went away mid-session. */
@@ -231,11 +277,22 @@ function AppRoute({ signup }: { signup: boolean }) {
 export function Root() {
   const path = usePath();
   const [qc] = useState(makeQueryClient);
+  const accountPage = path === "/connect" || path === "/devices";
 
   return (
     <QueryClientProvider client={qc}>
-      <Toaster />
-      <AppRoute signup={path === "/signup"} />
+      {!accountPage ? <Toaster /> : null}
+      {path === "/connect" ? (
+        <AuthPage title="Approve a sign-in · Nota">
+          <ConnectRoute />
+        </AuthPage>
+      ) : path === "/devices" ? (
+        <AuthPage title="Devices · Nota">
+          <DevicesRoute />
+        </AuthPage>
+      ) : (
+        <AppRoute signup={path === "/signup"} />
+      )}
     </QueryClientProvider>
   );
 }
