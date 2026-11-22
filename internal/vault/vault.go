@@ -1,6 +1,8 @@
 // Package vault is the file layer of Nota: a vault is a folder of markdown
 // notes, and the files on disk are the source of truth.
 //
+// A vault works on an FS: DirFS for a real directory, MemFS in tests.
+//
 // All paths in the API are vault-relative, slash-separated and in Unicode
 // NFC, whatever the file system stores. Writes are atomic (temp file and
 // rename), deletes move notes to .trash/, and a path that differs from an
@@ -36,15 +38,16 @@ type Options struct {
 	Bus *events.Bus
 }
 
-// Vault is an open vault directory.
+// Vault is an open vault.
 type Vault struct {
+	fs     FS
 	root   string
 	inbox  string
 	ignore *Ignore
 	bus    *events.Bus
 }
 
-// Open opens the vault at dir and loads its .notaignore.
+// Open opens the vault in the OS directory dir and loads its .notaignore.
 func Open(dir string, opts Options) (*Vault, error) {
 	root, err := filepath.Abs(dir)
 	if err != nil {
@@ -62,22 +65,37 @@ func Open(dir string, opts Options) (*Vault, error) {
 	if !st.IsDir() {
 		return nil, fmt.Errorf("vault: %s is not a directory", root)
 	}
+	return open(DirFS(root), root, opts)
+}
+
+// OpenFS opens a vault on any file system, such as a MemFS in tests.
+// name identifies the vault in events and logs (Root returns it).
+func OpenFS(fsys FS, name string, opts Options) (*Vault, error) {
+	return open(fsys, name, opts)
+}
+
+func open(fsys FS, root string, opts Options) (*Vault, error) {
 	inbox := opts.Inbox
 	if inbox == "" {
 		inbox = DefaultInbox
 	}
-	if inbox, err = CleanPath(inbox); err != nil {
+	inbox, err := CleanPath(inbox)
+	if err != nil {
 		return nil, fmt.Errorf("vault: inbox: %w", err)
 	}
-	v := &Vault{root: root, inbox: inbox, bus: opts.Bus}
+	v := &Vault{fs: fsys, root: root, inbox: inbox, bus: opts.Bus}
 	if err := v.ReloadIgnore(); err != nil {
 		return nil, err
 	}
 	return v, nil
 }
 
-// Root returns the absolute vault directory.
+// Root returns the absolute vault directory (the name given to OpenFS
+// for other file systems).
 func (v *Vault) Root() string { return v.root }
+
+// FS returns the file system the vault lives on.
+func (v *Vault) FS() FS { return v.fs }
 
 // Inbox returns the vault-relative inbox folder.
 func (v *Vault) Inbox() string { return v.inbox }
@@ -98,7 +116,7 @@ func (v *Vault) Ignore() *Ignore { return v.ignore }
 
 // ReloadIgnore re-reads .notaignore from the vault root.
 func (v *Vault) ReloadIgnore() error {
-	data, err := os.ReadFile(filepath.Join(v.root, IgnoreFile))
+	data, err := v.fs.ReadFile(IgnoreFile)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("vault: %w", err)
 	}
@@ -109,40 +127,43 @@ func (v *Vault) ReloadIgnore() error {
 // Ignored reports whether a vault-relative path is excluded by the ignore rules.
 func (v *Vault) Ignored(rel string, isDir bool) bool { return v.ignore.Match(rel, isDir) }
 
+// MetaDirName is the vault-relative folder of Nota's own files.
+const MetaDirName = ".nota"
+
 // MetaDir returns the absolute path of the vault's .nota directory.
-func (v *Vault) MetaDir() string { return filepath.Join(v.root, ".nota") }
+func (v *Vault) MetaDir() string { return filepath.Join(v.root, MetaDirName) }
 
 // Entry is a note found on disk.
 type Entry struct {
 	// Path is the vault-relative NFC path.
 	Path string
-	// Disk is the absolute OS path, with the name as the file system stores it.
+	// Disk is the name in the vault's FS, as the file system stores it
+	// (possibly NFD). Read it with ReadEntry.
 	Disk    string
 	ModTime time.Time
 	Size    int64
 }
 
+// ReadEntry reads the content of a note found by Walk.
+func (v *Vault) ReadEntry(e Entry) ([]byte, error) { return v.fs.ReadFile(e.Disk) }
+
 // Walk calls fn for every note in the vault that is not ignored, in
 // lexical order of the on-disk names.
 func (v *Vault) Walk(fn func(Entry) error) error {
-	return filepath.WalkDir(v.root, func(p string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(v.fs, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if p == v.root {
+			if p == "." {
 				return err
 			}
 			return nil // unreadable entries are skipped, not fatal
 		}
-		if p == v.root {
+		if p == "." {
 			return nil
 		}
-		r, err := filepath.Rel(v.root, p)
-		if err != nil {
-			return err
-		}
-		rel := NFC(filepath.ToSlash(r))
+		rel := NFC(p)
 		if d.IsDir() {
 			if v.ignore.Match(rel, true) {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
@@ -170,8 +191,8 @@ func (v *Vault) List() ([]Entry, error) {
 // lookup finds the entry in the directory disk whose NFC name is name.
 // exact is the on-disk name of a match; folded is the on-disk name of an
 // entry that differs only in letter case, when there is no exact match.
-func lookup(disk, name string) (exact, folded string, err error) {
-	entries, err := os.ReadDir(disk)
+func (v *Vault) lookup(disk, name string) (exact, folded string, err error) {
+	entries, err := v.fs.ReadDir(disk)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return "", "", nil
@@ -194,7 +215,7 @@ func lookup(disk, name string) (exact, folded string, err error) {
 // resolved is a vault path mapped onto the file system.
 type resolved struct {
 	rel  string // canonical NFC path
-	disk string // absolute OS path of the longest existing prefix plus the rest
+	disk string // FS name of the longest existing prefix plus the rest
 	// exists reports whether every component exists with the exact NFC name.
 	exists bool
 	// collision is the vault path of an existing entry that differs from
@@ -205,31 +226,31 @@ type resolved struct {
 // resolve maps a clean vault-relative path onto disk names component by
 // component, so NFD names on disk still match NFC input.
 func (v *Vault) resolve(rel string) (resolved, error) {
-	r := resolved{rel: rel, disk: v.root, exists: true}
+	r := resolved{rel: rel, disk: ".", exists: true}
 	if rel == "" {
 		return r, nil
 	}
 	parts := strings.Split(rel, "/")
 	for i, part := range parts {
 		if !r.exists {
-			r.disk = filepath.Join(r.disk, part)
+			r.disk = fsJoin(r.disk, part)
 			continue
 		}
-		exact, folded, err := lookup(r.disk, part)
+		exact, folded, err := v.lookup(r.disk, part)
 		if err != nil {
 			return r, fmt.Errorf("vault: %w", err)
 		}
 		switch {
 		case exact != "":
-			r.disk = filepath.Join(r.disk, exact)
+			r.disk = fsJoin(r.disk, exact)
 		case folded != "":
 			prefix := append(append([]string{}, parts[:i]...), NFC(folded))
 			r.collision = strings.Join(prefix, "/")
 			r.exists = false
-			r.disk = filepath.Join(r.disk, part)
+			r.disk = fsJoin(r.disk, part)
 		default:
 			r.exists = false
-			r.disk = filepath.Join(r.disk, part)
+			r.disk = fsJoin(r.disk, part)
 		}
 	}
 	return r, nil
@@ -246,7 +267,8 @@ func (v *Vault) Exists(rel string) bool {
 }
 
 // DiskPath returns the absolute OS path of an existing note, with the name
-// as the file system stores it (which may be NFD on macOS).
+// as the file system stores it (which may be NFD on macOS). It fails on
+// file systems that are not backed by the OS.
 func (v *Vault) DiskPath(rel string) (string, error) {
 	rel, err := NotePath(rel)
 	if err != nil {
@@ -259,7 +281,11 @@ func (v *Vault) DiskPath(rel string) (string, error) {
 	if !r.exists {
 		return "", &PathError{Op: "open", Path: rel, Existing: r.collision, Err: ErrNotFound}
 	}
-	return r.disk, nil
+	p := osPath(v.fs, r.disk)
+	if p == "" {
+		return "", errNoOSPath
+	}
+	return p, nil
 }
 
 // Read reads a note by vault-relative path. The ".md" may be left out.
@@ -279,16 +305,16 @@ func (v *Vault) Read(rel string) (*Note, error) {
 }
 
 func (v *Vault) readDisk(rel, disk string) (*Note, error) {
-	info, err := os.Stat(disk)
+	info, err := v.fs.Stat(disk)
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	if info.IsDir() {
 		return nil, &PathError{Op: "read", Path: rel, Err: ErrNotNote}
 	}
-	raw, err := os.ReadFile(disk)
+	raw, err := v.fs.ReadFile(disk)
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	n, _ := ParseNote(rel, raw) // broken YAML still yields a readable note
 	n.ModTime = info.ModTime()
@@ -322,8 +348,8 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 		return "", false, &PathError{Op: "write", Path: rel, Existing: r.collision, Err: ErrCaseCollision}
 	}
 	if r.exists {
-		if err := writeAtomic(r.disk, data); err != nil {
-			return "", false, err
+		if err := v.fs.WriteFile(r.disk, data); err != nil {
+			return "", false, wrap(err)
 		}
 		v.emit(events.Event{Type: events.NoteSaved, Path: rel}, false)
 		return rel, false, nil
@@ -332,8 +358,8 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	if err := writeAtomic(filepath.Join(disk, path.Base(rel)), data); err != nil {
-		return "", false, err
+	if err := v.fs.WriteFile(fsJoin(disk, path.Base(rel)), data); err != nil {
+		return "", false, wrap(err)
 	}
 	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
 	return rel, true, nil
@@ -355,13 +381,13 @@ func (v *Vault) Create(folder string, data []byte) (*Note, error) {
 	if err != nil {
 		return nil, err
 	}
-	name, err := freeName(dir, stem, Ext)
+	name, err := v.freeName(dir, stem, Ext)
 	if err != nil {
 		return nil, err
 	}
 	rel := path.Join(folder, name)
-	if err := writeAtomic(filepath.Join(dir, name), data); err != nil {
-		return nil, err
+	if err := v.fs.WriteFile(fsJoin(dir, name), data); err != nil {
+		return nil, wrap(err)
 	}
 	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
 	return v.Read(rel)
@@ -369,8 +395,8 @@ func (v *Vault) Create(folder string, data []byte) (*Note, error) {
 
 // freeName returns stem+ext, or "stem N"+ext for the lowest N >= 2, such
 // that no entry in dir has the same name ignoring case and normalization.
-func freeName(dir, stem, ext string) (string, error) {
-	entries, err := os.ReadDir(dir)
+func (v *Vault) freeName(dir, stem, ext string) (string, error) {
+	entries, err := v.fs.ReadDir(dir)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return "", fmt.Errorf("vault: %w", err)
 	}
@@ -385,8 +411,8 @@ func freeName(dir, stem, ext string) (string, error) {
 	return name, nil
 }
 
-// mkdirs makes sure the vault-relative folder exists and returns its disk
-// path. Each missing component is checked for case collisions first.
+// mkdirs makes sure the vault-relative folder exists and returns its FS
+// name. Each missing component is checked for case collisions first.
 func (v *Vault) mkdirs(folder string) (string, error) {
 	r, err := v.resolve(folder)
 	if err != nil {
@@ -398,8 +424,8 @@ func (v *Vault) mkdirs(folder string) (string, error) {
 	if r.exists {
 		return r.disk, nil
 	}
-	if err := os.MkdirAll(r.disk, 0o755); err != nil {
-		return "", fmt.Errorf("vault: %w", err)
+	if err := v.fs.MkdirAll(r.disk); err != nil {
+		return "", wrap(err)
 	}
 	return r.disk, nil
 }
@@ -457,8 +483,8 @@ func (v *Vault) Rename(from, to string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.Rename(src.disk, filepath.Join(dir, path.Base(to))); err != nil {
-		return "", fmt.Errorf("vault: %w", err)
+	if err := v.fs.Rename(src.disk, fsJoin(dir, path.Base(to))); err != nil {
+		return "", wrap(err)
 	}
 	v.emit(events.Event{Type: events.NoteMoved, Path: to, OldPath: from}, Folder(from) != Folder(to))
 	return to, nil
@@ -479,55 +505,17 @@ func (v *Vault) Delete(rel string) (string, error) {
 		return "", &PathError{Op: "delete", Path: rel, Existing: src.collision, Err: ErrNotFound}
 	}
 	folder := path.Join(TrashDir, Folder(rel))
-	dir := filepath.Join(v.root, filepath.FromSlash(folder))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("vault: %w", err)
+	if err := v.fs.MkdirAll(folder); err != nil {
+		return "", wrap(err)
 	}
-	name, err := freeName(dir, Stem(rel), path.Ext(rel))
+	name, err := v.freeName(folder, Stem(rel), path.Ext(rel))
 	if err != nil {
 		return "", err
 	}
-	if err := os.Rename(src.disk, filepath.Join(dir, name)); err != nil {
-		return "", fmt.Errorf("vault: %w", err)
+	if err := v.fs.Rename(src.disk, path.Join(folder, name)); err != nil {
+		return "", wrap(err)
 	}
 	trash := path.Join(folder, name)
 	v.emit(events.Event{Type: events.NoteDeleted, Path: rel, Trash: trash}, false)
 	return trash, nil
-}
-
-// writeAtomic writes data to a temp file next to dst and renames it over
-// dst, so readers never see a half-written note. An existing file's
-// permissions are kept.
-func writeAtomic(dst string, data []byte) error {
-	perm := fs.FileMode(0o644)
-	if st, err := os.Stat(dst); err == nil {
-		perm = st.Mode().Perm()
-	}
-	f, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".tmp-*")
-	if err != nil {
-		return fmt.Errorf("vault: %w", err)
-	}
-	tmp := f.Name()
-	fail := func(err error) error {
-		f.Close()
-		os.Remove(tmp)
-		return fmt.Errorf("vault: %w", err)
-	}
-	if _, err := f.Write(data); err != nil {
-		return fail(err)
-	}
-	if err := f.Sync(); err != nil {
-		return fail(err)
-	}
-	// Best effort: Windows only knows the read-only bit.
-	_ = f.Chmod(perm)
-	if err := f.Close(); err != nil {
-		os.Remove(tmp)
-		return fmt.Errorf("vault: %w", err)
-	}
-	if err := os.Rename(tmp, dst); err != nil {
-		os.Remove(tmp)
-		return fmt.Errorf("vault: %w", err)
-	}
-	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"runtime"
 	"sort"
 	"strconv"
@@ -232,7 +231,7 @@ func (ix *Index) Sync(v *vault.Vault) (Stats, error) {
 	}
 	st.Notes = len(seen)
 
-	docs := readDocs(todo)
+	docs := readDocs(v, todo)
 	tx, err := ix.db.Begin()
 	if err != nil {
 		return st, err
@@ -285,7 +284,7 @@ func (ix *Index) Sync(v *vault.Vault) (Stats, error) {
 
 // readDocs reads and parses entries on all CPUs. A nil result means the
 // file could not be read (for example deleted meanwhile).
-func readDocs(entries []vault.Entry) []*doc {
+func readDocs(v *vault.Vault, entries []vault.Entry) []*doc {
 	out := make([]*doc, len(entries))
 	jobs := make(chan int)
 	var wg sync.WaitGroup
@@ -294,7 +293,7 @@ func readDocs(entries []vault.Entry) []*doc {
 		go func() {
 			defer wg.Done()
 			for i := range jobs {
-				raw, err := os.ReadFile(entries[i].Disk)
+				raw, err := v.ReadEntry(entries[i])
 				if err != nil {
 					continue
 				}

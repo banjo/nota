@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -44,15 +43,14 @@ type View struct {
 	File string `yaml:"-" json:"file"`
 }
 
-// Dir returns the views directory of a vault.
-func Dir(v *vault.Vault) string { return filepath.Join(v.MetaDir(), "views") }
+// fsDir is the views directory in the vault's FS.
+const fsDir = vault.MetaDirName + "/views"
 
 // Load reads every *.yaml and *.yml file in the vault's views directory,
 // sorted by name. A missing directory means no views. A broken file fails
 // the whole load with an error that names the file.
 func Load(v *vault.Vault) ([]View, error) {
-	dir := Dir(v)
-	entries, err := os.ReadDir(dir)
+	entries, err := v.FS().ReadDir(fsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return []View{}, nil
 	}
@@ -66,7 +64,7 @@ func Load(v *vault.Vault) ([]View, error) {
 			continue
 		}
 		rel := ".nota/views/" + vault.NFC(e.Name())
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		data, err := v.FS().ReadFile(fsDir + "/" + e.Name())
 		if err != nil {
 			return nil, fmt.Errorf("views: %w", err)
 		}
