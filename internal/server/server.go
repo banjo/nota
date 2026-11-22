@@ -223,6 +223,7 @@ func (s *Server) routes() {
 	v1("GET /v1/vaults/{vault}/events", s.events)
 	s.authRoutes()
 	s.flowRoutes()
+	s.apiRoutes()
 	s.mux.Handle("/v1/", s.v1(func(http.ResponseWriter, *http.Request, Principal) error {
 		return &apiErr{http.StatusNotFound, protocol.Error{Code: protocol.CodeNotFound, Message: "no such route"}}
 	}))

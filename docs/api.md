@@ -120,3 +120,55 @@ NAME` (or `--id N`).
 
 CLI: `nota devices [--server URL]`, `nota devices revoke <id>`,
 `nota logout [url]`.
+
+## Web API
+
+The web app's `NotesClient` talks to `/v1/api/vaults/{vault}/…` with the
+session cookie (a device token works too). It reads the server's working
+copy of the vault and its index; every write is a new version in the
+version log, exactly like a sync push, so other devices pull it. Writes
+made with the cookie are versions of the device `web`; with a token, of
+the token's device. Note paths in URLs are vault paths escaped segment by
+segment (`protocol.EscapePath`); the `.md` may be left out.
+
+Shapes:
+
+```jsonc
+// NoteInfo (lists, tree, search)
+{"path": "Projekt/Plan.md", "folder": "Projekt", "title": "Plan",
+ "tags": ["work"], "properties": {"status": "draft"},
+ "created": "2026-11-22T10:12:00Z", "updated": "2026-11-22T10:42:00Z",
+ "modified": "…", "size": 120, "snippet": "…matching text…"}  // snippet: search only
+// Note = NoteInfo plus
+{"version": 7, "hash": "<sha256 hex of content>", "body": "# Plan\n…",
+ "content": "---\n…\n---\n# Plan\n…",
+ "backlinks": [{"from": "Möte.md", "to": "Projekt/Plan.md", "target": "Plan"}],
+ "links": [{"from": "Projekt/Plan.md", "to": "Möte.md", "target": "Möte"}]}
+```
+
+| Route | Body → response |
+| --- | --- |
+| `GET /v1/api/vaults` | → `{vaults: [{name, cursor, created_at}]}` |
+| `POST /v1/api/vaults` | `{name}` → `201` vault |
+| `GET …/tree` | → `{inbox, folders: [{path, name, notes}], notes: [NoteInfo], cursor}` (every note, by path; folders that hold notes, with counts including subfolders) |
+| `GET …/notes?folder=&tag=&where=k=v&where=k!=v&view=&sort=&limit=` | → `{notes: [NoteInfo], count}`. `sort` is `path|title|created|updated|modified [asc|desc]`; `view` starts from a saved view and the other filters narrow it. |
+| `GET …/search?q=&folder=&tag=&limit=` | → `{notes, count}` best match first, with `snippet`; empty `q` is `400` |
+| `GET …/inbox` | → `{notes, count}` the inbox folder, newest first |
+| `GET …/tags` | → `{tags: [{tag, count}]}` |
+| `GET …/views` | → `{views: [{id, name, icon, where, tag, folder, sort, file, count}]}` from `.nota/views/*.yaml` |
+| `GET …/notes/{path}` | → `Note`; `404 not_found` |
+| `POST …/notes` | `{title?, body?, folder?, tags?, properties?}` → `201 Note`. Default folder is the inbox (`"/"` is the root); the file name comes from the title; `created` is stamped. Hooks may move it: the response shows where it ended up. |
+| `PUT …/notes/{path}` | header `Base-Version: <version>` (required; `0` creates the note at that path), body `{content}` (whole file) or `{body}` (keeps the frontmatter) → `Note`. A stale base is `409 version_mismatch` with `current`, like sync. `updated` is set when the note has frontmatter. |
+| `PATCH …/notes/{path}` | optional `Base-Version`; `{set?: {k: v}, unset?: [k], tags?: {add?, remove?}}` → `Note`. Only the touched frontmatter lines change. |
+| `DELETE …/notes/{path}` | optional `Base-Version` → the tombstone entry. Devices move the file to `.trash/`; the server keeps every version. |
+| `POST …/move` | `{path, folder}` (keep the name; `"/"` = root) or `{path, to}` (rename), optional `base_version` → `{from, path, version}`; `409 exists` / `case_collision` |
+| `GET …/history/{path}` | → `{path, versions: [Entry]}` newest first, through renames |
+| `GET …/history/{path}?version=N` | → `Entry` plus `content` (absent for a delete) |
+| `POST …/history/{path}/restore` | `{version}`, optional `Base-Version` → the new `Entry`: the old bytes become the newest version; history is never rewritten |
+| `GET …/files/{path}` | the raw file (attachments), with the sync protocol's headers |
+| `GET …/changes?since=` | the sync change feed (to see which paths changed) |
+| `GET …/events?protocol=1` | SSE: `event: change` / `data: {"cursor": N}` on every new version (from any device, the web or a hook), `: keepalive` comments every 25 s. Use `new EventSource(url, {withCredentials: true})`. Responses send `X-Accel-Buffering: no` so proxies do not buffer. |
+
+Errors use the codes of the sync protocol (`not_found`, `version_mismatch`,
+`exists`, `case_collision`, `invalid_path`, `bad_request`, `too_large`)
+plus `unauthorized`, `csrf`, `passkey_required`.
