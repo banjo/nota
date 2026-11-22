@@ -84,7 +84,7 @@ nested:
   b: [x, y]
 
 custom: "keep  me"
-updated: "2026-11-22T10:42:00+01:00"
+updated: 2026-11-22T10:42:00+01:00
 ---
 # Plan
 
@@ -101,7 +101,7 @@ nested:
   b: [x, y]
 
 custom: "keep  me"
-updated: "2026-11-22T10:42:00+01:00"
+updated: 2026-11-22T10:42:00+01:00
 ---
 # Plan
 
@@ -117,7 +117,7 @@ nested:
   a: 1
   b: [x, y]
 
-updated: "2026-11-22T10:42:00+01:00"
+updated: 2026-11-22T10:42:00+01:00
 priority: 2
 aliases: [p, q]
 note: hello world
@@ -135,7 +135,7 @@ nested:
   a: 1
   b: [x, y]
 
-updated: "2026-11-22T10:42:00+01:00"
+updated: 2026-11-22T10:42:00+01:00
 priority: 2
 aliases: [p, q]
 note: hello world

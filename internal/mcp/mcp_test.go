@@ -135,7 +135,7 @@ func TestTools(t *testing.T) {
 	if n.Path != "Inbox/Möte med Åsa.md" || n.Title != "Möte med Åsa" {
 		t.Fatalf("created %+v", n.NoteInfo)
 	}
-	wantContent := "---\ntags: [projekt]\ncreated: \"2026-11-22T10:42:00+01:00\"\n---\n# Möte med Åsa\n\nAgenda #möte\n"
+	wantContent := "---\ntags: [projekt]\ncreated: 2026-11-22T10:42:00+01:00\n---\n# Möte med Åsa\n\nAgenda #möte\n"
 	if n.Content != wantContent {
 		t.Fatalf("content %q, want %q", n.Content, wantContent)
 	}
@@ -164,7 +164,7 @@ func TestTools(t *testing.T) {
 		t.Fatalf("stale hash: %s", msg)
 	}
 	call(t, cs, "update_note", map[string]any{"note": n.Path, "body": "# Möte med Åsa\n\nNy agenda\n", "expected_hash": r.Hash}, &r)
-	if r.Content != "---\ntags: [projekt]\ncreated: \"2026-11-22T10:42:00+01:00\"\nupdated: \"2026-11-22T10:42:00+01:00\"\n---\n# Möte med Åsa\n\nNy agenda\n" {
+	if r.Content != "---\ntags: [projekt]\ncreated: 2026-11-22T10:42:00+01:00\nupdated: 2026-11-22T10:42:00+01:00\n---\n# Möte med Åsa\n\nNy agenda\n" {
 		t.Fatalf("updated content %q", r.Content)
 	}
 

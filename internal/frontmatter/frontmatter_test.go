@@ -73,6 +73,21 @@ func TestSetIsByteStable(t *testing.T) {
 	}
 }
 
+// SetLiteral keeps the line's own style: a timestamp stays unquoted,
+// where Set would quote it because YAML could read it as a date.
+func TestSetLiteral(t *testing.T) {
+	out, err := SetLiteral([]byte(sample), "updated", "2026-11-22T10:42:00+01:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "\nupdated: 2026-11-22T10:42:00+01:00\n") {
+		t.Fatalf("unquoted line missing:\n%s", out)
+	}
+	if _, err := SetLiteral([]byte(sample), "updated", "a\nb"); err == nil {
+		t.Fatal("a newline in the value must be refused")
+	}
+}
+
 func TestSetReplacesBlockValue(t *testing.T) {
 	out, err := Set([]byte(sample), "tags", []string{"nota", "sync", "spike"})
 	if err != nil {

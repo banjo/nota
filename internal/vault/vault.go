@@ -443,7 +443,7 @@ func Stamp(old, data []byte, now time.Time) []byte {
 	if _, err := doc.Properties(); err != nil {
 		return data
 	}
-	out, err := frontmatter.Set(data, UpdatedKey, now.Format(time.RFC3339))
+	out, err := frontmatter.SetLiteral(data, UpdatedKey, now.Format(time.RFC3339))
 	if err != nil {
 		return data
 	}

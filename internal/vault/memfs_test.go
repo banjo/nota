@@ -126,7 +126,7 @@ func TestSaveStampsUpdated(t *testing.T) {
 	if _, _, err := v.Save("Fm", []byte("---\ncreated: 2026-01-01\n---\nNew body\n")); err != nil {
 		t.Fatal(err)
 	}
-	check("Fm.md", "---\ncreated: 2026-01-01\nupdated: \"2026-11-22T10:42:00+01:00\"\n---\nNew body\n")
+	check("Fm.md", "---\ncreated: 2026-01-01\nupdated: 2026-11-22T10:42:00+01:00\n---\nNew body\n")
 	// The same content again: no write, no event.
 	b, _ := m.ReadFile("Fm.md")
 	if _, _, err := v.Save("Fm", b); err != nil || saved != 1 {

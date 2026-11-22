@@ -38,23 +38,23 @@ stdout '^Gammal.md'
 -- want/1-added.md --
 ---
 tags: [a]
-created: "2026-11-20T08:00:00+01:00"
+created: 2026-11-20T08:00:00+01:00
 ---
 Ny anteckning
 -- want/2-set.md --
 ---
 tags: [a]
-created: "2026-11-20T08:00:00+01:00"
+created: 2026-11-20T08:00:00+01:00
 status: draft
-updated: "2026-11-21T09:30:00+01:00"
+updated: 2026-11-21T09:30:00+01:00
 ---
 Ny anteckning
 -- want/3-tag.md --
 ---
 tags: [a, b]
-created: "2026-11-20T08:00:00+01:00"
+created: 2026-11-20T08:00:00+01:00
 status: draft
-updated: "2026-11-22T10:42:00+01:00"
+updated: 2026-11-22T10:42:00+01:00
 ---
 Ny anteckning
 -- vault/Gammal.md --
@@ -67,7 +67,7 @@ Gammal
 -- want/gammal.md --
 ---
 # kommentar
-updated: "2026-11-23T00:00:00+01:00"
+updated: 2026-11-23T00:00:00+01:00
 created: 2019-01-01
 status: ok
 ---

@@ -53,7 +53,7 @@ func New(text string, tags []string, props map[string]any, now time.Time) ([]byt
 	}
 	p, _ := frontmatter.Split(src).Properties()
 	if _, ok := p[CreatedKey]; !ok {
-		if src, err = frontmatter.Set(src, CreatedKey, now.Format(time.RFC3339)); err != nil {
+		if src, err = frontmatter.SetLiteral(src, CreatedKey, now.Format(time.RFC3339)); err != nil {
 			return nil, err
 		}
 	}

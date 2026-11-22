@@ -185,27 +185,44 @@ func encodeLine(key string, value any) (string, error) {
 // a missing key is appended at the end of the block, and a note without
 // frontmatter gets a new block.
 func Set(src []byte, key string, value any) ([]byte, error) {
-	d := Split(src)
 	ln, err := encodeLine(key, value)
 	if err != nil {
 		return nil, err
 	}
+	return setLine(src, key, ln), nil
+}
+
+// SetLiteral is Set for a value already formatted as YAML, written as it
+// is: no quoting. Use it to keep a line's style, e.g. an RFC 3339
+// timestamp that was written without quotes.
+func SetLiteral(src []byte, key, literal string) ([]byte, error) {
+	if strings.ContainsAny(literal, "\n\r") {
+		return nil, errors.New("frontmatter: value does not fit on one line")
+	}
+	if strings.TrimSpace(literal) == "" {
+		return nil, errors.New("frontmatter: empty value")
+	}
+	return setLine(src, key, strings.TrimSpace(key)+": "+literal), nil
+}
+
+func setLine(src []byte, key, ln string) []byte {
+	d := Split(src)
 	if !d.has {
 		var b bytes.Buffer
 		b.Write(src[:d.prefix])
 		b.WriteString("---" + d.nl + ln + d.nl + "---" + d.nl)
 		b.Write(src[d.prefix:])
-		return b.Bytes(), nil
+		return b.Bytes()
 	}
 	if r, ok := d.findKey(key); ok {
-		return splice(src, r.start, r.end, ln+d.nl), nil
+		return splice(src, r.start, r.end, ln+d.nl)
 	}
 	ins := d.fmEnd
 	prefix := ""
 	if ins > d.fmStart && src[ins-1] != '\n' {
 		prefix = d.nl
 	}
-	return splice(src, ins, ins, prefix+ln+d.nl), nil
+	return splice(src, ins, ins, prefix+ln+d.nl)
 }
 
 // Delete returns src without key. Deleting a missing key returns src as is.

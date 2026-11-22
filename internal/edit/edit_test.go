@@ -13,7 +13,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "---\ntags: [a, b]\nnum: 2\nstatus: draft\ncreated: \"2026-11-22T10:42:00Z\"\n---\n# Plan\n"
+	want := "---\ntags: [a, b]\nnum: 2\nstatus: draft\ncreated: 2026-11-22T10:42:00Z\n---\n# Plan\n"
 	if string(got) != want {
 		t.Fatalf("New =\n%s\nwant\n%s", got, want)
 	}

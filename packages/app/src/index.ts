@@ -1,4 +1,5 @@
 export { NotaApp, NotaProviders } from "./App.tsx";
+export { CaptureApp } from "./components/Capture.tsx";
 export { registerBuiltins } from "./builtins/index.tsx";
 export {
   createRegistry,

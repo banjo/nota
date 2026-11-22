@@ -266,7 +266,7 @@ func (a *Account) SignIn(server string) (string, error) {
 		st.State, st.Server, st.ConnectURL, st.Error = "pending", server, u, ""
 	})
 	if err := a.openURL(u); err != nil {
-		a.update(func(st *AccountState) { st.Error = "Open this page to sign in: " + u })
+		a.update(func(st *AccountState) { st.Error = "Couldn't open your browser. Use the button below." })
 		return u, nil
 	}
 	return u, nil

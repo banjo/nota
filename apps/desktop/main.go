@@ -214,7 +214,7 @@ func main() {
 			Hidden:          true,
 			Frameless:       true,
 			Width:           560,
-			Height:          164,
+			Height:          150,
 			AlwaysOnTop:     true,
 			BackgroundColor: "light-dark(#ffffff, #232325)",
 		})

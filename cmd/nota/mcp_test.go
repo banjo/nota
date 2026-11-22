@@ -125,7 +125,7 @@ func TestMCPStdio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "---\ntags: [mcp]\ncreated: \"2026-11-22T10:42:00+01:00\"\n---\n# Från MCP\n\nEtt mcpord här.\n"
+	want := "---\ntags: [mcp]\ncreated: 2026-11-22T10:42:00+01:00\n---\n# Från MCP\n\nEtt mcpord här.\n"
 	if string(b) != want {
 		t.Fatalf("file %q, want %q", b, want)
 	}

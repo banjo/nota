@@ -128,13 +128,13 @@ fail  note.saved   after      30s    folder=Inbox           echo nope >&2; exit 
 Direkt #jobb
 -- want/filed.md --
 ---
-created: "2026-11-22T10:42:00+01:00"
+created: 2026-11-22T10:42:00+01:00
 tags: [sorterad]
-updated: "2026-11-22T10:42:00+01:00"
+updated: 2026-11-22T10:42:00+01:00
 ---
 Ring Anna #jobb
 -- want/slow.md --
 ---
-created: "2026-11-22T10:42:00+01:00"
+created: 2026-11-22T10:42:00+01:00
 ---
 Långsam #slow

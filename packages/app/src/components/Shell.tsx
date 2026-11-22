@@ -12,6 +12,7 @@ import { EmptyState } from "./EmptyState.tsx";
 import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
 import { NotePage } from "./NotePage.tsx";
+import { Settings } from "./Settings.tsx";
 import { Palette } from "./Palette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
@@ -98,6 +99,8 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
       return <NoteList key={JSON.stringify(route.list)} list={route.list} />;
     case "inbox":
       return <InboxView />;
+    case "settings":
+      return <Settings />;
     default:
       return <Home run={run} />;
   }
