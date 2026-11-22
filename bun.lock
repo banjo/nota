@@ -35,6 +35,31 @@
         "vite-plus": "catalog:",
       },
     },
+    "apps/web": {
+      "name": "@nota/web",
+      "version": "0.0.0",
+      "dependencies": {
+        "@nota/app": "workspace:*",
+        "@nota/client": "workspace:*",
+        "@nota/ui": "workspace:*",
+        "@tanstack/react-query": "^5.90.11",
+        "lucide-react": "^0.555.0",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+      },
+      "devDependencies": {
+        "@babel/core": "^7.28.5",
+        "@rolldown/plugin-babel": "^0.2.0",
+        "@tailwindcss/vite": "^4.1.17",
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+        "@vitejs/plugin-react": "^6.0.0",
+        "babel-plugin-react-compiler": "^1.0.0",
+        "tailwindcss": "^4.1.17",
+        "typescript": "catalog:",
+        "vite-plus": "catalog:",
+      },
+    },
     "packages/app": {
       "name": "@nota/app",
       "version": "0.0.0",
@@ -242,6 +267,8 @@
     "@nota/editor": ["@nota/editor@workspace:packages/editor"],
 
     "@nota/ui": ["@nota/ui@workspace:packages/ui"],
+
+    "@nota/web": ["@nota/web@workspace:apps/web"],
 
     "@oxc-project/runtime": ["@oxc-project/runtime@0.159.0", "", {}, "sha512-z+wJlHpqB2rsnQ5PbQlWKC7lYISlHrniQ3N5JF4LGaa+kOopx5u5DMT2P7pN12fsXFg1gVcoLdRXPRyIS61OKQ=="],
 

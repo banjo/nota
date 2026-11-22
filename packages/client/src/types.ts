@@ -216,3 +216,91 @@ export interface ShellApi {
   /** Menu items and global shortcuts, as command ids. */
   onCommand(listener: (id: string) => void): () => void;
 }
+
+// The web app's account (docs/api.md, "Accounts"): passkeys, recovery
+// codes, devices and the approvals behind /app/connect.
+
+export interface SessionUser {
+  id: number;
+  email: string;
+  createdAt: string;
+}
+
+/** The signed-in browser session. */
+export interface AuthSession {
+  user: SessionUser;
+  /** Signed in with a recovery code: a new passkey is required first. */
+  needsPasskey: boolean;
+  passkeys: number;
+  recoveryCodesLeft: number;
+}
+
+export interface AuthConfig {
+  signup: "invite" | "open" | "closed";
+  rpId: string;
+  passkeys: boolean;
+}
+
+export interface PasskeyInfo {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+/** A pending CLI sign-in, by its user code. */
+export interface PendingCode {
+  id: number;
+  device: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface VaultSummary {
+  name: string;
+  cursor: number;
+  createdAt: string;
+}
+
+/**
+ * The web app's account API. It lives on the HTTP client only: the
+ * desktop app signs in through browser + PKCE (AccountApi) and the CLI
+ * through device codes.
+ */
+export interface AuthApi {
+  config(): Promise<AuthConfig>;
+  /** null when there is no session. Throws `unreachable` when offline. */
+  session(): Promise<AuthSession | null>;
+  register(input: {
+    email: string;
+    invite?: string;
+    /** The passkey's name, e.g. "MacBook Air". */
+    name: string;
+  }): Promise<{ user: SessionUser; recoveryCodes: string[] }>;
+  login(email?: string): Promise<AuthSession>;
+  recovery(email: string, code: string): Promise<AuthSession>;
+  addPasskey(name: string): Promise<PasskeyInfo[]>;
+  passkeys(): Promise<PasskeyInfo[]>;
+  removePasskey(id: string): Promise<void>;
+  logout(): Promise<void>;
+  devices(): Promise<Device[]>;
+  revokeDevice(id: number): Promise<void>;
+  /** A pending `nota login` by its user code. */
+  lookupCode(code: string): Promise<PendingCode>;
+  approveCode(code: string, approve: boolean): Promise<void>;
+  /** Approves a desktop sign-in and gets the nota://auth redirect. */
+  approveDesktop(input: {
+    challenge: string;
+    device: string;
+    redirect: string;
+    state?: string;
+  }): Promise<{ code: string; redirect: string; expiresIn: number }>;
+  vaults(): Promise<VaultSummary[]>;
+  createVault(name: string): Promise<VaultSummary>;
+  /** Where the web app lists this account's devices. */
+  devicesUrl(): string;
+  /** Fires when the session changes or expires; refetch `session()`. */
+  subscribe(listener: () => void): () => void;
+  /** Treats the session as gone (a 401 anywhere, or a sign-out). */
+  invalidate(): void;
+}

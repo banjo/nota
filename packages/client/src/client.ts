@@ -1,5 +1,6 @@
 import type {
   AccountApi,
+  AuthApi,
   Base,
   ChangeEvent,
   CreateInput,
@@ -62,6 +63,8 @@ export interface NotesClient {
   };
   /** Sign in to sync (desktop). The web app's session is phase 4b. */
   account?: AccountApi;
+  /** The web app's session: passkeys, devices, approvals. */
+  auth?: AuthApi;
   /** Windows, the file manager and menu commands (desktop). */
   shell?: ShellApi;
 }

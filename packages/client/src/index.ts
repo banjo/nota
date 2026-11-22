@@ -1,4 +1,15 @@
 export { NotaError, type NotesClient } from "./client.ts";
+export { createHttpAuth, type HttpAuth, type HttpAuthOptions } from "./auth.ts";
+export {
+  createPasskey,
+  creationOptionsFromJSON,
+  credentialToJSON,
+  fromBase64Url,
+  getPasskey,
+  passkeysSupported,
+  requestOptionsFromJSON,
+  toBase64Url,
+} from "./webauthn.ts";
 export {
   createHttpClient,
   escapePath,

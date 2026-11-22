@@ -1,0 +1,10 @@
+@import "@nota/ui/styles.css";
+@source "./";
+
+/* The web app fills the window like the desktop app; the document
+   scrolls only inside panes. */
+html,
+body,
+#root {
+  height: 100%;
+}

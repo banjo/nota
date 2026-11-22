@@ -10,7 +10,11 @@
   "scripts": {
     "ready": "vp check && vp run -r test && vp run go:test",
     "dev": "vp run @nota/desktop#dev",
+    "dev:web": "vp run @nota/web#dev",
+    "dev:landing": "vp run @nota/landing#dev",
     "build": "vp run @nota/desktop#build",
+    "web:build": "vp run @nota/web#build",
+    "site:build": "vp run @nota/landing#build && vp run @nota/web#build",
     "go:test": "go test ./...",
     "go:vet": "go vet ./...",
     "go:build": "go build -o bin/nota ./cmd/nota"

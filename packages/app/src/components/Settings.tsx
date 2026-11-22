@@ -4,11 +4,12 @@ import { Input } from "@nota/ui/input";
 import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Cloud, ExternalLink, FolderOpen, Laptop, LoaderCircle } from "lucide-react";
+import { Check, Cloud, ExternalLink, FolderOpen, LoaderCircle } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { fail } from "../actions.ts";
+import { DeviceList } from "../auth/Devices.tsx";
+import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
-import { relativeTime } from "../lib/format.ts";
 import { keys, useVaultInfo } from "../queries.ts";
 import { TopBar } from "./TopBar.tsx";
 
@@ -75,37 +76,11 @@ function Devices() {
       </p>
     );
   return (
-    <ul className="overflow-hidden rounded-lg border border-hairline">
-      {(devices.data ?? []).map((d) => (
-        <li
-          key={d.id}
-          className="flex items-center gap-3 border-t border-divider px-3.5 py-2.5 text-ui first:border-t-0 pointer-coarse:py-3"
-        >
-          <Laptop className="size-4 text-faint" strokeWidth={1.75} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-foreground">
-              {d.device}
-              {d.current ? <span className="ml-2 text-small text-ink">This device</span> : null}
-            </div>
-            <div className="text-small text-faint">
-              {d.lastUsedAt
-                ? `Last seen ${relativeTime(d.lastUsedAt).toLowerCase()}`
-                : `Added ${relativeTime(d.createdAt).toLowerCase()}`}
-            </div>
-          </div>
-          {!d.current ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => revoke.mutate(d)}
-              disabled={revoke.isPending}
-            >
-              Sign out
-            </Button>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+    <DeviceList
+      devices={devices.data ?? []}
+      onRevoke={(d) => revoke.mutate(d)}
+      busy={revoke.isPending}
+    />
   );
 }
 
@@ -166,11 +141,56 @@ function ChooseVault({ st }: { st: AccountState }) {
   );
 }
 
+function WebAccount() {
+  const client = useClient();
+  const auth = client.auth!;
+  const session = useSession();
+  const [busy, setBusy] = useState(false);
+  if (!session) return null;
+  return (
+    <Section
+      title="Account"
+      description="This vault lives on the server, and this browser is signed in with a passkey. Every change is saved there and reaches your other devices."
+    >
+      <Field label="Account">
+        <span className="flex items-center gap-1.5 text-foreground">
+          <Check className="size-3.5 text-success" strokeWidth={2.5} />
+          {session.user.email}
+        </span>
+      </Field>
+      <Field label="Passkeys">
+        <a href={auth.devicesUrl()} className="text-ink underline-offset-2 hover:underline">
+          {session.passkeys === 1 ? "1 passkey" : `${session.passkeys} passkeys`} · devices and
+          security
+        </a>
+      </Field>
+      <Field label="Recovery codes">{session.recoveryCodesLeft} left</Field>
+      <div className="mt-4">
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void auth.logout().finally(() => setBusy(false));
+          }}
+        >
+          Sign out
+        </Button>
+        <p className="mt-2 text-small text-faint">
+          Signing out ends this browser session. Your notes stay on the server, and your passkey
+          stays on this device.
+        </p>
+      </div>
+    </Section>
+  );
+}
+
 function SyncAccount() {
   const client = useClient();
   const st = useAccount();
   const [busy, setBusy] = useState(false);
   if (!client.account) {
+    if (client.auth) return <WebAccount />;
     return (
       <Section
         title="Account"

@@ -1,5 +1,6 @@
 import { NotaError, type NotesClient } from "./client.ts";
 import type {
+  AuthApi,
   Base,
   ChangeEvent,
   CreateInput,
@@ -31,6 +32,12 @@ export interface HttpClientOptions {
   fetch?: typeof fetch;
   /** Defaults to `new EventSource(url, { withCredentials: true })`. */
   eventSource?: (url: string) => EventSourceLike;
+  /** The web app's account API, exposed as `client.auth`. */
+  auth?: AuthApi;
+  /** Called on a 401, so the web app can show sign-in again. */
+  onUnauthorized?: () => void;
+  /** Called when the server answers, or when it cannot be reached. */
+  onStatus?: (up: boolean) => void;
 }
 
 /** The protocol version the client speaks (docs/sync-protocol.md). */
@@ -89,12 +96,22 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       ...init.headers,
     };
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
-    const res = await doFetch(url.toString(), {
-      method,
-      headers,
-      credentials: "include",
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    });
+    let res: Response;
+    try {
+      res = await doFetch(url.toString(), {
+        method,
+        headers,
+        credentials: "include",
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      });
+    } catch (e) {
+      options.onStatus?.(false);
+      throw new NotaError(
+        e instanceof Error && e.message ? e.message : "the server did not answer",
+        "unreachable",
+      );
+    }
+    options.onStatus?.(true);
     if (!res.ok) {
       let body: { code?: string; message?: string } | undefined;
       try {
@@ -102,6 +119,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       } catch {
         body = undefined;
       }
+      if (res.status === 401) options.onUnauthorized?.();
       throw new NotaError(
         body?.message ?? `${res.status} ${res.statusText}`,
         body?.code ?? `http_${res.status}`,
@@ -142,6 +160,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
 
   return {
     kind: "web",
+    ...(options.auth ? { auth: options.auth } : {}),
     async info(): Promise<VaultInfo> {
       const tree = await request<Tree>("GET", "/tree");
       return { name: options.vault, dir: `${root}/${options.vault}`, inbox: tree.inbox };

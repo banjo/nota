@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./styles.css": "./src/styles.css",
+    "./tokens.css": "./src/tokens.css",
     "./utils": "./src/lib/utils.ts",
     "./*": "./src/components/*.tsx"
   },
