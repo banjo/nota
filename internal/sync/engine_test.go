@@ -684,3 +684,63 @@ func randomOp(t *testing.T, n *node, rng *rand.Rand, next *int) {
 		n.write(p, strings.Join(lines, ""))
 	}
 }
+
+func TestWatch(t *testing.T) {
+	h := newHarness(t)
+	a, b := h.node("a"), h.node("b")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	passes := make(chan *Result, 100)
+	done := make(chan error, 1)
+	go func() {
+		done <- b.e.Watch(ctx, WatchOptions{Debounce: 20 * time.Millisecond, Poll: time.Hour, OnPass: func(r *Result, err error) {
+			if err == nil {
+				passes <- r
+			}
+		}})
+	}()
+	waitPass := func(what string, ok func(*Result) bool) {
+		t.Helper()
+		timeout := time.After(10 * time.Second)
+		for {
+			select {
+			case r := <-passes:
+				if ok(r) {
+					return
+				}
+			case <-timeout:
+				t.Fatalf("no pass %s", what)
+			}
+		}
+	}
+	waitPass("at start", func(*Result) bool { return true })
+	// A server-side change arrives through the SSE nudge.
+	a.write("remote.md", "from a\n")
+	a.sync()
+	waitPass("pulling remote.md", func(r *Result) bool { return slices.Contains(r.Pulled, "remote.md") })
+	// A local change, also in a new folder, is seen by the file watcher.
+	b.write("Ny mapp/local.md", "from b\n")
+	waitPass("pushing local.md", func(r *Result) bool { return slices.Contains(r.Pushed, "Ny mapp/local.md") })
+	// Writes into ignored folders do not trigger passes. (Let the
+	// follow-up pass for b's own nudge go by first.)
+	for quiet := time.After(300 * time.Millisecond); ; {
+		select {
+		case <-passes:
+			continue
+		case <-quiet:
+		}
+		break
+	}
+	b.write(".nota/noise.txt", "x")
+	select {
+	case r := <-passes:
+		t.Fatalf("pass for an ignored file: %+v", r)
+	case <-time.After(200 * time.Millisecond):
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	a.sync()
+	sameFiles(t, a, b)
+}

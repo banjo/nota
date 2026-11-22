@@ -240,6 +240,7 @@ func (e *Engine) Sync(ctx context.Context) (*Result, error) {
 		e.log.Warn("sync pass failed", append(attrs, "err", err)...)
 		return res, err
 	}
+	_ = e.st.setMeta("last_sync", time.Now().UTC().Format(time.RFC3339Nano))
 	if gerr := e.st.gcBases(); gerr != nil {
 		e.log.Warn("sync: cleaning merge bases", "err", gerr)
 	}

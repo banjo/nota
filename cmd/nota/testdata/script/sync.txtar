@@ -1,0 +1,167 @@
+# Two machines, vaults a and b, sync through a real `nota serve` running
+# in the background: create, merge, conflict copy, delete, watch mode.
+[windows] skip 'stops the server with SIGINT'
+env NOTA_NOW=2026-11-22T10:42:00+01:00
+
+exec nota serve --addr 127.0.0.1:0 --data data --addr-file addr &srv&
+waitaddr addr SERVER
+nota serve --data data user add anton@example.com
+nota serve --data data token create anton@example.com --device laptop
+envstdout TOKA
+nota serve --data data token create anton@example.com --device desktop
+envstdout TOKB
+
+# Without a remote, sync says how to add one.
+exitcode 3 nota --vault a sync
+stderr 'no sync remote; add one with `nota remote add'
+
+# A bad token is refused before anything is saved.
+exitcode 1 nota --vault a remote add $SERVER --token nota_wrong
+stderr 'server: unknown or revoked token'
+! exists a/.nota/sync.toml
+
+nota --vault a remote add $SERVER --token $TOKA --device laptop
+stdout '^remote http://127.0.0.1:\d+, vault main \(created\), device laptop$'
+stderr 'no OS keyring \(NOTA_KEYRING=file\); the token is stored in .*credentials \(mode 0600\)'
+grep 'token_store = "file"' a/.nota/sync.toml
+! grep nota_ a/.nota/sync.toml
+nota --vault a remote show
+stdout '^vault   main$'
+stdout '^token   stored in the file$'
+
+nota --vault a sync
+stdout '^  pushed    Plan.md$'
+stdout '^  pushed    Möte.md$'
+stdout '^synced with http://127.0.0.1:\d+ \(vault main\): 2 pushed; cursor 2$'
+nota --vault a sync
+stdout '^up to date with .* \(vault main, cursor 2\)$'
+
+mkdir b
+nota --vault b remote add $SERVER --token $TOKB --device desktop
+stdout 'vault main \(using\), device desktop'
+nota --vault b sync
+stdout '^  pulled    Plan.md$'
+stdout '^  pulled    Möte.md$'
+cmp b/Plan.md a/Plan.md
+
+# Edits to different lines on both machines merge cleanly.
+cp plan-a.md a/Plan.md
+cp plan-b.md b/Plan.md
+nota --vault a sync
+stdout '^  pushed    Plan.md$'
+nota --vault b sync
+stdout '^  merged    Plan.md$'
+cmp b/Plan.md want/plan-merged.md
+nota --vault a sync
+stdout '^  pulled    Plan.md$'
+cmp a/Plan.md want/plan-merged.md
+
+# Edits to the same line keep both: b's text goes to a conflict copy.
+cp mote-a.md a/Möte.md
+cp mote-b.md b/Möte.md
+nota --vault a sync
+nota --vault b sync --json
+stdout '"path": "Möte.md"'
+stdout '"copy": "Möte \(conflict 2026-11-22 1042 desktop\).md"'
+cmp b/Möte.md mote-a.md
+cmp 'b/Möte (conflict 2026-11-22 1042 desktop).md' mote-b.md
+nota --vault a sync
+stdout '^  pulled    Möte \(conflict 2026-11-22 1042 desktop\).md$'
+cmp 'a/Möte (conflict 2026-11-22 1042 desktop).md' mote-b.md
+
+# sync.completed runs hooks; status shows the state.
+cp hooks.toml a/.nota/hooks.toml
+rm a/Plan.md
+nota --vault a sync status
+stdout '^synced   3 files, cursor 6, last sync '
+stdout '^server   cursor 6 \(up to date\)$'
+stdout '^local    0 changed, 0 new, 1 deleted \(not pushed yet\)$'
+stdout '^daemon   not running$'
+nota --vault a sync
+stdout '^  deleted   Plan.md$'
+grep '^sync.completed$' a/.nota/synced.log
+nota --vault b sync
+stdout '^  removed   Plan.md \(moved to .trash/\)$'
+exists b/.trash/Plan.md
+
+# Watch mode on b picks up a's changes through the SSE nudge, and stops
+# cleanly on SIGINT.
+exec nota --vault b sync --watch --interval 1h --debounce 50ms &watch&
+waitfor b/.nota/sync.lock pid
+nota --vault b sync status
+stdout '^daemon   running \(pid \d+'
+exitcode 1 nota --vault b sync
+stderr 'already being synced'
+cp idea.md a/Idé.md
+nota --vault a sync
+stdout '^  pushed    Idé.md$'
+waitfor b/Idé.md 'Ny idé'
+kill -INT watch
+wait watch
+stdout '  pulled    Idé.md'
+stderr 'stopped watching'
+! exists b/.nota/sync.lock
+
+kill -INT srv
+wait srv
+stderr 'nota serve: listening'
+stderr 'method=PUT route="PUT /v1/vaults/{vault}/files/{path...}" path=/v1/vaults/main/files/Idé.md status=200 .* user=anton@example.com device=laptop vault=main'
+stderr 'method=PUT .* path="/v1/vaults/main/files/Möte \(conflict 2026-11-22 1042 desktop\).md" status=200 .* device=desktop'
+stderr 'nota serve: stopped'
+
+# Removing the remote keeps the files and forgets the token.
+nota --vault a remote rm
+stdout '^removed remote http://127.0.0.1:\d+ \(vault main\)$'
+! exists a/.nota/sync.toml
+exists a/Idé.md
+! grep '#laptop' $XDG_CONFIG_HOME/nota/credentials
+grep '#desktop' $XDG_CONFIG_HOME/nota/credentials
+
+-- a/Plan.md --
+# Plan
+
+- one
+- two
+- three
+- four
+-- a/Möte.md --
+# Möte
+
+Tid: 10:00
+-- plan-a.md --
+# Plan
+
+- ONE from a
+- two
+- three
+- four
+-- plan-b.md --
+# Plan
+
+- one
+- two
+- three
+- FOUR from b
+- five from b
+-- want/plan-merged.md --
+# Plan
+
+- ONE from a
+- two
+- three
+- FOUR from b
+- five from b
+-- mote-a.md --
+# Möte
+
+Tid: 11:00
+-- mote-b.md --
+# Möte
+
+Tid: 14:30
+-- hooks.toml --
+[[hook]]
+event = "sync.completed"
+run = "echo $NOTA_EVENT >> .nota/synced.log"
+-- idea.md --
+# Ny idé

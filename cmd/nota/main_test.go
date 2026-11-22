@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rogpeppe/go-internal/testscript"
 
@@ -35,11 +37,16 @@ func TestScripts(t *testing.T) {
 			e.Setenv("USERPROFILE", filepath.Join(e.WorkDir, "home"))
 			e.Setenv("XDG_CONFIG_HOME", filepath.Join(e.WorkDir, ".config"))
 			e.Setenv("TZ", "UTC")
+			// No OS keyring in tests: tokens go to the credentials file.
+			e.Setenv("NOTA_KEYRING", "file")
 			return os.MkdirAll(filepath.Join(e.WorkDir, "home"), 0o755)
 		},
 		Cmds: map[string]func(*testscript.TestScript, bool, []string){
-			"exitcode": cmdExitcode,
-			"diskls":   cmdDiskls,
+			"exitcode":  cmdExitcode,
+			"diskls":    cmdDiskls,
+			"waitaddr":  cmdWaitaddr,
+			"envstdout": cmdEnvstdout,
+			"waitfor":   cmdWaitfor,
 		},
 	})
 }
@@ -94,4 +101,47 @@ func cmdDiskls(ts *testscript.TestScript, neg bool, args []string) {
 		ts.Fatalf("diskls: %v", err)
 	}
 	fmt.Fprintln(ts.Stdout(), strings.Join(lines, "\n"))
+}
+
+// waitaddr file NAME waits up to 10 s for a server to write its address
+// to file (nota serve --addr-file) and sets $NAME to http://<addr>.
+func cmdWaitaddr(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || len(args) != 2 {
+		ts.Fatalf("usage: waitaddr file NAME")
+	}
+	p := ts.MkAbs(args[0])
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if data, err := os.ReadFile(p); err == nil && strings.HasSuffix(string(data), "\n") {
+			ts.Setenv(args[1], "http://"+strings.TrimSpace(string(data)))
+			return
+		}
+	}
+	ts.Fatalf("waitaddr: no address in %s after 10s", args[0])
+}
+
+// envstdout NAME sets $NAME to the trimmed stdout of the last command.
+func cmdEnvstdout(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || len(args) != 1 {
+		ts.Fatalf("usage: envstdout NAME")
+	}
+	ts.Setenv(args[0], strings.TrimSpace(ts.ReadFile("stdout")))
+}
+
+// waitfor file regexp waits up to 10 s until file exists and matches.
+func cmdWaitfor(ts *testscript.TestScript, neg bool, args []string) {
+	if neg || len(args) != 2 {
+		ts.Fatalf("usage: waitfor file regexp")
+	}
+	re, err := regexp.Compile(args[1])
+	if err != nil {
+		ts.Fatalf("waitfor: %v", err)
+	}
+	p := ts.MkAbs(args[0])
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if data, err := os.ReadFile(p); err == nil && re.Match(data) {
+			return
+		}
+	}
+	data, _ := os.ReadFile(p)
+	ts.Fatalf("waitfor: %s does not match %q after 10s; it has %q", args[0], args[1], data)
 }

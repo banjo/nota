@@ -174,6 +174,7 @@ Every command prints JSON with --json.`,
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(),
 		a.rmCmd(), a.tagCmd(), a.setCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(),
 		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(), a.serveCmd(),
+		a.syncCmd(), a.remoteCmd(),
 	)
 	return root
 }
@@ -288,6 +289,13 @@ func (a *app) close() {
 	if a.ix != nil {
 		a.ix.Close()
 	}
+}
+
+// printJSONLine writes v as one line of JSON (for streams of results).
+func (a *app) printJSONLine(v any) error {
+	enc := json.NewEncoder(a.stdout)
+	enc.SetEscapeHTML(false)
+	return enc.Encode(v)
 }
 
 // printJSON writes v as indented JSON.
