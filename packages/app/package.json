@@ -1,0 +1,31 @@
+{
+  "name": "@nota/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@nota/client": "workspace:*",
+    "@nota/editor": "workspace:*",
+    "@nota/ui": "workspace:*",
+    "@tanstack/react-query": "^5.90.11",
+    "@tanstack/react-virtual": "^3.13.12",
+    "lucide-react": "^0.555.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

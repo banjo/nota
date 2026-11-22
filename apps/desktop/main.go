@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/egoist/mygo"
 
@@ -181,6 +182,11 @@ func main() {
 		}
 	})
 
+	// The capture panel hides instead of closing, except while quitting.
+	var quitting atomic.Bool
+	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting.Store(true) })
+	mygo.App.OnQuitCanceled(func() { quitting.Store(false) })
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	mygo.App.WhenReady(func() {
@@ -213,6 +219,9 @@ func main() {
 			BackgroundColor: "light-dark(#ffffff, #232325)",
 		})
 		c.OnClose(func(e *mygo.CloseEvent) {
+			if quitting.Load() {
+				return // the app is quitting: let it close
+			}
 			e.PreventDefault()
 			c.Hide()
 		})

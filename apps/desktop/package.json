@@ -12,8 +12,8 @@
     "test": "vp test --passWithNoTests"
   },
   "dependencies": {
+    "@nota/app": "workspace:*",
     "@nota/client": "workspace:*",
-    "@nota/editor": "workspace:*",
     "@nota/ui": "workspace:*",
     "mygo-runtime": "^0.10.0",
     "react": "catalog:",

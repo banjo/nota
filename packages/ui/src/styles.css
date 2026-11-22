@@ -12,6 +12,11 @@
 :root {
   color-scheme: light dark;
 
+  /* The system font on Apple platforms; Inter elsewhere. WebKitGTK maps
+     unknown families such as -apple-system to the default font, so other
+     platforms list Inter first (NotaApp sets data-platform). */
+  --app-font: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+
   --background: #ffffff;
   --foreground: #1d1f24;
   --text: #2a2c31; /* body copy */
@@ -26,6 +31,7 @@
   --selected: #e8e8e4;
   --chip: #efefec;
   --chip-foreground: #4a4d55;
+  --file: #55585f; /* note rows in the tree */
   --code: #f1f1ee;
   --surface: #ffffff; /* popovers, palette, capture card */
   --overlay: rgba(20, 21, 24, 0.28);
@@ -46,6 +52,10 @@
   --shadow-card: 0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+:root[data-platform="other"] {
+  --app-font: "Inter", "Inter Variable", "Segoe UI", system-ui, sans-serif;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #1c1c1e;
@@ -62,6 +72,7 @@
     --selected: #333337;
     --chip: #2e2e32;
     --chip-foreground: #c4c5ca;
+    --file: #b4b3af;
     --code: #29292d;
     --surface: #26262a;
     --overlay: rgba(0, 0, 0, 0.5);
@@ -97,6 +108,7 @@
   --color-selected: var(--selected);
   --color-chip: var(--chip);
   --color-chip-foreground: var(--chip-foreground);
+  --color-file: var(--file);
   --color-code: var(--code);
   --color-surface: var(--surface);
   --color-overlay: var(--overlay);
@@ -186,7 +198,7 @@
     margin: 0;
     background: var(--background);
     color: var(--foreground);
-    font-family: var(--font-sans);
+    font-family: var(--app-font);
     font-size: 13px;
     line-height: 1.4;
     -webkit-font-smoothing: antialiased;

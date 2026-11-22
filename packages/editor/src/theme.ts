@@ -38,8 +38,8 @@ export const notaTheme = EditorView.theme({
     letterSpacing: "-0.02em",
     fontWeight: "700",
   },
-  ".cm-h2": { fontSize: "1.2em", lineHeight: "1.4", paddingTop: "0.9em !important" },
-  ".cm-h3": { fontSize: "1.07em", paddingTop: "0.7em !important" },
+  ".cm-h2": { fontSize: "1.15em", lineHeight: "1.4", paddingTop: "0.35em !important" },
+  ".cm-h3": { fontSize: "1.05em", paddingTop: "0.3em !important" },
   ".cm-h4, .cm-h5, .cm-h6": {
     fontSize: "1em",
     paddingTop: "0.5em !important",
@@ -111,7 +111,7 @@ export const notaTheme = EditorView.theme({
 
   // Lists: a hanging indent so wrapped lines align with the text.
   ".cm-list": { paddingLeft: "var(--hang) !important", textIndent: "calc(-1 * var(--hang))" },
-  ".cm-list-mark": { color: v("faint", "#9ca0a8") },
+  ".cm-list-mark": { color: v("muted-foreground", "#6b6f78"), fontVariantNumeric: "tabular-nums" },
   ".cm-bullet": {
     display: "inline-block",
     width: "1ch",

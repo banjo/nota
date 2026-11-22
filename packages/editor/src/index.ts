@@ -23,6 +23,7 @@ export {
 export { livePreview, toDecorations, type PreviewHandlers } from "./preview.ts";
 export { findTags, notaSyntax, parseWikilink, tagLength, type Wikilink } from "./syntax.ts";
 export { notaTheme } from "./theme.ts";
+export type { EditorView } from "@codemirror/view";
 
 /** Markdown with GFM and Nota's wikilinks and tags. */
 export const notaMarkdown = () =>
