@@ -181,6 +181,8 @@ export interface AccountState {
   vaults: { name: string; cursor: number; created: string }[];
   suggested?: string;
   connectUrl?: string;
+  /** Where the browser signs in (the web app's origin). */
+  web?: string;
   error?: string;
 }
 

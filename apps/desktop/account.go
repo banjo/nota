@@ -51,7 +51,10 @@ type AccountState struct {
 	Suggested string `json:"suggested,omitempty"`
 	// ConnectURL is the page opened in the browser while pending.
 	ConnectURL string `json:"connectUrl,omitempty"`
-	Error      string `json:"error,omitempty"`
+	// Web is where the browser signs in ($NOTA_WEB_URL): the hint under
+	// the button names its host, so a self-hosted pair shows its own.
+	Web   string `json:"web,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 // RemoteVault is a vault of the account on the server.
@@ -196,7 +199,8 @@ func newAccount(s *Vault) *Account {
 
 // initial is the state at start: signed in when the vault has a remote.
 func (a *Account) initial() AccountState {
-	st := AccountState{State: "signed-out", Server: envOr("NOTA_SERVER_URL", defaultServer), Device: deviceName(), Vaults: []RemoteVault{}}
+	st := AccountState{State: "signed-out", Server: envOr("NOTA_SERVER_URL", defaultServer), Web: a.web,
+		Device: deviceName(), Vaults: []RemoteVault{}}
 	r, ok, err := nsync.LoadRemote(a.metaDir)
 	switch {
 	case err != nil:

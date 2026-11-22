@@ -23,6 +23,11 @@ export interface AccountState {
   suggested?: string;
   /** ConnectURL is the page opened in the browser while pending. */
   connectUrl?: string;
+  /**
+   * Web is where the browser signs in ($NOTA_WEB_URL): the hint under
+   * the button names its host, so a self-hosted pair shows its own.
+   */
+  web?: string;
   error?: string;
 }
 

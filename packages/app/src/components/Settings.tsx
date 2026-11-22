@@ -340,8 +340,8 @@ function SyncAccount() {
             <Cloud /> Sign in to sync
           </Button>
           <p className="text-small text-faint">
-            Opens {new URL(st.connectUrl ?? "https://nota.banjoanton.com").host} in your browser;
-            you come back here when done.
+            Opens {new URL(st.web ?? st.connectUrl ?? "https://nota.banjoanton.com").host} in your
+            browser; you come back here when done.
           </p>
         </div>
       ) : null}
