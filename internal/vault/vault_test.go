@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/banjo/nota/internal/events"
 )
 
 const nfd = "Mo\u0308te" // "Möte" decomposed, as macOS may store it
@@ -352,5 +354,56 @@ func TestOpenInbox(t *testing.T) {
 	}
 	if v.Inbox() != "Inkorg" {
 		t.Fatalf("inbox %q", v.Inbox())
+	}
+}
+
+func TestEvents(t *testing.T) {
+	bus := events.New()
+	v, err := Open(t.TempDir(), Options{Bus: bus})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	bus.Subscribe(func(e events.Event) {
+		s := string(e.Type) + " " + e.Path
+		if e.OldPath != "" {
+			s += " <- " + e.OldPath
+		}
+		if e.Trash != "" {
+			s += " -> " + e.Trash
+		}
+		got = append(got, s)
+	})
+	n, err := v.Create(v.Inbox(), []byte("Idea"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := v.Write(n.Path, []byte("Idea\nmore")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := v.Write("Projects/Plan.md", []byte("Plan")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Move(n.Path, "Projects"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Move("Projects/Plan.md", "Inbox"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Delete("Inbox/Plan.md"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"note.created Inbox/Idea.md",
+		"inbox.added Inbox/Idea.md",
+		"note.saved Inbox/Idea.md",
+		"note.created Projects/Plan.md",
+		"note.moved Projects/Idea.md <- Inbox/Idea.md",
+		"note.moved Inbox/Plan.md <- Projects/Plan.md",
+		"inbox.added Inbox/Plan.md",
+		"note.deleted Inbox/Plan.md -> .trash/Inbox/Plan.md",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("events:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }

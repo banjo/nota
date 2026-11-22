@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/frontmatter"
 )
 
@@ -31,6 +32,8 @@ type Options struct {
 	Inbox string
 	// Create makes the vault directory when it does not exist yet.
 	Create bool
+	// Bus receives the vault's events. Nil drops them.
+	Bus *events.Bus
 }
 
 // Vault is an open vault directory.
@@ -38,6 +41,7 @@ type Vault struct {
 	root   string
 	inbox  string
 	ignore *Ignore
+	bus    *events.Bus
 }
 
 // Open opens the vault at dir and loads its .notaignore.
@@ -65,7 +69,7 @@ func Open(dir string, opts Options) (*Vault, error) {
 	if inbox, err = CleanPath(inbox); err != nil {
 		return nil, fmt.Errorf("vault: inbox: %w", err)
 	}
-	v := &Vault{root: root, inbox: inbox}
+	v := &Vault{root: root, inbox: inbox, bus: opts.Bus}
 	if err := v.ReloadIgnore(); err != nil {
 		return nil, err
 	}
@@ -77,6 +81,17 @@ func (v *Vault) Root() string { return v.root }
 
 // Inbox returns the vault-relative inbox folder.
 func (v *Vault) Inbox() string { return v.inbox }
+
+// Bus returns the event bus the vault emits on (possibly nil).
+func (v *Vault) Bus() *events.Bus { return v.bus }
+
+// emit sends an event, plus inbox.added when a note arrives in the inbox.
+func (v *Vault) emit(e events.Event, arrived bool) {
+	v.bus.Emit(e)
+	if arrived && Folder(e.Path) == v.inbox {
+		v.bus.Emit(events.Event{Type: events.InboxAdded, Path: e.Path, Time: e.Time})
+	}
+}
 
 // Ignore returns the vault's ignore matcher.
 func (v *Vault) Ignore() *Ignore { return v.ignore }
@@ -290,13 +305,21 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 		return "", false, &PathError{Op: "write", Path: rel, Existing: r.collision, Err: ErrCaseCollision}
 	}
 	if r.exists {
-		return rel, false, writeAtomic(r.disk, data)
+		if err := writeAtomic(r.disk, data); err != nil {
+			return "", false, err
+		}
+		v.emit(events.Event{Type: events.NoteSaved, Path: rel}, false)
+		return rel, false, nil
 	}
 	disk, err := v.mkdirs(Folder(rel))
 	if err != nil {
 		return "", false, err
 	}
-	return rel, true, writeAtomic(filepath.Join(disk, path.Base(rel)), data)
+	if err := writeAtomic(filepath.Join(disk, path.Base(rel)), data); err != nil {
+		return "", false, err
+	}
+	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
+	return rel, true, nil
 }
 
 // Create writes a new note into folder ("" for the vault root). The file
@@ -323,6 +346,7 @@ func (v *Vault) Create(folder string, data []byte) (*Note, error) {
 	if err := writeAtomic(filepath.Join(dir, name), data); err != nil {
 		return nil, err
 	}
+	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
 	return v.Read(rel)
 }
 
@@ -419,6 +443,7 @@ func (v *Vault) Rename(from, to string) (string, error) {
 	if err := os.Rename(src.disk, filepath.Join(dir, path.Base(to))); err != nil {
 		return "", fmt.Errorf("vault: %w", err)
 	}
+	v.emit(events.Event{Type: events.NoteMoved, Path: to, OldPath: from}, Folder(from) != Folder(to))
 	return to, nil
 }
 
@@ -448,7 +473,9 @@ func (v *Vault) Delete(rel string) (string, error) {
 	if err := os.Rename(src.disk, filepath.Join(dir, name)); err != nil {
 		return "", fmt.Errorf("vault: %w", err)
 	}
-	return path.Join(folder, name), nil
+	trash := path.Join(folder, name)
+	v.emit(events.Event{Type: events.NoteDeleted, Path: rel, Trash: trash}, false)
+	return trash, nil
 }
 
 // writeAtomic writes data to a temp file next to dst and renames it over
