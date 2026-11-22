@@ -20,7 +20,12 @@ const (
 	NoteMoved   Type = "note.moved"
 	NoteDeleted Type = "note.deleted"
 	InboxAdded  Type = "inbox.added"
+	// SyncCompleted is emitted after a sync pass (phase 3).
+	SyncCompleted Type = "sync.completed"
 )
+
+// Types lists every event type, in documentation order.
+var Types = []Type{NoteCreated, NoteSaved, NoteMoved, NoteDeleted, InboxAdded, SyncCompleted}
 
 // Event is one thing that happened in a vault.
 type Event struct {
@@ -33,6 +38,9 @@ type Event struct {
 	// Trash is where a deleted note went (".trash/…"), for note.deleted.
 	Trash string    `json:"trash,omitempty"`
 	Time  time.Time `json:"time"`
+	// Origin names who made the change when it was not the user, e.g.
+	// "hook:<id>" for a transform hook's edit. Empty otherwise.
+	Origin string `json:"origin,omitempty"`
 }
 
 // Handler receives events.

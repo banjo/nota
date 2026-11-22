@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/banjo/nota/internal/events"
+	"github.com/banjo/nota/internal/hooks"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/egoist/mygo"
@@ -25,9 +26,10 @@ type Note struct {
 
 // Vault exposes the notes of one folder to the frontend.
 type Vault struct {
-	mu sync.Mutex // bound methods run on their own goroutines
-	v  *vault.Vault
-	ix *index.Index
+	mu    sync.Mutex // bound methods run on their own goroutines
+	v     *vault.Vault
+	ix    *index.Index
+	hooks *hooks.Runner // nil without .nota/hooks.toml
 }
 
 // openVault opens the vault and its persistent index (.nota/index.db),
@@ -60,6 +62,14 @@ func openVault(dir, inbox string) (*Vault, error) {
 			slog.Warn("index update failed", "path", e.Path, "err", err)
 		}
 	}, events.NoteCreated, events.NoteSaved, events.NoteMoved, events.NoteDeleted)
+	// Hooks run after the index has seen a change. After hooks never
+	// block the UI; transform hooks run inside the write, as in the CLI.
+	if cfg, err := hooks.Load(v); err != nil {
+		slog.Warn("hooks disabled", "err", err)
+	} else if len(cfg.Hooks) > 0 {
+		s.hooks = hooks.New(v, cfg, hooks.Options{})
+		s.hooks.Attach(bus)
+	}
 	return s, nil
 }
 
@@ -144,6 +154,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer s.ix.Close()
+	if s.hooks != nil {
+		defer s.hooks.Wait()
+	}
 	if err := ensureWelcome(s); err != nil {
 		log.Fatal(err)
 	}

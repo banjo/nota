@@ -17,6 +17,7 @@ import (
 
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/events"
+	"github.com/banjo/nota/internal/hooks"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/vault"
 )
@@ -89,6 +90,7 @@ type app struct {
 	vault *vault.Vault
 	bus   *events.Bus
 	ix    *index.Index
+	hooks *hooks.Runner
 	// attrs are added to the command's wide log event.
 	attrs []any
 }
@@ -171,7 +173,7 @@ Every command prints JSON with --json.`,
 	root.AddCommand(
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(),
 		a.rmCmd(), a.tagCmd(), a.setCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(),
-		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(),
+		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(),
 	)
 	return root
 }
@@ -205,6 +207,14 @@ func (a *app) openVault(create bool) error {
 	a.vault = v
 	// Keep the index in step with every write this command makes.
 	a.bus.Subscribe(a.onEvent)
+	// Then run the vault's hooks on them. A broken hooks file is reported
+	// but does not stop the command.
+	if cfg, err := hooks.Load(v); err != nil {
+		a.log.Warn("hooks disabled", "err", err)
+	} else if len(cfg.Hooks) > 0 {
+		a.hooks = hooks.New(v, cfg, hooks.Options{Logger: a.log})
+		a.hooks.Attach(a.bus)
+	}
 	a.log.Debug("vault", "dir", loc.Dir, "source", loc.Source, "inbox", v.Inbox())
 	return nil
 }
@@ -271,6 +281,9 @@ func (a *app) onEvent(e events.Event) {
 }
 
 func (a *app) close() {
+	if a.hooks != nil {
+		a.hooks.Wait() // let background hooks finish before the process exits
+	}
 	a.bus.Close()
 	if a.ix != nil {
 		a.ix.Close()

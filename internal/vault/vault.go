@@ -49,6 +49,7 @@ type Vault struct {
 	ignore *Ignore
 	bus    *events.Bus
 	now    func() time.Time
+	origin string
 }
 
 // Open opens the vault in the OS directory dir and loads its .notaignore.
@@ -114,11 +115,23 @@ func (v *Vault) Now() time.Time { return v.now() }
 // Bus returns the event bus the vault emits on (possibly nil).
 func (v *Vault) Bus() *events.Bus { return v.bus }
 
-// emit sends an event, plus inbox.added when a note arrives in the inbox.
+// WithOrigin returns a view of the vault whose events carry origin in
+// Event.Origin, so subscribers can tell who made a change. Hooks use it
+// to keep their own writes from triggering them again.
+func (v *Vault) WithOrigin(origin string) *Vault {
+	c := *v
+	c.origin = origin
+	return &c
+}
+
+// emit sends an event, plus inbox.added when a note arrives in the inbox
+// and is still there once the first event has been handled (a hook may
+// have filed it already).
 func (v *Vault) emit(e events.Event, arrived bool) {
+	e.Origin = v.origin
 	v.bus.Emit(e)
-	if arrived && Folder(e.Path) == v.inbox {
-		v.bus.Emit(events.Event{Type: events.InboxAdded, Path: e.Path, Time: e.Time})
+	if arrived && Folder(e.Path) == v.inbox && v.Exists(e.Path) {
+		v.bus.Emit(events.Event{Type: events.InboxAdded, Path: e.Path, Time: e.Time, Origin: v.origin})
 	}
 }
 
@@ -427,7 +440,8 @@ func Stamp(old, data []byte, now time.Time) []byte {
 
 // Create writes a new note into folder ("" for the vault root). The file
 // name comes from the note's title; " 2", " 3" … are added until the name
-// is free, comparing names case-insensitively.
+// is free, comparing names case-insensitively. The note is returned as
+// written; event handlers may have moved it since (see events.Bus.Follow).
 func (v *Vault) Create(folder string, data []byte) (*Note, error) {
 	folder, err := CleanPath(folder)
 	if err != nil {
@@ -446,11 +460,17 @@ func (v *Vault) Create(folder string, data []byte) (*Note, error) {
 		return nil, err
 	}
 	rel := path.Join(folder, name)
-	if err := v.fs.WriteFile(fsJoin(dir, name), data); err != nil {
+	disk := fsJoin(dir, name)
+	if err := v.fs.WriteFile(disk, data); err != nil {
 		return nil, wrap(err)
 	}
+	// Read before emitting: handlers (hooks) may move the note right away.
+	n, err := v.readDisk(rel, disk)
+	if err != nil {
+		return nil, err
+	}
 	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
-	return v.Read(rel)
+	return n, nil
 }
 
 // freeName returns stem+ext, or "stem N"+ext for the lowest N >= 2, such

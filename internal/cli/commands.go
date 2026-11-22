@@ -98,7 +98,8 @@ func (a *app) addCmd() *cobra.Command {
 		Long: `Create a note. The first line becomes its title and file name.
 With "-" (or no text and piped input) the note is read from stdin.
 Notes go to the inbox folder unless --folder is given; use --folder / for
-the vault root.`,
+the vault root. The printed path is where the note ended up, after any
+transform hooks (.nota/hooks.toml) filed it.`,
 		Example: `  nota add "Köp mjölk" --tag handla
   nota add --folder Projekt "# Plan" 
   pbpaste | nota add -`,
@@ -120,16 +121,19 @@ the vault root.`,
 			if _, err := a.index(); err != nil {
 				return err
 			}
+			where, stop := a.bus.Follow() // a transform hook may file the note
 			n, err := a.vault.Create(folder, content)
+			stop()
 			if err != nil {
 				return err
 			}
-			a.attrs = append(a.attrs, "path", n.Path)
+			p := where(n.Path)
+			a.attrs = append(a.attrs, "path", p)
 			if !a.json {
-				fmt.Fprintln(a.stdout, n.Path)
+				fmt.Fprintln(a.stdout, p)
 				return nil
 			}
-			e, err := a.ix.Get(n.Path)
+			e, err := a.ix.Get(p)
 			if err != nil {
 				return err
 			}
@@ -387,10 +391,13 @@ The file's content is not touched, so its "updated" timestamp stays.`,
 			if err != nil {
 				return err
 			}
+			where, stop := a.bus.Follow() // moving into the inbox runs inbox.added hooks
 			to, err := a.vault.Move(p, args[1])
+			stop()
 			if err != nil {
 				return err
 			}
+			to = where(to)
 			if a.json {
 				return a.printJSON(map[string]string{"from": p, "path": to})
 			}
