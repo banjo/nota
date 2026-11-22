@@ -162,6 +162,12 @@ func (r *Runner) Handle(e events.Event) {
 }
 
 func (r *Runner) skip(h Hook, e events.Event) bool {
+	// Notes that arrive through sync were already transformed on the
+	// device that made them; transforming them again on every device
+	// would fight over the same edit.
+	if e.Origin == events.OriginSync && h.Mode == Transform {
+		return true
+	}
 	by, ok := strings.CutPrefix(e.Origin, OriginPrefix)
 	if !ok {
 		return false

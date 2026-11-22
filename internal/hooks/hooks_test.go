@@ -425,3 +425,28 @@ func TestShellExec(t *testing.T) {
 		t.Fatalf("took %v", d)
 	}
 }
+
+func TestSyncedNotesSkipTransforms(t *testing.T) {
+	// A note written by the sync engine was transformed (or not) on the
+	// device it came from: only after hooks run for it here.
+	f := &fake{reply: func(Hook, Payload) (string, error) { return `{"set":{"x":1}}`, nil }}
+	s := newSetup(t, `
+[[hook]]
+name = "stamp"
+event = "note.created"
+mode = "transform"
+run = "x"
+
+[[hook]]
+name = "log"
+event = "note.created"
+run = "x"
+`, f, nil)
+	if _, _, err := s.v.WithOrigin(events.OriginSync).Write("Notes/synced.md", []byte("x\n")); err != nil {
+		t.Fatal(err)
+	}
+	s.r.Wait()
+	if got, want := f.hooksCalled(), []string{"note.created Notes/synced.md"}; !slices.Equal(got, want) || !slices.Contains(f.env[0], "NOTA_HOOK=log") {
+		t.Fatalf("calls %q (env %q), want only the after hook", got, f.env)
+	}
+}

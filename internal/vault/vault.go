@@ -173,7 +173,10 @@ func (v *Vault) ReadEntry(e Entry) ([]byte, error) { return v.fs.ReadFile(e.Disk
 
 // Walk calls fn for every note in the vault that is not ignored, in
 // lexical order of the on-disk names.
-func (v *Vault) Walk(fn func(Entry) error) error {
+func (v *Vault) Walk(fn func(Entry) error) error { return v.walk(true, fn) }
+
+// walk visits the files that are not ignored; only notes when notesOnly.
+func (v *Vault) walk(notesOnly bool, fn func(Entry) error) error {
 	return fs.WalkDir(v.fs, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if p == "." {
@@ -191,7 +194,7 @@ func (v *Vault) Walk(fn func(Entry) error) error {
 			}
 			return nil
 		}
-		if !d.Type().IsRegular() || !IsNote(rel) || v.ignore.Match(rel, false) {
+		if !d.Type().IsRegular() || (notesOnly && !IsNote(rel)) || v.ignore.Match(rel, false) {
 			return nil
 		}
 		info, err := d.Info()
@@ -361,6 +364,11 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
+	return v.write(rel, data)
+}
+
+// write writes any file at a clean path; notes emit events.
+func (v *Vault) write(rel string, data []byte) (string, bool, error) {
 	if err := v.checkWritable("write", rel); err != nil {
 		return "", false, err
 	}
@@ -375,7 +383,9 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 		if err := v.fs.WriteFile(r.disk, data); err != nil {
 			return "", false, wrap(err)
 		}
-		v.emit(events.Event{Type: events.NoteSaved, Path: rel}, false)
+		if IsNote(rel) {
+			v.emit(events.Event{Type: events.NoteSaved, Path: rel}, false)
+		}
 		return rel, false, nil
 	}
 	disk, err := v.mkdirs(Folder(rel))
@@ -385,7 +395,9 @@ func (v *Vault) Write(rel string, data []byte) (string, bool, error) {
 	if err := v.fs.WriteFile(fsJoin(disk, path.Base(rel)), data); err != nil {
 		return "", false, wrap(err)
 	}
-	v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
+	if IsNote(rel) {
+		v.emit(events.Event{Type: events.NoteCreated, Path: rel}, true)
+	}
 	return rel, true, nil
 }
 
@@ -536,6 +548,11 @@ func (v *Vault) Rename(from, to string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return v.rename(from, to)
+}
+
+// rename moves any file between clean paths; notes emit note.moved.
+func (v *Vault) rename(from, to string) (string, error) {
 	src, err := v.resolve(from)
 	if err != nil {
 		return "", err
@@ -566,7 +583,9 @@ func (v *Vault) Rename(from, to string) (string, error) {
 	if err := v.fs.Rename(src.disk, fsJoin(dir, path.Base(to))); err != nil {
 		return "", wrap(err)
 	}
-	v.emit(events.Event{Type: events.NoteMoved, Path: to, OldPath: from}, Folder(from) != Folder(to))
+	if IsNote(from) && IsNote(to) {
+		v.emit(events.Event{Type: events.NoteMoved, Path: to, OldPath: from}, Folder(from) != Folder(to))
+	}
 	return to, nil
 }
 
@@ -577,6 +596,11 @@ func (v *Vault) Delete(rel string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return v.trash(rel)
+}
+
+// trash moves any file at a clean path to .trash/; notes emit note.deleted.
+func (v *Vault) trash(rel string) (string, error) {
 	src, err := v.resolve(rel)
 	if err != nil {
 		return "", err
@@ -596,6 +620,8 @@ func (v *Vault) Delete(rel string) (string, error) {
 		return "", wrap(err)
 	}
 	trash := path.Join(folder, name)
-	v.emit(events.Event{Type: events.NoteDeleted, Path: rel, Trash: trash}, false)
+	if IsNote(rel) {
+		v.emit(events.Event{Type: events.NoteDeleted, Path: rel, Trash: trash}, false)
+	}
 	return trash, nil
 }

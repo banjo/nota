@@ -20,9 +20,14 @@ const (
 	NoteMoved   Type = "note.moved"
 	NoteDeleted Type = "note.deleted"
 	InboxAdded  Type = "inbox.added"
-	// SyncCompleted is emitted after a sync pass (phase 3).
+	// SyncCompleted is emitted after every successful sync pass.
 	SyncCompleted Type = "sync.completed"
 )
+
+// OriginSync is the Event.Origin of changes the sync engine writes
+// (files pulled from the server, merges, conflict copies) and of
+// sync.completed.
+const OriginSync = "sync"
 
 // Types lists every event type, in documentation order.
 var Types = []Type{NoteCreated, NoteSaved, NoteMoved, NoteDeleted, InboxAdded, SyncCompleted}
