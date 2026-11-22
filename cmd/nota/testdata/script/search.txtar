@@ -1,0 +1,71 @@
+# search ranks title matches first and prints a snippet under each hit.
+nota search kaffe
+cmp stdout kaffe.txt
+
+# Every word must match; the last one also as a prefix.
+nota search möte ann
+stdout '^Möten/Anna.md\tMöte med Anna$'
+stdout -count=1 '\.md'
+
+# Phrases, OR and exclusion (after -- so -word is not a flag).
+nota search '"sync engine"'
+stdout -count=2 '\.md'
+stdout '^Rot.md'
+stdout '^Projekt/Plan.md'
+nota search kaffe OR gammal
+stdout -count=3 '\.md'
+nota search -- plan -gammal
+stdout '^Projekt/Plan.md'
+! stdout 'Gammal'
+
+# Filters combine with the search.
+nota search --tag projekt plan
+stdout -count=1 '\.md'
+stdout '^Projekt/Plan.md'
+nota search --folder Projekt/Arkiv plan
+stdout '^Projekt/Arkiv/Gammal.md'
+! stdout '^Projekt/Plan.md'
+
+# Characters that are FTS syntax are just text.
+nota search 'a:b' 'c-d' '"unclosed'
+! stdout .
+
+# --json includes the snippet.
+nota search --json bryggt --limit 1
+stdout '"path": "Kaffe.md"'
+stdout '"snippet": ".*Bryggt\.'
+
+# No hits is not an error; no query is.
+nota search zzzz
+! stdout .
+exitcode 2 nota search
+stderr 'expected a search query'
+exitcode 2 nota search -- -only
+stderr 'empty search query'
+
+-- vault/Rot.md --
+Rot
+
+Notes about the sync engine and kaffe.
+-- vault/Kaffe.md --
+# Kaffe
+
+Bryggt.
+-- vault/Projekt/Plan.md --
+---
+tags: [projekt]
+---
+# Plan
+
+Plan for the sync engine.
+-- vault/Projekt/Arkiv/Gammal.md --
+# Gammal plan
+-- vault/Möten/Anna.md --
+# Möte med Anna
+
+Om planen.
+-- kaffe.txt --
+Kaffe.md	Kaffe
+    # Kaffe Bryggt.
+Rot.md	Rot
+    Rot Notes about the sync engine and kaffe.

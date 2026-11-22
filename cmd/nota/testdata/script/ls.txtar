@@ -1,0 +1,95 @@
+# ls lists notes as path, title and tags, sorted by path.
+nota ls
+cmp stdout ls.txt
+
+# --folder includes subfolders but not folders that merely share a prefix.
+nota ls --folder Projekt
+cmp stdout folder.txt
+nota ls --folder Proj
+! stdout .
+
+# --tag matches frontmatter tags (list or string) and inline tags, nested included.
+nota ls --tag nota
+cmp stdout tag-nota.txt
+nota ls --tag '#NOTA/sync'
+stdout '^Inbox/Idé.md'
+! stdout 'Plan'
+
+# --where matches property values (case-insensitive), != excludes; flags combine.
+nota ls --where status=Draft --sort 'updated desc'
+cmp stdout drafts.txt
+nota ls --where status!=draft
+cmp stdout not-draft.txt
+nota ls --tag projekt --where status=draft --limit 1
+stdout -count=1 '\.md'
+stdout '^Möten/Anna.md'
+nota ls --where priority=2 --where tags=nota
+stdout -count=1 '\.md'
+stdout '^Projekt/Plan.md'
+
+# --sort title desc
+nota ls --sort 'title desc' --folder Projekt
+cmp stdout title-desc.txt
+
+# --json is a list of notes with properties and tags.
+nota ls --json --where priority=2
+stdout '^\[$'
+stdout '"path": "Projekt/Plan.md"'
+stdout '"title": "Plan"'
+stdout '"status": "draft"'
+stdout '"priority": 2'
+stdout '"updated": "2026-11-20T00:00:00Z"'
+nota ls --json --tag nothing
+stdout '^\[\]$'
+
+# Bad input is a usage error.
+exitcode 2 nota ls --where status
+stderr 'want key=value'
+exitcode 2 nota ls --sort sideways
+stderr 'sort "sideways"'
+exitcode 2 nota ls extra
+stderr 'expected no arguments'
+
+-- vault/Inbox/Idé.md --
+Idé om #nota/sync
+-- vault/Projekt/Plan.md --
+---
+tags: [projekt, nota]
+status: draft
+priority: 2
+updated: 2026-11-20
+---
+# Plan
+-- vault/Projekt/Arkiv/Gammal.md --
+---
+status: done
+updated: 2026-01-01
+---
+# Gammal plan
+-- vault/Möten/Anna.md --
+---
+tags: projekt, möte
+status: draft
+updated: 2026-11-21
+---
+# Möte med Anna
+-- ls.txt --
+Inbox/Idé.md             Idé om #nota/sync  #nota/sync
+Möten/Anna.md            Möte med Anna      #projekt #möte
+Projekt/Arkiv/Gammal.md  Gammal plan
+Projekt/Plan.md          Plan               #projekt #nota
+-- folder.txt --
+Projekt/Arkiv/Gammal.md  Gammal plan
+Projekt/Plan.md          Plan         #projekt #nota
+-- tag-nota.txt --
+Inbox/Idé.md     Idé om #nota/sync  #nota/sync
+Projekt/Plan.md  Plan               #projekt #nota
+-- drafts.txt --
+Möten/Anna.md    Möte med Anna  #projekt #möte
+Projekt/Plan.md  Plan           #projekt #nota
+-- not-draft.txt --
+Inbox/Idé.md             Idé om #nota/sync  #nota/sync
+Projekt/Arkiv/Gammal.md  Gammal plan
+-- title-desc.txt --
+Projekt/Plan.md          Plan         #projekt #nota
+Projekt/Arkiv/Gammal.md  Gammal plan

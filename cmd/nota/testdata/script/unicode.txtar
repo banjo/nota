@@ -1,0 +1,45 @@
+# Names stored decomposed (NFD, as on macOS) are reported and addressed in NFC.
+diskls vault
+stdout '"Mo\\u0308ten/Mo\\u0308te.md"'
+nota ls
+stdout '^Möten/Möte.md  +Möte$'
+nota cat Möten/Möte.md
+stdout '^# Möte$'
+nota cat 'Möten/Möte'
+stdout '^# Möte$'
+nota ls --json
+stdout '"path": "Möten/Möte.md"'
+
+# Writing through the NFC path updates the NFD file: no NFC twin appears.
+nota set Möten/Möte status=ok
+stdout '^Möten/Möte.md$'
+nota add --folder Möten Möte
+stdout '^Möten/Möte 2.md$'
+diskls vault
+stdout '"Mo\\u0308ten/Mo\\u0308te.md"'
+stdout '"Mo\\u0308ten/M\\u00f6te 2.md"'
+! stdout '"M\\u00f6ten'
+nota ls --where status=ok
+stdout '^Möten/Möte.md'
+
+# Paths that differ only in case from an existing one are refused (exit 5).
+exitcode 5 nota add --folder projekt Idé
+stderr 'differs only in case from an existing path: Projekt'
+! exists vault/projekt
+exitcode 5 nota mv Plan PROJEKT/Sub
+stderr 'differs only in case'
+exitcode 5 nota --json add --folder möten x
+stderr '"code":"case_collision"'
+
+# A new file name that differs only in case is deduplicated instead.
+nota add --folder Projekt plan
+stdout '^Projekt/plan 2.md$'
+
+# Å, ä and ö survive in generated file names.
+nota add 'Åtgärder för översyn'
+stdout '^Inbox/Åtgärder för översyn.md$'
+
+-- vault/Möten/Möte.md --
+# Möte
+-- vault/Projekt/Plan.md --
+# Plan

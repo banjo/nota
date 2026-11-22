@@ -57,4 +57,5 @@ bunx vp check        # format, lint, types
 bunx vp run -r test  # JS tests
 go test ./...        # Go tests, incl. the 10k-note performance budget
 go test -short ./... # without the 10k-note fixture
+go test ./cmd/nota   # CLI scripts in cmd/nota/testdata/script
 ```

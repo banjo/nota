@@ -1,0 +1,89 @@
+# views lists .nota/views/*.yaml with the number of notes in each.
+nota views
+cmp stdout views.txt
+nota views --json
+stdout '"id": "drafts"'
+stdout '"name": "Drafts"'
+stdout '"icon": "pen"'
+stdout '"where": \{\s+"status": "draft"\s+\}'
+stdout '"file": ".nota/views/drafts.yaml"'
+stdout '"count": 3'
+
+# ls --view runs a view by id or name, with its sort.
+nota ls --view drafts
+cmp stdout drafts.txt
+nota ls --view 'Mina projekt'
+cmp stdout projekt.txt
+
+# Other ls flags narrow the view or override its sort and limit.
+nota ls --view Drafts --folder Projekt
+stdout -count=2 '\.md'
+stdout '^Projekt/A.md'
+nota ls --view drafts --sort title --limit 2
+cmp stdout drafts-title.txt
+
+# Views see changes right away.
+nota set C status=draft
+nota views
+stdout '^drafts\s+Drafts\s+4$'
+
+# Unknown and broken views.
+exitcode 3 nota ls --view nope
+stderr 'no view "nope"; see `nota views`'
+cp broken.yaml vault/.nota/views/zz.yaml
+exitcode 1 nota views
+stderr '.nota/views/zz.yaml'
+
+-- vault/.nota/views/drafts.yaml --
+name: Drafts
+icon: pen
+where: { status: draft }
+sort: updated desc
+-- vault/.nota/views/projekt.yml --
+name: Mina projekt
+tag: projekt
+sort: title desc
+-- vault/.nota/views/empty.yaml --
+name: Tom
+where:
+  status: none
+-- vault/Projekt/A.md --
+---
+status: draft
+updated: 2026-11-01
+tags: [projekt/nota]
+---
+# Alfa
+-- vault/Projekt/B.md --
+---
+status: draft
+updated: 2026-11-20
+---
+# Beta #projekt
+-- vault/Möten/M.md --
+---
+status: draft
+updated: 2026-11-10
+---
+# Möte
+-- vault/C.md --
+---
+status: done
+---
+# Gamma
+-- broken.yaml --
+sort: sideways
+-- views.txt --
+drafts   Drafts        3
+projekt  Mina projekt  2
+empty    Tom           0
+-- drafts.txt --
+Projekt/B.md  Beta #projekt  #projekt
+Möten/M.md    Möte
+Projekt/A.md  Alfa           #projekt/nota
+-- projekt.txt --
+Projekt/B.md  Beta #projekt  #projekt
+Projekt/A.md  Alfa           #projekt/nota
+-- drafts-title.txt --
+Projekt/A.md  Alfa           #projekt/nota
+Projekt/B.md  Beta #projekt  #projekt

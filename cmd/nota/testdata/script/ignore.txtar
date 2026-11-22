@@ -1,0 +1,56 @@
+# .notaignore (gitignore syntax) and the built-in rules hide files from
+# ls, search and the index; only .md files are notes.
+nota ls
+cmp stdout ls.txt
+nota search word
+stdout -count=1 '\.md'
+stdout '^keep.tmp.md'
+nota ls --json
+! stdout secret
+! stdout obsidian
+
+# Ignored notes can still be read by path.
+nota cat drafts/secret.md
+stdout '^secret word$'
+
+# Nota refuses to write into ignored places.
+exitcode 2 nota add --folder .trash x
+stderr 'ignored by the vault''s ignore rules'
+exitcode 2 nota add --folder drafts x
+exitcode 2 nota mv a.md .obsidian
+! exists vault/.obsidian/a.md
+
+# Changing .notaignore takes effect on the next command.
+cp notaignore2 vault/.notaignore
+nota ls
+stdout '^drafts/secret.md'
+! stdout '^a.md'
+
+-- vault/.notaignore --
+# private drafts
+drafts/
+*.tmp.md
+!keep.tmp.md
+-- notaignore2 --
+/a.md
+-- vault/a.md --
+A plain note
+-- vault/drafts/secret.md --
+secret word
+-- vault/x.tmp.md --
+tmp word
+-- vault/keep.tmp.md --
+keep word
+-- vault/.obsidian/workspace.md --
+obsidian word
+-- vault/.trash/old.md --
+trash word
+-- vault/sub/.git/x.md --
+git word
+-- vault/sub/.DS_Store --
+x
+-- vault/notes.txt --
+not markdown word
+-- ls.txt --
+a.md         A plain note
+keep.tmp.md  keep word

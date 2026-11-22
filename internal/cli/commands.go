@@ -8,9 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
@@ -79,18 +80,11 @@ func (a *app) printEntries(es []index.Entry) error {
 	if a.json {
 		return a.printJSON(es)
 	}
-	tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
-	for _, e := range es {
-		tags := ""
-		for i, t := range e.Tags {
-			if i > 0 {
-				tags += " "
-			}
-			tags += "#" + t
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", e.Path, e.Title, tags)
+	rows := make([][]string, len(es))
+	for i, e := range es {
+		rows[i] = []string{e.Path, e.Title, hashTags(e.Tags)}
 	}
-	return tw.Flush()
+	return table(a.stdout, rows)
 }
 
 func (a *app) addCmd() *cobra.Command {
@@ -533,6 +527,34 @@ Flags must come before the note: nota tag --json Plan +a -b.`,
 	return cmd
 }
 
+// table prints rows as columns separated by two spaces, without trailing
+// white space (so an empty last column leaves no padding behind).
+func table(w io.Writer, rows [][]string) error {
+	var widths []int
+	for _, r := range rows {
+		for i, c := range r {
+			if i >= len(widths) {
+				widths = append(widths, 0)
+			}
+			widths[i] = max(widths[i], utf8.RuneCountInString(c))
+		}
+	}
+	var b strings.Builder
+	for _, r := range rows {
+		line := ""
+		for i, c := range r {
+			if i < len(r)-1 {
+				c += strings.Repeat(" ", widths[i]-utf8.RuneCountInString(c)+2)
+			}
+			line += c
+		}
+		b.WriteString(strings.TrimRight(line, " "))
+		b.WriteByte('\n')
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
 func hashTags(ts []string) string {
 	out := make([]string, len(ts))
 	for i, t := range ts {
@@ -675,17 +697,26 @@ keys' lines change; everything else in the file stays byte for byte.
 	return cmd
 }
 
-// parseValue decodes a CLI value as YAML when that gives a number, bool,
-// list or map, and keeps it as the literal string otherwise (dates and
-// text included, so "2026-11-22" is not turned into a timestamp).
+// parseValue decodes a CLI value as YAML when that gives a number, a bool,
+// a [flow list] or a {flow map}, and keeps it as the literal string
+// otherwise (dates and text included, so "2026-11-22" stays a date string).
 func parseValue(s string) any {
 	var v any
 	if err := yaml.Unmarshal([]byte(s), &v); err != nil {
 		return s
 	}
+	t := strings.TrimSpace(s)
 	switch v.(type) {
-	case bool, int, int64, uint64, float64, []any, map[string]any:
+	case bool, int, int64, uint64, float64:
 		return v
+	case []any:
+		if strings.HasPrefix(t, "[") { // not "- a", which is a list too
+			return v
+		}
+	case map[string]any:
+		if strings.HasPrefix(t, "{") { // not "a: b", which is a map too
+			return v
+		}
 	}
 	return s
 }
@@ -763,11 +794,11 @@ func (a *app) viewsCmd() *cobra.Command {
 			if a.json {
 				return a.printJSON(rows)
 			}
-			tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
-			for _, r := range rows {
-				fmt.Fprintf(tw, "%s\t%s\t%d\n", r.ID, r.Name, r.Count)
+			out := make([][]string, len(rows))
+			for i, r := range rows {
+				out[i] = []string{r.ID, r.Name, strconv.Itoa(r.Count)}
 			}
-			return tw.Flush()
+			return table(a.stdout, out)
 		},
 	}
 }
@@ -798,7 +829,11 @@ func (a *app) backlinksCmd() *cobra.Command {
 				return a.printJSON(ls)
 			}
 			for _, l := range ls {
-				fmt.Fprintf(a.stdout, "%s\t[[%s]]\n", l.From, l.Target)
+				bang := ""
+				if l.Embed {
+					bang = "!"
+				}
+				fmt.Fprintf(a.stdout, "%s\t%s[[%s]]\n", l.From, bang, l.Target)
 			}
 			return nil
 		},
@@ -822,11 +857,11 @@ func (a *app) tagsCmd() *cobra.Command {
 			if a.json {
 				return a.printJSON(ts)
 			}
-			tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
-			for _, t := range ts {
-				fmt.Fprintf(tw, "#%s\t%d\n", t.Tag, t.Count)
+			rows := make([][]string, len(ts))
+			for i, t := range ts {
+				rows[i] = []string{"#" + t.Tag, strconv.Itoa(t.Count)}
 			}
-			return tw.Flush()
+			return table(a.stdout, rows)
 		},
 	}
 }

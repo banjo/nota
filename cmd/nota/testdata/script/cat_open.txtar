@@ -1,0 +1,68 @@
+# cat prints the file byte for byte; notes are found by path, title or prefix.
+nota cat Projekt/Plan.md
+cmp stdout vault/Projekt/Plan.md
+nota cat projekt/plan
+cmp stdout vault/Projekt/Plan.md
+nota cat 'gammal PLAN'
+stdout '^# Gammal plan$'
+nota cat Gam
+stdout '^# Gammal plan$'
+
+# An existing path wins over titles: "Plan B" is a path here.
+nota cat 'Plan B'
+stdout '^Plan B$'
+
+# An ambiguous reference lists the candidates (exit 4).
+exitcode 4 nota cat Pla
+stderr '"Pla" matches 2 notes; use the path'
+stderr '^  Plan B.md$'
+stderr '^  Projekt/Plan.md$'
+exitcode 4 nota cat --json Pla
+stderr '"code":"ambiguous"'
+stderr '"matches":\["Plan B.md","Projekt/Plan.md"\]'
+
+# A missing note is exit 3.
+exitcode 3 nota cat nope
+stderr 'no note matches "nope"'
+exitcode 3 nota --json cat nope
+stderr '^\{"error":\{"code":"not_found","message":"no note matches \\"nope\\""\}\}$'
+exitcode 2 nota cat
+stderr 'expected a note'
+
+# cat --json has properties, body and the raw content.
+nota cat --json Projekt/Plan
+stdout '"path": "Projekt/Plan.md"'
+stdout '"tags": \[\s+"projekt"\s+\]'
+stdout '"properties": \{\s+"status": "draft",\s+"tags": \['
+stdout '"body": "# Plan\\n\\nText.\\n"'
+stdout '"content": "---\\ntags: \[projekt\]\\nstatus: draft\\n---\\n# Plan\\n\\nText.\\n"'
+
+# open runs $VISUAL or $EDITOR with the note's file.
+[!exec:cat] skip 'needs cat'
+env EDITOR=cat
+nota open 'Gammal plan'
+stdout '^# Gammal plan$'
+env VISUAL='cat -n'
+nota open 'Gammal plan'
+stdout '^\s+1\t# Gammal plan$'
+env VISUAL=
+nota open --json 'Plan B.md'
+stdout '^\{\s+"path": "Plan B.md"\s+\}$'
+stderr '^Plan B$'
+[!exec:false] stop
+env EDITOR=false
+exitcode 1 nota open Gam
+stderr 'editor false: exit status 1'
+
+-- vault/Projekt/Plan.md --
+---
+tags: [projekt]
+status: draft
+---
+# Plan
+
+Text.
+-- vault/Projekt/Arkiv/Gammal.md --
+# Gammal plan
+-- vault/Plan B.md --
+Plan B

@@ -1,0 +1,53 @@
+# mv moves a note into a folder (created if needed) and keeps the index current.
+nota mv Projekt/Plan Arkiv/2026
+stdout '^Arkiv/2026/Plan.md$'
+exists vault/Arkiv/2026/Plan.md
+! exists vault/Projekt/Plan.md
+nota ls --folder Arkiv
+stdout '^Arkiv/2026/Plan.md'
+nota ls --folder Projekt
+! stdout .
+
+# / is the vault root; --json reports both paths.
+nota mv --json Arkiv/2026/Plan.md /
+stdout '"from": "Arkiv/2026/Plan.md"'
+stdout '"path": "Plan.md"'
+exists vault/Plan.md
+
+# Moving onto an existing note is refused (exit 5); nothing changes.
+exitcode 5 nota mv Plan.md Other
+stderr 'already exists'
+exists vault/Plan.md
+exitcode 3 nota mv nope Other
+exitcode 2 nota mv Plan.md
+exitcode 2 nota mv Plan.md ../outside
+stderr 'leaves the vault'
+
+# Backlinks follow the moved note.
+nota backlinks Plan.md
+stdout '^Länk.md\t\[\[Plan\]\]$'
+
+# rm moves the note to .trash/ (never deletes); it leaves the index.
+nota rm Plan.md
+stdout '^.trash/Plan.md$'
+exists vault/.trash/Plan.md
+! exists vault/Plan.md
+nota ls
+! stdout '^Plan.md'
+nota rm --json Other/Plan.md
+stdout '"trash": ".trash/Other/Plan.md"'
+nota add --folder / Plan
+nota rm Plan.md
+stdout '^.trash/Plan 2.md$'
+exitcode 3 nota cat Plan
+nota ls
+cmp stdout after.txt
+
+-- vault/Projekt/Plan.md --
+# Plan
+-- vault/Other/Plan.md --
+# Other plan
+-- vault/Länk.md --
+See [[Plan]].
+-- after.txt --
+Länk.md  See [[Plan]].
