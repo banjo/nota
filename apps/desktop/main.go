@@ -1,134 +1,91 @@
-// Command desktop is the Nota desktop app. It serves the React frontend in
-// the system webview and gives it the vault through bound Go services: the
-// frontend never reads files itself. All vault IO goes through the same
-// core packages as the nota CLI (internal/vault, internal/index).
+// Command desktop is the Nota desktop app. It serves the React frontend
+// (packages/app) in the system webview and gives it the vault through
+// bound Go services: the frontend never reads files itself. All vault
+// IO goes through the same core packages as the nota CLI
+// (internal/vault, internal/index, internal/views, internal/edit).
 package main
 
 import (
+	"context"
 	"log"
 	"log/slog"
+	"runtime"
+	"strings"
 	"sync"
 
-	"github.com/banjo/nota/internal/events"
-	"github.com/banjo/nota/internal/hooks"
-	"github.com/banjo/nota/internal/index"
-	"github.com/banjo/nota/internal/vault"
 	"github.com/egoist/mygo"
+
+	"github.com/banjo/nota/internal/vault"
 )
 
-// Note is one markdown file in the vault.
-type Note struct {
-	Path  string   `json:"path"`
-	Title string   `json:"title"`
-	Tags  []string `json:"tags"`
-	Body  string   `json:"body"`
+func warn(msg string, args ...any) { slog.Warn(msg, args...) }
+
+// Command is a menu item or global shortcut the frontend carries out,
+// e.g. "note.new" or "palette.toggle".
+type Command struct {
+	ID string `json:"id"`
 }
 
-// Vault exposes the notes of one folder to the frontend.
-type Vault struct {
-	mu    sync.Mutex // bound methods run on their own goroutines
-	v     *vault.Vault
-	ix    *index.Index
-	hooks *hooks.Runner // nil without .nota/hooks.toml
-	sync  *syncer       // background sync; "off" without .nota/sync.toml
+// commandEvent sends menu commands to the main window's page.
+var commandEvent = mygo.NewEvent[Command]("command")
+
+// Desktop is what only the desktop app has: its windows and the file
+// manager.
+type Desktop struct {
+	mu      sync.Mutex
+	main    *mygo.Window
+	capture *mygo.Window
+	dir     string
 }
 
-// openVault opens the vault and its persistent index (.nota/index.db),
-// and keeps the index current on every write through the event bus.
-func openVault(dir, inbox string) (*Vault, error) {
-	bus := events.New()
-	v, err := vault.Open(dir, vault.Options{Inbox: inbox, Create: true, Bus: bus})
-	if err != nil {
-		return nil, err
+// HideCapture hides the quick-capture window (after saving, or on
+// Escape). It keeps running, so it shows at once the next time.
+func (d *Desktop) HideCapture() {
+	d.mu.Lock()
+	w := d.capture
+	d.mu.Unlock()
+	if w != nil {
+		w.Hide()
 	}
-	ix, err := index.OpenVault(v)
-	if err != nil {
-		return nil, err
-	}
-	s := &Vault{v: v, ix: ix}
-	bus.Subscribe(func(e events.Event) {
-		// Runs inside a locked method: the write that emitted the event.
-		if err := updateIndex(ix, v, e); err != nil {
-			slog.Warn("index update failed", "path", e.Path, "err", err)
-		}
-	}, events.NoteCreated, events.NoteSaved, events.NoteMoved, events.NoteDeleted)
-	// Hooks run after the index has seen a change. After hooks never
-	// block the UI; transform hooks run inside the write, as in the CLI.
-	if cfg, err := hooks.Load(v); err != nil {
-		slog.Warn("hooks disabled", "err", err)
-	} else if len(cfg.Hooks) > 0 {
-		s.hooks = hooks.New(v, cfg, hooks.Options{})
-		s.hooks.Attach(bus)
-	}
-	return s, nil
 }
 
-// List returns every note in the vault, sorted by path. The index is
-// brought up to date with the files first, so outside edits show up.
-func (s *Vault) List() ([]Note, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, err := s.ix.Sync(s.v); err != nil {
-		return nil, err
+// ShowCapture shows the quick-capture window over other apps.
+func (d *Desktop) ShowCapture() {
+	d.mu.Lock()
+	w := d.capture
+	d.mu.Unlock()
+	if w == nil {
+		return
 	}
-	es, err := s.ix.Query(index.Query{})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Note, 0, len(es))
-	for _, e := range es {
-		n, err := s.v.Read(e.Path)
-		if err != nil {
-			continue // deleted since the sync
-		}
-		out = append(out, Note{Path: e.Path, Title: e.Title, Tags: e.Tags, Body: n.Body})
-	}
-	return out, nil
+	disp := mygo.Screen.DisplayNearestPoint(mygo.Screen.CursorScreenPoint())
+	width, height := w.Size()
+	w.SetPosition(disp.WorkArea.X+(disp.WorkArea.Width-width)/2, disp.WorkArea.Y+(disp.WorkArea.Height-height)/3)
+	w.Show()
+	w.Focus()
+	_ = commandEvent.Emit(w, Command{ID: "capture.focus"})
 }
 
-// Save writes a note's body back, keeping its frontmatter byte for byte
-// apart from "updated", which the vault sets to now when the note has
-// frontmatter.
-func (s *Vault) Save(path, body string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	n, err := s.v.Read(path)
-	if err != nil {
-		return err
+// ShowMain brings the main window to the front, e.g. to open a note
+// captured in the quick-capture window.
+func (d *Desktop) ShowMain() {
+	d.mu.Lock()
+	w := d.main
+	d.mu.Unlock()
+	if w != nil {
+		w.Restore()
+		w.Show()
+		w.Focus()
 	}
-	head := n.Raw[:len(n.Raw)-len(n.Body)]
-	_, _, err = s.v.Save(n.Path, append(append([]byte{}, head...), body...))
-	return err
 }
 
-// Search runs a full-text query over the vault and returns the paths of
-// the matching notes, best match first. All words must match, the last
-// one as a prefix.
-func (s *Vault) Search(q string) ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, err := s.ix.Sync(s.v); err != nil {
-		return nil, err
-	}
-	es, err := s.ix.Search(q, index.Query{})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, len(es))
-	for i, e := range es {
-		out[i] = e.Path
-	}
-	return out, nil
+// RevealVault opens the vault folder in the file manager.
+func (d *Desktop) RevealVault() error {
+	return mygo.Shell.OpenPath(d.dir)
 }
 
-// SyncStatus returns the state of the background sync. Updates also
-// arrive as "syncStatus" events after every pass.
-func (s *Vault) SyncStatus() SyncStatus {
-	if s.sync == nil {
-		return SyncStatus{State: "off", Conflicts: []string{}}
-	}
-	return s.sync.get()
-}
+// Platform is the OS the app runs on ("darwin", "linux", "windows"),
+// for shortcut labels.
+func (d *Desktop) Platform() string { return runtime.GOOS }
 
 // welcome is written into a vault that has no notes yet, so a fresh
 // install (or a phone, which has no NOTA_VAULT) opens on something.
@@ -143,7 +100,43 @@ func ensureWelcome(s *Vault) error {
 	return err
 }
 
+func send(id string) func(*mygo.MenuItem, *mygo.Window) {
+	return func(*mygo.MenuItem, *mygo.Window) { _ = commandEvent.Broadcast(Command{ID: id}) }
+}
+
+func menu(d *Desktop) *mygo.Menu {
+	return mygo.NewMenu([]*mygo.MenuItem{
+		{Role: mygo.RoleAppMenu},
+		{Label: "File", Submenu: []*mygo.MenuItem{
+			{Label: "New Note", Accelerator: "CmdOrCtrl+N", Click: send("note.new")},
+			{Label: "Quick Capture", Click: func(*mygo.MenuItem, *mygo.Window) { d.ShowCapture() }},
+			mygo.Separator(),
+			{Label: "Open Inbox", Accelerator: "CmdOrCtrl+Shift+I", Click: send("inbox.open")},
+			{Label: "Move Note To…", Accelerator: "CmdOrCtrl+Shift+M", Click: send("note.move")},
+			mygo.Separator(),
+			{Label: "Settings…", Accelerator: "CmdOrCtrl+,", Click: send("settings.open")},
+			mygo.Separator(),
+			{Role: mygo.RoleClose},
+		}},
+		{Role: mygo.RoleEditMenu},
+		{Label: "View", Submenu: []*mygo.MenuItem{
+			{Label: "Command Palette", Accelerator: "CmdOrCtrl+K", Click: send("palette.toggle")},
+			{Label: "Toggle Sidebar", Accelerator: "CmdOrCtrl+\\", Click: send("sidebar.toggle")},
+			mygo.Separator(),
+			{Role: mygo.RoleResetZoom},
+			{Role: mygo.RoleZoomIn},
+			{Role: mygo.RoleZoomOut},
+			mygo.Separator(),
+			{Role: mygo.RoleToggleFullScreen},
+		}},
+		{Role: mygo.RoleWindowMenu},
+	})
+}
+
 func main() {
+	if !mygo.App.RequestSingleInstanceLock() {
+		return // the running instance gets our deep link
+	}
 	loc, err := vault.Discover("")
 	if err != nil {
 		log.Fatal(err)
@@ -160,19 +153,76 @@ func main() {
 		log.Fatal(err)
 	}
 	// Sync runs in the background when the vault has a remote.
-	s.sync = startSync(s, loc.Dir, loc.Config.Inbox)
-	defer s.sync.stop()
-	mygo.Bind(s)
+	s.syn.Store(startSync(s, loc.Dir, loc.Config.Inbox))
+	defer func() { s.syn.Load().stop() }()
+	acc := newAccount(s)
+	acc.refreshEmail()
+	d := &Desktop{dir: loc.Dir}
+	mygo.Bind(s, acc, d)
+
+	// Sign-in comes back as nota://auth?code=… (registered at install;
+	// portable builds register it here).
+	if runtime.GOOS != "darwin" {
+		if err := mygo.App.RegisterURLScheme("nota"); err != nil {
+			warn("registering nota:// failed", "err", err)
+		}
+	}
+	mygo.App.OnOpenURL(func(u string) {
+		if strings.HasPrefix(u, "nota://auth") {
+			go func() { _ = acc.CompleteSignIn(u) }()
+			d.ShowMain()
+		}
+	})
+	mygo.App.OnSecondInstance(func([]string, string) { d.ShowMain() })
+	mygo.App.SetMenu(menu(d))
+	mygo.App.OnWindowAllClosed(func() {
+		if runtime.GOOS != "darwin" {
+			mygo.App.Quit()
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mygo.App.WhenReady(func() {
-		mygo.NewWindow(mygo.WindowOptions{
-			Title:     "Nota",
-			Width:     1200,
-			Height:    780,
-			MinWidth:  640,
-			MinHeight: 420,
-			StateKey:  "main",
-			URL:       "/",
+		w := mygo.NewWindow(mygo.WindowOptions{
+			Title:           "Nota",
+			Width:           1280,
+			Height:          820,
+			MinWidth:        360,
+			MinHeight:       480,
+			StateKey:        "main",
+			URL:             "/",
+			BackgroundColor: "light-dark(#ffffff, #1c1c1e)",
 		})
+		w.OnClosed(func() {
+			if runtime.GOOS != "darwin" {
+				mygo.App.Quit()
+			}
+		})
+		// Quick capture: a small panel above every app, summoned from
+		// anywhere with ⌥⌘N. It hides rather than closes.
+		c := mygo.NewWindow(mygo.WindowOptions{
+			Title:           "Quick Capture",
+			URL:             "/?window=capture",
+			Panel:           true,
+			Hidden:          true,
+			Frameless:       true,
+			Width:           560,
+			Height:          164,
+			AlwaysOnTop:     true,
+			BackgroundColor: "light-dark(#ffffff, #232325)",
+		})
+		c.OnClose(func(e *mygo.CloseEvent) {
+			e.PreventDefault()
+			c.Hide()
+		})
+		d.mu.Lock()
+		d.main, d.capture = w, c
+		d.mu.Unlock()
+		if err := mygo.GlobalShortcut.Register("Alt+CmdOrCtrl+N", d.ShowCapture); err != nil {
+			warn("quick capture shortcut unavailable", "err", err)
+		}
+		s.watch(ctx)
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)

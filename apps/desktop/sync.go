@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -36,12 +37,34 @@ type SyncStatus struct {
 // syncStatusEvent tells the frontend about every sync pass.
 var syncStatusEvent = mygo.NewEvent[SyncStatus]("syncStatus")
 
+// storeApp marks a token kept in the app's credential store
+// (mygo.Secrets: the Keychain on macOS) rather than the CLI's keyring
+// entry or credentials file.
+const storeApp = "app"
+
+// loadToken reads a remote's device token from where sign-in put it.
+func loadToken(r nsync.Remote) (string, error) {
+	if r.TokenStore != storeApp {
+		return nsync.LoadToken(r.Account(), r.TokenStore)
+	}
+	b, err := mygo.Secrets.Get(r.Account())
+	if errors.Is(err, mygo.ErrSecretNotFound) {
+		return "", nsync.ErrNoToken
+	}
+	return string(b), err
+}
+
 // syncer runs the sync engine of the vault in the background.
 type syncer struct {
 	mu     sync.Mutex
 	status SyncStatus
+	c      *nsync.Client // nil while sync is off
 	cancel context.CancelFunc
 	done   chan struct{}
+}
+
+func offSyncer() *syncer {
+	return &syncer{status: SyncStatus{State: "off", Conflicts: []string{}, Time: time.Now()}}
 }
 
 func (y *syncer) set(st SyncStatus) {
@@ -61,17 +84,27 @@ func (y *syncer) get() SyncStatus {
 	return y.status
 }
 
+// client is the server client of a running sync, for history; nil when
+// sync is off.
+func (y *syncer) client() *nsync.Client {
+	y.mu.Lock()
+	defer y.mu.Unlock()
+	return y.c
+}
+
 // startSync starts the background sync when the vault has a remote
-// (.nota/sync.toml, made by `nota remote add`). It uses a vault instance
-// of its own, whose writes update the shared index under s.mu.
+// (.nota/sync.toml, made by signing in or by `nota remote add`). It uses
+// a vault instance of its own, whose writes update the shared index
+// under s.mu and reach the frontend as changes.
 func startSync(s *Vault, dir, inbox string) *syncer {
-	y := &syncer{status: SyncStatus{State: "off", Conflicts: []string{}}}
+	y := offSyncer()
 	r, ok, err := nsync.LoadRemote(s.v.MetaDir())
 	if err != nil {
 		y.set(SyncStatus{State: "error", Error: err.Error()})
 		return y
 	}
 	if !ok {
+		y.set(SyncStatus{State: "off"})
 		return y
 	}
 	base := SyncStatus{Remote: r.URL, Vault: r.Vault}
@@ -82,21 +115,23 @@ func startSync(s *Vault, dir, inbox string) *syncer {
 		slog.Warn("sync disabled", "err", err)
 		return y
 	}
-	tok, err := nsync.LoadToken(r.Account(), r.TokenStore)
+	tok, err := loadToken(r)
 	if err != nil {
 		return fail(err)
 	}
 	bus := events.New()
-	sv, err := vault.Open(dir, vault.Options{Inbox: inbox, Bus: bus})
+	sv, err := vault.Open(dir, vault.Options{Inbox: inbox, Bus: bus, Now: clock()})
 	if err != nil {
 		return fail(err)
 	}
 	bus.Subscribe(func(e events.Event) {
 		s.mu.Lock()
-		defer s.mu.Unlock()
-		if err := updateIndex(s.ix, sv, e); err != nil {
+		err := updateIndex(s.ix, sv, e)
+		s.mu.Unlock()
+		if err != nil {
 			slog.Warn("index update failed", "path", e.Path, "err", err)
 		}
+		s.changes.add(e.Path, e.OldPath)
 	}, events.NoteCreated, events.NoteSaved, events.NoteMoved, events.NoteDeleted)
 	c := &nsync.Client{BaseURL: r.URL, Vault: r.Vault, Token: tok, UserAgent: "nota-desktop"}
 	e, err := nsync.Open(sv, c, nsync.Options{Device: r.Device})
@@ -105,7 +140,9 @@ func startSync(s *Vault, dir, inbox string) *syncer {
 		return fail(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	y.cancel, y.done = cancel, make(chan struct{})
+	y.mu.Lock()
+	y.c, y.cancel, y.done = c, cancel, make(chan struct{})
+	y.mu.Unlock()
 	st := base
 	st.State = "starting"
 	y.set(st)
@@ -132,10 +169,21 @@ func startSync(s *Vault, dir, inbox string) *syncer {
 
 // stop ends the background sync and waits for a running pass.
 func (y *syncer) stop() {
-	if y.cancel != nil {
-		y.cancel()
-		<-y.done
+	y.mu.Lock()
+	cancel, done := y.cancel, y.done
+	y.cancel, y.c = nil, nil
+	y.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		<-done
 	}
+}
+
+// restartSync stops the running sync, if any, and starts it again from
+// .nota/sync.toml (after signing in or out).
+func (s *Vault) restartSync() {
+	s.syn.Load().stop()
+	s.syn.Store(startSync(s, s.v.Root(), s.v.Inbox()))
 }
 
 // updateIndex applies one vault event to the index.

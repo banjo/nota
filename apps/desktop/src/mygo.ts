@@ -4,12 +4,180 @@ import { bind, event } from "mygo-runtime";
 
 // ---- Types ----
 
-/** Note is one markdown file in the vault. */
+/** AccountState is what Settings shows about sync. */
+export interface AccountState {
+  /**
+   * State is "signed-out", "pending" (the browser is open, waiting for
+   * the deep link), "choose-vault" (signed in, pick where this vault
+   * syncs), "signed-in" or "error".
+   */
+  state: string;
+  server: string;
+  email?: string;
+  device: string;
+  /** Vault is the server vault this vault syncs with. */
+  vault?: string;
+  /** Vaults are the account's vaults, while choosing one. */
+  vaults: RemoteVault[];
+  /** Suggested is the name to upload this vault as. */
+  suggested?: string;
+  /** ConnectURL is the page opened in the browser while pending. */
+  connectUrl?: string;
+  error?: string;
+}
+
+/**
+ * Changes tells the frontend which notes changed: by the app itself,
+ * the sync engine, a hook, or another program editing the files.
+ */
+export interface Changes {
+  /**
+   * Paths are the vault paths that changed (old and new paths of a
+   * move). ".nota/views" stands for the saved views.
+   */
+  paths: string[];
+  /** Seq counts the change batches since the app started. */
+  seq: number;
+}
+
+/**
+ * Command is a menu item or global shortcut the frontend carries out,
+ * e.g. "note.new" or "palette.toggle".
+ */
+export interface Command {
+  id: string;
+}
+
+/**
+ * CreateRequest makes a new note. Folder defaults to the inbox; "/" is
+ * the vault root. The file name comes from the title (or first line).
+ */
+export interface CreateRequest {
+  title?: string;
+  body?: string;
+  folder?: string;
+  tags?: string[];
+  properties?: Record<string, unknown>;
+}
+
+/** Device is one signed-in device of the account. */
+export interface Device {
+  id: number;
+  device: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  current: boolean;
+}
+
+/** HistoryEntry is one server version of a note. */
+export interface HistoryEntry {
+  path: string;
+  version: number;
+  hash: string;
+  size: number;
+  deleted: boolean;
+  device: string;
+  modifiedAt: string;
+  movedFrom?: string;
+}
+
+/**
+ * Link is a link between two notes. To is "" when the target does not
+ * resolve to a note.
+ */
+export interface Link {
+  from: string;
+  to: string;
+  target: string;
+  heading?: string;
+  alias?: string;
+}
+
+/**
+ * ListQuery filters a note list. Where holds "key=value" or
+ * "key!=value" conditions; Sort is "field [asc|desc]".
+ */
+export interface ListQuery {
+  folder?: string;
+  tag?: string;
+  where?: string[];
+  view?: string;
+  sort?: string;
+  limit?: number;
+}
+
+/** MoveResult is where a moved note went. */
+export interface MoveResult {
+  from: string;
+  path: string;
+}
+
+/** Note is one note with its content and links. */
 export interface Note {
   path: string;
+  folder: string;
   title: string;
   tags: string[];
+  properties: Record<string, unknown>;
+  created?: string;
+  updated?: string;
+  modified: string;
+  size: number;
+  /**
+   * Version is the server version on the web; always 0 on the desktop,
+   * where Hash is what saves are checked against.
+   */
+  version: number;
+  /** Hash is the SHA-256 of the whole file (hex). */
+  hash: string;
+  /** Body is the markdown after the frontmatter; Content the whole file. */
   body: string;
+  content: string;
+  backlinks: Link[];
+  links: Link[];
+}
+
+/**
+ * NoteInfo is a note in lists, the tree and search results: its
+ * metadata without the content.
+ */
+export interface NoteInfo {
+  path: string;
+  folder: string;
+  title: string;
+  tags: string[];
+  properties: Record<string, unknown>;
+  created?: string;
+  updated?: string;
+  modified: string;
+  size: number;
+  /** Snippet is the matching text, for search results. */
+  snippet?: string;
+}
+
+/** PatchRequest edits frontmatter: only the touched lines change. */
+export interface PatchRequest {
+  set?: Record<string, unknown>;
+  unset?: string[];
+  tags?: TagEdit;
+}
+
+/** RemoteVault is a vault of the account on the server. */
+export interface RemoteVault {
+  name: string;
+  cursor: number;
+  created: string;
+}
+
+/**
+ * SaveResult is a write checked against the hash the editor started
+ * from. On a conflict nothing was written and Current is the note as it
+ * is now.
+ */
+export interface SaveResult {
+  note?: Note;
+  conflict: boolean;
+  current?: Note;
 }
 
 /** SyncStatus describes the background sync of the open vault. */
@@ -31,38 +199,211 @@ export interface SyncStatus {
   time: string;
 }
 
+/** TagCount is a tag with the number of notes that have it. */
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+/** TagEdit adds and removes tags. */
+export interface TagEdit {
+  add?: string[];
+  remove?: string[];
+}
+
+/** Tree is every folder and every note of the vault. */
+export interface Tree {
+  inbox: string;
+  folders: TreeFolder[];
+  notes: NoteInfo[];
+  cursor: number;
+}
+
+/**
+ * TreeFolder is a folder that holds notes, with its note count
+ * (subfolders included).
+ */
+export interface TreeFolder {
+  path: string;
+  name: string;
+  notes: number;
+}
+
+/** VaultInfo describes the open vault. */
+export interface VaultInfo {
+  /** Name is the folder name, Dir its full path. */
+  name: string;
+  dir: string;
+  inbox: string;
+}
+
+/** ViewInfo is a saved view (.nota/views/*.yaml) with its note count. */
+export interface ViewInfo {
+  id: string;
+  name: string;
+  icon?: string;
+  where?: Record<string, unknown>;
+  tag?: string;
+  folder?: string;
+  sort?: string;
+  file: string;
+  count: number;
+}
+
 // ---- Services ----
 
-/** Vault exposes the notes of one folder to the frontend. */
+/**
+ * Vault exposes the notes of one folder to the frontend. Every method
+ * goes through internal/vault and the index, as the CLI does.
+ */
 export const Vault = {
   /**
-   * List returns every note in the vault, sorted by path. The index is
-   * brought up to date with the files first, so outside edits show up.
+   * Create writes a new note, by default into the inbox. Transform hooks
+   * may file it elsewhere: the result shows where it ended up.
    */
-  list: bind<[], Note[]>("Vault.List", () => []),
+  create: bind<[CreateRequest], Note>("Vault.Create", (req: CreateRequest) => [req]),
+  /** Delete moves a note to .trash/ and returns where it went. */
+  delete: bind<[string], string>("Vault.Delete", (path: string) => [path]),
+  /** Get returns one note with its content, hash, links and backlinks. */
+  get: bind<[string], Note>("Vault.Get", (path: string) => [path]),
+  /**
+   * History lists the server versions of a note, newest first. Versions
+   * live on the sync server, so it needs sync.
+   */
+  history: bind<[string], HistoryEntry[]>("Vault.History", (path: string) => [path]),
+  /** Inbox returns the notes in the inbox folder, newest first. */
+  inbox: bind<[], NoteInfo[]>("Vault.Inbox", () => []),
+  /** Info describes the open vault. */
+  info: bind<[], VaultInfo>("Vault.Info", () => []),
+  /**
+   * List returns the notes matching a query: a folder (with subfolders),
+   * a tag, property conditions or a saved view.
+   */
+  list: bind<[ListQuery], NoteInfo[]>("Vault.List", (q: ListQuery) => [q]),
+  /**
+   * Move moves a note into folder, keeping its file name ("/" or "" is
+   * the vault root).
+   */
+  move: bind<[string, string], MoveResult>("Vault.Move", (path: string, folder: string) => [path, folder]),
+  /**
+   * Patch edits a note's frontmatter (set and unset keys, add and remove
+   * tags); only the touched lines change. baseHash works as in Save.
+   */
+  patch: bind<[string, PatchRequest, string], SaveResult>("Vault.Patch", (path: string, req: PatchRequest, baseHash: string) => [path, req, baseHash]),
+  /** Rename gives a note a new path (a new name, a new folder, or both). */
+  rename: bind<[string, string], MoveResult>("Vault.Rename", (path: string, to: string) => [path, to]),
+  /**
+   * Restore makes an old server version of a note its newest one; the
+   * background sync brings it to this vault (the server nudges it).
+   */
+  restore: bind<[string, number], void>("Vault.Restore", (path: string, version: number) => [path, version]),
   /**
    * Save writes a note's body back, keeping its frontmatter byte for byte
-   * apart from "updated", which the vault sets to now when the note has
-   * frontmatter.
+   * apart from "updated", which is set to now when the note has
+   * frontmatter. baseHash is the hash the editor started from: when the
+   * file changed since, nothing is written and the result is a conflict
+   * with the current note. An empty baseHash overwrites.
    */
-  save: bind<[string, string], void>("Vault.Save", (path: string, body: string) => [path, body]),
+  save: bind<[string, string, string], SaveResult>("Vault.Save", (path: string, body: string, baseHash: string) => [path, body, baseHash]),
   /**
-   * Search runs a full-text query over the vault and returns the paths of
-   * the matching notes, best match first. All words must match, the last
-   * one as a prefix.
+   * Search runs a full-text query, best match first, with snippets. All
+   * words must match, the last one as a prefix.
    */
-  search: bind<[string], string[]>("Vault.Search", (q: string) => [q]),
+  search: bind<[string, ListQuery], NoteInfo[]>("Vault.Search", (q: string, filter: ListQuery) => [q, filter]),
   /**
    * SyncStatus returns the state of the background sync. Updates also
    * arrive as "syncStatus" events after every pass.
    */
   syncStatus: bind<[], SyncStatus>("Vault.SyncStatus", () => []),
+  /** Tags returns every tag with its note count. */
+  tags: bind<[], TagCount[]>("Vault.Tags", () => []),
+  /** Tree returns every folder that holds notes and every note, by path. */
+  tree: bind<[], Tree>("Vault.Tree", () => []),
+  /** Views returns the saved views of .nota/views with their note counts. */
+  views: bind<[], ViewInfo[]>("Vault.Views", () => []),
+} as const;
+
+/**
+ * Account manages signing in to sync, the devices of the account and
+ * signing out. Signing out keeps the local vault as it is.
+ */
+export const Account = {
+  /** CancelSignIn forgets a sign-in that has not come back. */
+  cancelSignIn: bind<[], void>("Account.CancelSignIn", () => []),
+  /**
+   * ChooseVault links this vault to the server vault name, creating it
+   * first when create is set (uploading this vault as a new synced vault),
+   * writes .nota/sync.toml and starts the background sync. Either way the
+   * first pass is a normal three-way sync: nothing is overwritten.
+   */
+  chooseVault: bind<[string, boolean], void>("Account.ChooseVault", (name: string, create: boolean) => [name, create]),
+  /**
+   * CompleteSignIn handles the nota://auth?code=…&state=… deep link: it
+   * checks the state, trades the code and the PKCE verifier for a device
+   * token, stores the token and lists the account's vaults to choose from.
+   */
+  completeSignIn: bind<[string], void>("Account.CompleteSignIn", (link: string) => [link]),
+  /** Devices lists the account's signed-in devices. */
+  devices: bind<[], Device[]>("Account.Devices", () => []),
+  /** RevokeDevice signs another device out of the account. */
+  revokeDevice: bind<[number], void>("Account.RevokeDevice", (id: number) => [id]),
+  /**
+   * SignIn starts signing in to sync on server ("" for the default): it
+   * opens the web app's connect page in the browser and returns its URL.
+   * The browser comes back through the nota://auth deep link.
+   */
+  signIn: bind<[string], string>("Account.SignIn", (server: string) => [server]),
+  /**
+   * SignOut stops sync, revokes this device's token and forgets it. The
+   * local vault stays exactly as it is.
+   */
+  signOut: bind<[], void>("Account.SignOut", () => []),
+  /**
+   * State returns the sync account state. Changes also arrive as
+   * "account" events.
+   */
+  state: bind<[], AccountState>("Account.State", () => []),
+} as const;
+
+/**
+ * Desktop is what only the desktop app has: its windows and the file
+ * manager.
+ */
+export const Desktop = {
+  /**
+   * HideCapture hides the quick-capture window (after saving, or on
+   * Escape). It keeps running, so it shows at once the next time.
+   */
+  hideCapture: bind<[], void>("Desktop.HideCapture", () => []),
+  /**
+   * Platform is the OS the app runs on ("darwin", "linux", "windows"),
+   * for shortcut labels.
+   */
+  platform: bind<[], string>("Desktop.Platform", () => []),
+  /** RevealVault opens the vault folder in the file manager. */
+  revealVault: bind<[], void>("Desktop.RevealVault", () => []),
+  /** ShowCapture shows the quick-capture window over other apps. */
+  showCapture: bind<[], void>("Desktop.ShowCapture", () => []),
+  /**
+   * ShowMain brings the main window to the front, e.g. to open a note
+   * captured in the quick-capture window.
+   */
+  showMain: bind<[], void>("Desktop.ShowMain", () => []),
 } as const;
 
 // ---- Events ----
 
 /** Events sent by the Go side. Subscribe with `events.name.on(listener)`. */
 export const events = {
+  /** accountEvent tells the frontend the account state changed. */
+  account: event<AccountState>("account"),
+  /** commandEvent sends menu commands to the main window's page. */
+  command: event<Command>("command"),
   /** syncStatusEvent tells the frontend about every sync pass. */
   syncStatus: event<SyncStatus>("syncStatus"),
+  /**
+   * changedEvent is sent after notes change, debounced to one batch per
+   * burst of writes. The frontend refetches what it shows.
+   */
+  changed: event<Changes>("changed"),
 } as const;

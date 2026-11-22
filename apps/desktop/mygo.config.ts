@@ -10,4 +10,6 @@ export default defineConfig({
   frontendDist: "dist",
   bindings: "src/mygo.ts",
   out: "build",
+  // Sign-in to sync comes back as nota://auth?code=… (account.go).
+  urlSchemes: ["nota"],
 });
