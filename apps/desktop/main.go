@@ -30,6 +30,7 @@ type Vault struct {
 	v     *vault.Vault
 	ix    *index.Index
 	hooks *hooks.Runner // nil without .nota/hooks.toml
+	sync  *syncer       // background sync; "off" without .nota/sync.toml
 }
 
 // openVault opens the vault and its persistent index (.nota/index.db),
@@ -47,18 +48,7 @@ func openVault(dir, inbox string) (*Vault, error) {
 	s := &Vault{v: v, ix: ix}
 	bus.Subscribe(func(e events.Event) {
 		// Runs inside a locked method: the write that emitted the event.
-		var err error
-		switch e.Type {
-		case events.NoteMoved:
-			if err = ix.Remove(e.OldPath); err == nil {
-				err = ix.Update(v, e.Path)
-			}
-		case events.NoteDeleted:
-			err = ix.Remove(e.Path)
-		default:
-			err = ix.Update(v, e.Path)
-		}
-		if err != nil {
+		if err := updateIndex(ix, v, e); err != nil {
 			slog.Warn("index update failed", "path", e.Path, "err", err)
 		}
 	}, events.NoteCreated, events.NoteSaved, events.NoteMoved, events.NoteDeleted)
@@ -131,6 +121,15 @@ func (s *Vault) Search(q string) ([]string, error) {
 	return out, nil
 }
 
+// SyncStatus returns the state of the background sync. Updates also
+// arrive as "syncStatus" events after every pass.
+func (s *Vault) SyncStatus() SyncStatus {
+	if s.sync == nil {
+		return SyncStatus{State: "off", Conflicts: []string{}}
+	}
+	return s.sync.get()
+}
+
 // welcome is written into a vault that has no notes yet, so a fresh
 // install (or a phone, which has no NOTA_VAULT) opens on something.
 const welcome = "---\ntags: [nota]\n---\n# Välkommen till Nota\n\nAnteckningarna är vanliga .md-filer i den här mappen.\n"
@@ -160,6 +159,9 @@ func main() {
 	if err := ensureWelcome(s); err != nil {
 		log.Fatal(err)
 	}
+	// Sync runs in the background when the vault has a remote.
+	s.sync = startSync(s, loc.Dir, loc.Config.Inbox)
+	defer s.sync.stop()
 	mygo.Bind(s)
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{

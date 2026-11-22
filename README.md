@@ -104,6 +104,44 @@ something that is not a patch is logged and leaves the note unchanged.
 runs them on a note without applying anything. Hooks run in the CLI,
 `nota mcp` and the desktop app.
 
+## Sync
+
+Sync is opt-in: a vault works offline forever without it. `nota serve`
+is the sync server; every machine runs `nota sync` against it. The files
+stay the truth: edits to different lines of a note on two machines
+merge, edits to the same lines keep both (yours in
+`Note (conflict 2026-11-22 1042 laptop).md`), deletes go to `.trash/`
+and an edit always beats a delete. The protocol is in
+[docs/sync-protocol.md](docs/sync-protocol.md).
+
+Self-host the server (everything it keeps is in `--data`):
+
+```sh
+nota serve --addr :8080 --data /srv/nota          # or $NOTA_SERVER_ADDR, $NOTA_SERVER_DATA
+nota serve --data /srv/nota user add you@example.com
+nota serve --data /srv/nota token create you@example.com --device laptop   # prints the token once
+nota serve --data /srv/nota token list            # and `token revoke <id>`
+```
+
+On each machine, with one token per device:
+
+```sh
+nota remote add https://notes.example.com --token nota_… --remote-vault main
+nota sync            # one pass; --json for scripts
+nota sync status     # unsynced changes, server cursor, daemon
+nota sync --watch    # keep syncing: file changes, server nudges, every minute
+```
+
+`nota remote add` creates the server vault if it is new and keeps the
+token in the OS keyring. Where there is none (a headless Linux box) it
+says so and uses `~/.config/nota/credentials` (mode 0600) instead;
+`NOTA_KEYRING=file` always uses the file and `NOTA_TOKEN` passes a token
+without storing it. Sync state lives in `.nota/` (`sync.toml`,
+`state.db`, merge bases); only one sync runs per vault at a time. The
+desktop app syncs in the background when the vault has a remote. Hooks
+on `sync.completed` run after every pass; transform hooks do not run on
+notes that arrive through sync (they ran on the device that made them).
+
 ## Notes and timestamps
 
 Edits through Nota (`set`, `tag`, the app, MCP, hooks) set `updated` in the
@@ -114,7 +152,7 @@ does not touch the file. `nota tag -x` edits the frontmatter only: inline
 
 ## Layout
 
-- `cmd/nota`: the CLI entry point (`nota mcp`, `nota serve` later)
+- `cmd/nota`: the CLI entry point (also `nota mcp`, `nota serve`)
 - `internal/vault`: files (on an `FS`: `DirFS` or the in-memory `MemFS`), note model, discovery, ignore rules, NFC paths
 - `internal/edit`: note edits shared by the CLI, MCP, hooks and the app
 - `internal/frontmatter`: byte-stable frontmatter edits
@@ -124,6 +162,9 @@ does not touch the file. `nota tag -x` edits the frontmatter only: inline
 - `internal/events`: core event bus
 - `internal/mcp`: MCP tools and resources (transport-agnostic)
 - `internal/hooks`: `.nota/hooks.toml` scripts
+- `internal/protocol`: sync protocol types (shared by server and client)
+- `internal/server`: the sync server (SQLite version log, blobs, device tokens)
+- `internal/sync`: the client sync engine (state, 3-way merge, conflict copies, watch)
 - `internal/cli`: the commands
 - `apps/desktop`: the MyGo app (Go + React)
 - `packages/editor`: CodeMirror 6 setup
