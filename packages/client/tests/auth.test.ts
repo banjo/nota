@@ -70,7 +70,11 @@ describe("webauthn options", () => {
     expect(new Uint8Array(inner.challenge as ArrayBuffer)).toEqual(new Uint8Array([1, 2, 3]));
     expect(inner.rp.id).toBe("nota.banjoanton.com");
     const request = requestOptionsFromJSON({
-      publicKey: { challenge: options.challenge, rpId: "nota.banjoanton.com", allowCredentials: [] },
+      publicKey: {
+        challenge: options.challenge,
+        rpId: "nota.banjoanton.com",
+        allowCredentials: [],
+      },
     });
     expect(new Uint8Array(request.challenge as ArrayBuffer)).toEqual(new Uint8Array([1, 2, 3]));
     expect(request.rpId).toBe("nota.banjoanton.com");
@@ -237,5 +241,25 @@ describe("createHttpAuth", () => {
     await auth.revokeDevice(4);
     expect(f.call(1).method).toBe("DELETE");
     expect(f.call(1).url.pathname).toBe("/v1/devices/4");
+  });
+
+  test("maps a pending code's snake_case times", async () => {
+    const f = mockFetch(
+      json({
+        id: 1,
+        device: "cli",
+        created_at: "2026-11-22T19:50:00Z",
+        expires_at: "2026-11-22T20:00:00Z",
+      }),
+    );
+    const auth = createHttpAuth({ baseUrl: BASE, fetch: f.fn as unknown as typeof fetch });
+    const pending = await auth.lookupCode("ABCD-1234");
+    expect(pending).toEqual({
+      id: 1,
+      device: "cli",
+      createdAt: "2026-11-22T19:50:00Z",
+      expiresAt: "2026-11-22T20:00:00Z",
+    });
+    expect(f.call(0).url.pathname).toBe("/v1/auth/device/lookup");
   });
 });

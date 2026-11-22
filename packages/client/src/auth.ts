@@ -235,8 +235,20 @@ export function createHttpAuth(options: HttpAuthOptions): HttpAuth {
       await request("DELETE", `/v1/devices/${id}`);
     },
 
-    lookupCode: (code: string) =>
-      request<PendingCode>("POST", "/v1/auth/device/lookup", { user_code: code }),
+    // The server speaks snake_case on the wire; the UI reads camelCase.
+    async lookupCode(code: string) {
+      const d = await request<PendingCode & { created_at?: string; expires_at?: string }>(
+        "POST",
+        "/v1/auth/device/lookup",
+        { user_code: code },
+      );
+      return {
+        id: d.id,
+        device: d.device,
+        createdAt: d.createdAt ?? d.created_at ?? "",
+        expiresAt: d.expiresAt ?? d.expires_at ?? "",
+      };
+    },
 
     async approveCode(code: string, approve: boolean) {
       await request("POST", "/v1/auth/device/approve", { user_code: code, approve });

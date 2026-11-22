@@ -235,6 +235,9 @@ function CliApproval({
     );
   }
 
+  const at = new Date(pending.data.expiresAt);
+  const expires = Number.isNaN(at.getTime()) ? null : at;
+
   return (
     <AuthShell
       title="Approve this terminal?"
@@ -258,13 +261,17 @@ function CliApproval({
           ),
         },
         { label: "Device", value: pending.data.device },
-        {
-          label: "Expires",
-          value: new Date(pending.data.expiresAt).toLocaleTimeString(undefined, {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
+        ...(expires
+          ? [
+              {
+                label: "Expires",
+                value: expires.toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              },
+            ]
+          : []),
       ])}
       <div className="mt-4 flex gap-2">
         <Button size="lg" className="flex-1" disabled={busy} onClick={() => void decide(true)}>
