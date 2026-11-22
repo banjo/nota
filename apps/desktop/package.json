@@ -1,0 +1,28 @@
+{
+  "name": "@nota/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mygo dev",
+    "build": "mygo build",
+    "generate": "mygo generate",
+    "dev:web": "vp dev",
+    "build:web": "vp build",
+    "test": "vp test --passWithNoTests"
+  },
+  "dependencies": {
+    "@nota/editor": "workspace:*",
+    "mygo-runtime": "^0.10.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "mygo-cli": "^0.10.0",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

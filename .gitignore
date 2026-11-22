@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.mygo/
+bin/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+mygo_windows_*.syso
