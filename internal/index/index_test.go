@@ -25,10 +25,10 @@ func TestSearch(t *testing.T) {
 		}
 	}
 	for q, want := range map[string][]string{
-		"merge":       {"Projekt/Nota/Sync-protokoll.md"},
-		"träning":     {"Fotboll/Junior.md"},
-		"möte":        {"Hem/Möte.md"},
-		"förskol*":    {"Hem/Möte.md"},
+		"merge":        {"Projekt/Nota/Sync-protokoll.md"},
+		"träning":      {"Fotboll/Junior.md"},
+		"möte":         {"Hem/Möte.md"},
+		"förskol*":     {"Hem/Möte.md"},
 		"sync OR sömn": {"Projekt/Nota/Sync-protokoll.md", "Hem/Möte.md"},
 	} {
 		got, err := ix.Search(q)
