@@ -3,6 +3,7 @@ import { createNote, deleteNote, newNoteFolder } from "../actions.ts";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
 import { statusColor } from "../lib/properties.ts";
+import { suggestFolders } from "../lib/suggest.ts";
 import { useUI } from "../state.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
 import { FoldersSection, NavSection, ViewsSection } from "./sections.tsx";
@@ -18,6 +19,11 @@ export function registerBuiltins(r: Registry): () => void {
     r.register("sidebar", { id: "nota.folders", order: 20, component: FoldersSection }),
 
     r.register("panel", { id: "nota.backlinks", order: 100, component: BacklinksPanel }),
+
+    r.register("inboxSuggester", {
+      id: "nota.rules",
+      suggest: (note, { tree }) => suggestFolders(note, tree),
+    }),
 
     // A note with a status shows its colour in the tree.
     r.register("treeDecorator", {

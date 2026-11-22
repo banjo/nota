@@ -9,8 +9,10 @@ import { label, matches } from "../lib/shortcuts.ts";
 import { type CommandContext, useRegistry } from "../registry.ts";
 import { currentPath, type Route, useUI } from "../state.ts";
 import { EmptyState } from "./EmptyState.tsx";
+import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
 import { NotePage } from "./NotePage.tsx";
+import { Palette } from "./Palette.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
 
@@ -94,6 +96,8 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
       );
     case "list":
       return <NoteList key={JSON.stringify(route.list)} list={route.list} />;
+    case "inbox":
+      return <InboxView />;
     default:
       return <Home run={run} />;
   }
@@ -136,6 +140,7 @@ export function Shell({ children }: { children?: ReactNode }) {
       >
         <Page route={route} run={run} />
       </main>
+      <Palette />
       {children}
     </div>
   );

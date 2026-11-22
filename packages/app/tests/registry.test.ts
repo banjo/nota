@@ -25,6 +25,7 @@ describe("contribution registry", () => {
     const off = registerBuiltins(r);
     expect(r.get("sidebar").map((s) => s.id)).toEqual(["nota.nav", "nota.views", "nota.folders"]);
     expect(r.get("panel").map((p) => p.id)).toEqual(["nota.backlinks"]);
+    expect(r.get("inboxSuggester").map((p) => p.id)).toEqual(["nota.rules"]);
     expect(r.command("note.new")?.shortcut).toBe("mod+n");
     expect(r.command("sidebar.toggle")?.shortcut).toBe("mod+\\");
     const deco = r.get("treeDecorator")[0]!;
