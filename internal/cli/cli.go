@@ -173,7 +173,7 @@ Every command prints JSON with --json.`,
 	root.AddCommand(
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(),
 		a.rmCmd(), a.tagCmd(), a.setCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(),
-		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(),
+		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(), a.serveCmd(),
 	)
 	return root
 }

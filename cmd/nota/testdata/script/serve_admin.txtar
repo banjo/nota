@@ -1,0 +1,31 @@
+# The serve admin commands bootstrap users and device tokens in the
+# server's data directory.
+env NOTA_SERVER_DATA=$WORK/data
+
+nota serve user add Anton@Example.com
+stdout '^created user anton@example.com$'
+exitcode 5 nota serve user add anton@example.com
+stderr 'already exists'
+exitcode 2 nota serve user add not-an-email
+nota serve user list
+stdout '^anton@example.com\t'
+
+exitcode 2 nota serve token create anton@example.com
+stderr '--device is required'
+exitcode 3 nota serve token create nobody@example.com --device x
+nota serve token create anton@example.com --device laptop
+stdout '^nota_[A-Za-z0-9_-]{43}$'
+stderr 'token 1 for anton@example.com on laptop; it is shown only once'
+nota serve token create --json anton@example.com --device phone
+stdout '"token": "nota_'
+stdout '"device": "phone"'
+
+nota serve token list
+stdout '^1 +anton@example.com +laptop .* never +active$'
+nota serve token revoke 1
+stdout '^revoked token 1$'
+nota serve token list anton@example.com
+stdout '^1 .*revoked '
+stdout '^2 .*active$'
+exitcode 3 nota serve token revoke 99
+exists data/nota.db
