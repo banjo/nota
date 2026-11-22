@@ -2,7 +2,7 @@ import { FilePlus2, FolderInput, Inbox, PanelLeft, Search, Settings, Trash2 } fr
 import { createNote, deleteNote, newNoteFolder } from "../actions.ts";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
-import { statusColor } from "../lib/properties.ts";
+
 import { suggestFolders } from "../lib/suggest.ts";
 import { useUI } from "../state.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
@@ -25,15 +25,8 @@ export function registerBuiltins(r: Registry): () => void {
       suggest: (note, { tree }) => suggestFolders(note, tree),
     }),
 
-    // A note with a status shows its colour in the tree.
-    r.register("treeDecorator", {
-      id: "nota.status",
-      decorate: (item) => {
-        if (item.kind !== "note") return null;
-        const s = item.note.properties.status;
-        return typeof s === "string" && s ? { dot: statusColor(s), label: `Status: ${s}` } : null;
-      },
-    }),
+    // No default tree decoration: a status is read in the page, and the
+    // tree stays quiet. Plugins get the same hook through the registry.
 
     r.register("command", {
       id: "note.new",

@@ -215,3 +215,16 @@ go test ./...        # Go tests, incl. the 10k-note performance budget
 go test -short ./... # without the 10k-note fixture
 go test ./cmd/nota   # CLI scripts in cmd/nota/testdata/script
 ```
+
+## Screenshots
+
+The desktop app (macOS/Linux, MyGo + React), from `scripts/demo-vault.sh`:
+
+| | |
+| --- | --- |
+| ![Main](docs/screenshots/main.png) | ![Inbox](docs/screenshots/inbox.png) |
+| Tree, properties and live preview | Inbox triage with one-click filing |
+| ![Palette](docs/screenshots/palette.png) | ![Settings](docs/screenshots/settings.png) |
+| Command palette (⌘K) | Settings and sync sign-in |
+
+Narrow windows switch to a navigation stack (`docs/screenshots/narrow.png`), and ⌃⌥N opens quick capture (`docs/screenshots/capture.png`).

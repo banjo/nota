@@ -303,7 +303,7 @@ function AddProperty({
           <Plus className="size-3.5" strokeWidth={1.75} /> Add property
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3">
+      <PopoverContent className="w-80 p-3">
         <form
           className="flex flex-col gap-2.5"
           onSubmit={(e) => {
@@ -319,7 +319,7 @@ function AddProperty({
             onChange={(e) => setName(e.target.value)}
             className="h-8 rounded-md bg-surface px-2.5 text-ui shadow-card outline-none focus:shadow-[0_0_0_1px_var(--ink),0_0_0_4px_var(--ink-soft)]"
           />
-          <div role="radiogroup" aria-label="Type" className="grid grid-cols-5 gap-1">
+          <div role="radiogroup" aria-label="Type" className="grid grid-cols-5 gap-0.5">
             {(Object.keys(TYPE_LABEL) as PropType[]).map((t) => {
               const Icon = TYPE_ICON[t];
               return (
@@ -331,7 +331,7 @@ function AddProperty({
                   title={TYPE_LABEL[t]}
                   onClick={() => setType(t)}
                   className={cn(
-                    "flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[11px] text-muted-foreground outline-none hover:bg-hover focus-visible:bg-hover",
+                    "flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[10.5px] text-muted-foreground outline-none hover:bg-hover focus-visible:bg-hover",
                     type === t && "bg-ink-soft text-ink-strong hover:bg-ink-soft",
                   )}
                 >

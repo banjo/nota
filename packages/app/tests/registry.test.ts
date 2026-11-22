@@ -28,22 +28,8 @@ describe("contribution registry", () => {
     expect(r.get("inboxSuggester").map((p) => p.id)).toEqual(["nota.rules"]);
     expect(r.command("note.new")?.shortcut).toBe("mod+n");
     expect(r.command("sidebar.toggle")?.shortcut).toBe("mod+\\");
-    const deco = r.get("treeDecorator")[0]!;
-    expect(
-      deco.decorate({
-        kind: "note",
-        path: "a.md",
-        note: {
-          path: "a.md",
-          folder: "",
-          title: "a",
-          tags: [],
-          properties: { status: "draft" },
-          modified: "",
-          size: 0,
-        },
-      }),
-    ).toMatchObject({ label: "Status: draft" });
+    // The tree ships without decorations: status lives on the page.
+    expect(r.get("treeDecorator")).toEqual([]);
     off();
     expect(r.get("command")).toEqual([]);
   });

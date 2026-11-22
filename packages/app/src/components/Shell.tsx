@@ -8,6 +8,7 @@ import { useClient } from "../context.ts";
 import { label, matches } from "../lib/shortcuts.ts";
 import { type CommandContext, useRegistry } from "../registry.ts";
 import { currentPath, type Route, useUI } from "../state.ts";
+import { useList } from "../queries.ts";
 import { EmptyState } from "./EmptyState.tsx";
 import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
@@ -110,6 +111,22 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
  * The Träd layout: sidebar and page. Below 720px it is a navigation
  * stack: the sidebar, then the page with a back button (decision 10).
  */
+
+/** A fresh window opens the most recently edited note rather than an empty page. */
+function OpenRecent() {
+  const route = useUI((s) => s.route);
+  const navigate = useUI((s) => s.navigate);
+  const { data } = useList({ sort: "updated desc", limit: 1 }, route.kind === "home");
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || route.kind !== "home" || !data?.length) return;
+    done.current = true;
+    const newest = [...data].sort((a, b) => (b.updated ?? "").localeCompare(a.updated ?? ""))[0];
+    if (newest) navigate({ kind: "note", path: newest.path });
+  }, [data, route, navigate]);
+  return null;
+}
+
 export function Shell({ children }: { children?: ReactNode }) {
   const route = useUI((s) => s.route);
   const sidebarOpen = useUI((s) => s.sidebarOpen);
@@ -143,6 +160,7 @@ export function Shell({ children }: { children?: ReactNode }) {
       >
         <Page route={route} run={run} />
       </main>
+      <OpenRecent />
       <Palette />
       {children}
     </div>
