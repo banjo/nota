@@ -101,3 +101,40 @@ serve …` on the server, or the terminal in the Coolify UI).
 Backups: copy `/data` (with the server stopped, or `sqlite3 nota.db
 ".backup"` for the database plus `blobs/`). `vaults/` can be left out; it
 is rebuilt.
+
+# Deploying the web app and the landing page
+
+Both are static builds in one Cloudflare Pages project, `nota`
+(`nota-3jn.pages.dev`), served at `nota.banjoanton.com`:
+
+- `/` — the landing page (`apps/landing`)
+- `/app/` — the web app (`apps/web`, `base: "/app/"`), with every
+  extensionless path under `/app` answered by `app/index.html` so
+  deep links work
+
+The domain is a CNAME in Netlify DNS for `banjoanton.com` pointing at the
+Pages project; Cloudflare terminates TLS.
+
+```sh
+bun install
+bunx vp run site:build      # landing + web app into dist/
+bunx -y wrangler@4 pages deploy dist --project-name nota --branch main
+```
+
+`site:build` writes `dist/index.html` (landing), `dist/app/` and copies
+`apps/landing/public/_worker.js`. The worker is what makes the SPA
+fallback work: a `_redirects` rule for `/app/*` would also swallow
+`/app/assets/*`, so `_worker.js` (Pages advanced mode) rewrites only
+dotless paths under `/app` and lets everything else fall through to the
+uploaded files.
+
+`CLOUDFLARE_API_TOKEN` needs the *Cloudflare Pages: Edit* permission on
+the account; the token lives in the Hermes `.env` on the mini-pc. After a
+deploy, check `https://nota.banjoanton.com/` (landing),
+`/app/` (app shell) and `/app/assets/*.js` (`application/javascript`, not
+HTML — that was the bug the worker fixed).
+
+The web app talks to the API at `https://nota.app.banjoanton.com`
+(`VITE_API_URL` overrides it at build time). Passkeys work because the
+API's `NOTA_SERVER_RP_ID` is `nota.banjoanton.com`, the web app's domain,
+not the API's — keep it that way, or every passkey is invalidated.

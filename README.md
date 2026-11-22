@@ -2,7 +2,30 @@
 
 Lightweight local-first markdown notes: CLI first, MCP, sync, desktop and phone app.
 
+**Site:** [nota.banjoanton.com](https://nota.banjoanton.com) · **Web app:** [/app](https://nota.banjoanton.com/app) · **API:** `https://nota.app.banjoanton.com`
+
 The plan is in [issue #1](https://github.com/banjo/nota/issues/1).
+
+## Four ways in
+
+| | |
+| --- | --- |
+| **The app** | The desktop app (mygo + React, a few megabytes) opens any folder of `.md` files. Tree, properties, backlinks, inbox triage, ⌘K palette, live-preview editor. Sign in only if you want sync. |
+| **The web** | [nota.banjoanton.com/app](https://nota.banjoanton.com/app) is the same UI over the HTTP client, against a vault on your own server. E-mail + passkey, no password. |
+| **The CLI** | Everything exists as a command before it exists as a button: `nota add`, `ls`, `search`, `set`, `tag`, `mv`, `inbox`, `sync`, `history`, `restore`. `--json` everywhere. |
+| **Your agents** | `nota mcp` speaks MCP over stdio, `nota serve` serves the same tools over HTTP at `/mcp`, so an agent can read and write the same vault you type in. |
+
+## Accounts and sync
+
+A local vault needs no account. Sync does: sign up at
+[/app/signup](https://nota.banjoanton.com/app/signup) with an invite, an
+e-mail address and a passkey (Face ID, Touch ID, a security key — no
+password), and the server prints ten recovery codes once. Sign-in on the
+desktop happens in your real browser (`/app/connect`) and hands a device
+token back over the `nota://` scheme; on the command line it is
+`nota login https://nota.example.com`.
+
+Self-hosting is one container: see [docs/deploy.md](docs/deploy.md).
 
 ## Use the CLI
 
@@ -228,3 +251,7 @@ The desktop app (macOS/Linux, MyGo + React), from `scripts/demo-vault.sh`:
 | Command palette (⌘K) | Settings and sync sign-in |
 
 Narrow windows switch to a navigation stack (`docs/screenshots/narrow.png`), and ⌃⌥N opens quick capture (`docs/screenshots/capture.png`).
+
+In the browser: [sign in with a passkey](docs/screenshots/web-signin.png), the same app over HTTP (`web-app.png`), [approving a desktop sign-in](docs/screenshots/connect.png), the [device list](docs/screenshots/web-devices.png), and the [recovery codes](docs/screenshots/web-recovery-codes.png) shown once at sign-up.
+
+![Landing](docs/screenshots/landing.png)
