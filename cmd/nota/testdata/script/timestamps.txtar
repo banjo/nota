@@ -13,8 +13,10 @@ env NOTA_NOW=2026-11-22T10:42:00+01:00
 nota tag 'Ny anteckning' +b
 cmp 'vault/Inbox/Ny anteckning.md' want/3-tag.md
 
-# Setting what is already there writes nothing, so updated stays.
-env NOTA_NOW=2026-11-23T00:00:00+01:00
+# Setting what is already there writes nothing, so updated stays. The date
+# is far enough ahead that a note without frontmatter, whose updated time is
+# its file's mtime, can never outrank it however late the suite runs.
+env NOTA_NOW=2099-01-01T00:00:00Z
 nota set 'Ny anteckning' status=draft
 nota tag 'Ny anteckning' +a
 cmp 'vault/Inbox/Ny anteckning.md' want/3-tag.md
@@ -67,7 +69,7 @@ Gammal
 -- want/gammal.md --
 ---
 # kommentar
-updated: 2026-11-23T00:00:00+01:00
+updated: 2099-01-01T00:00:00Z
 created: 2019-01-01
 status: ok
 ---
