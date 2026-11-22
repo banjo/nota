@@ -8,7 +8,7 @@ export function Editor({ doc, onSave }: { doc: string; onSave: (body: string) =>
 
   useEffect(() => {
     if (!ref.current) return;
-    const view = createEditor(ref.current, doc, (body) => save.current(body));
+    const view = createEditor(ref.current, { doc, onChange: (body) => save.current(body) });
     return () => view.destroy();
   }, [doc]);
 
