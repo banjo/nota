@@ -21,7 +21,11 @@ export const Vault = {
    * brought up to date with the files first, so outside edits show up.
    */
   list: bind<[], Note[]>("Vault.List", () => []),
-  /** Save writes a note's body back, keeping its frontmatter byte for byte. */
+  /**
+   * Save writes a note's body back, keeping its frontmatter byte for byte
+   * apart from "updated", which the vault sets to now when the note has
+   * frontmatter.
+   */
   save: bind<[string, string], void>("Vault.Save", (path: string, body: string) => [path, body]),
   /**
    * Search runs a full-text query over the vault and returns the paths of

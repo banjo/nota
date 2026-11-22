@@ -11,6 +11,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/banjo/nota/internal/events"
+	"github.com/banjo/nota/internal/hooks"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/vault"
 )
@@ -20,12 +21,20 @@ var now = time.Date(2026, 11, 22, 10, 42, 0, 0, time.FixedZone("CET", 3600))
 // connect serves a MemFS vault over the SDK's in-memory transport and
 // returns a connected client session.
 func connect(t *testing.T, files map[string]string) (*sdk.ClientSession, *vault.MemFS) {
+	return connectWith(t, files, nil)
+}
+
+// connectWith is connect with a setup func for the vault (to attach hooks).
+func connectWith(t *testing.T, files map[string]string, setup func(*vault.Vault, *events.Bus)) (*sdk.ClientSession, *vault.MemFS) {
 	t.Helper()
 	m := vault.NewMemFS(files)
 	bus := events.New()
 	v, err := vault.OpenFS(m, "mem", vault.Options{Bus: bus, Now: func() time.Time { return now }})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if setup != nil {
+		setup(v, bus)
 	}
 	ix, err := index.Open(":memory:")
 	if err != nil {
@@ -257,5 +266,32 @@ func TestURI(t *testing.T) {
 		if err != nil || got != p {
 			t.Errorf("round trip %q: %q %v", p, got, err)
 		}
+	}
+}
+
+// TestCreateFollowsTransformHook checks that create_note reports where a
+// transform hook filed the note.
+func TestCreateFollowsTransformHook(t *testing.T) {
+	cfg, err := hooks.Parse([]byte("[[hook]]\nname = \"sort\"\nevent = \"inbox.added\"\nmode = \"transform\"\nrun = \"x\"\nmatch = { tag = \"jobb\" }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := func(context.Context, hooks.Hook, string, []string, []byte) ([]byte, error) {
+		return []byte(`{"folder":"Jobb","tags":{"add":["sorterad"]}}`), nil
+	}
+	cs, m := connectWith(t, nil, func(v *vault.Vault, bus *events.Bus) {
+		hooks.New(v, cfg, hooks.Options{Exec: fake}).Attach(bus)
+	})
+	var n Note
+	call(t, cs, "create_note", map[string]any{"body": "Ring Anna", "tags": []string{"jobb"}}, &n)
+	if n.Path != "Jobb/Ring Anna.md" || !slices.Contains(n.Tags, "sorterad") {
+		t.Fatalf("created %+v", n.NoteInfo)
+	}
+	if _, err := m.Stat("Jobb/Ring Anna.md"); err != nil {
+		t.Fatal(err)
+	}
+	call(t, cs, "create_note", map[string]any{"body": "Handla"}, &n)
+	if n.Path != "Inbox/Handla.md" {
+		t.Fatalf("unmatched note filed: %q", n.Path)
 	}
 }
