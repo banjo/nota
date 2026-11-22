@@ -30,10 +30,10 @@ function Changes({ client }: { client: NotesClient }) {
 }
 
 /** Toasts in the mode in effect, and the chrome around the page with it. */
-function Themed() {
+function Themed({ client }: { client: NotesClient }) {
   const theme = useTheme();
   useThemeTokens(theme, useContributions("theme"));
-  useThemeChrome(theme);
+  useThemeChrome(theme, client.shell);
   return <Toaster theme={theme.resolved} />;
 }
 
@@ -61,7 +61,7 @@ export function NotaProviders({
           <TooltipProvider>
             <Changes client={client} />
             {children}
-            <Themed />
+            <Themed client={client} />
           </TooltipProvider>
         </RegistryContext.Provider>
       </ClientContext.Provider>

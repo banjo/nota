@@ -215,6 +215,19 @@ export interface ShellApi {
   showMain(): Promise<void>;
   /** Menu items and global shortcuts, as command ids. */
   onCommand(listener: (id: string) => void): () => void;
+  /** The windows' native appearance and the colours behind the page. */
+  setAppearance?(appearance: ShellAppearance): Promise<void>;
+}
+
+/** What the native windows need of the theme. */
+export interface ShellAppearance {
+  /** The choice: "system", "light" or "dark". */
+  mode: string;
+  /** The mode in effect. */
+  resolved: "light" | "dark";
+  /** The main window's page colour and the capture panel's, as #rrggbb. */
+  background: string;
+  captureBackground: string;
 }
 
 // The web app's account (docs/api.md, "Accounts"): passkeys, recovery

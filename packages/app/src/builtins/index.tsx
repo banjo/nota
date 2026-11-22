@@ -1,9 +1,20 @@
-import { FilePlus2, FolderInput, Inbox, PanelLeft, Search, Settings, Trash2 } from "lucide-react";
+import {
+  FilePlus2,
+  FolderInput,
+  Inbox,
+  PanelLeft,
+  Palette,
+  Search,
+  Settings,
+  SunMoon,
+  Trash2,
+} from "lucide-react";
 import { createNote, deleteNote, newNoteFolder } from "../actions.ts";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
 
 import { suggestFolders } from "../lib/suggest.ts";
+import { themeStore } from "../theme/store.ts";
 import { BUILTIN_THEMES } from "../theme/themes.ts";
 import { useUI } from "../state.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
@@ -94,11 +105,31 @@ export function registerBuiltins(r: Registry): () => void {
       shortcut: "mod+\\",
       run: () => useUI.getState().toggleSidebar(),
     }),
+    // No shortcut: ⌘⇧L is CodeMirror's select-matches and Safari's
+    // sidebar, ⌘⇧D bookmarks every tab in browsers.
+    r.register("command", {
+      id: "theme.toggleDark",
+      title: "Toggle dark mode",
+      group: "View",
+      keywords: ["light", "appearance", "night", "theme", "mörkt"],
+      icon: SunMoon,
+      run: () => themeStore().toggleDark(),
+    }),
+    ...BUILTIN_THEMES.map((t) =>
+      r.register("command", {
+        id: `theme.palette.${t.id}`,
+        title: `Theme: ${t.name}`,
+        group: "View",
+        keywords: ["colour", "color", "palette", "appearance"],
+        icon: Palette,
+        run: () => themeStore().setPalette(t.id),
+      }),
+    ),
     r.register("command", {
       id: "settings.open",
       title: "Settings",
       group: "Go to",
-      keywords: ["sync", "account", "sign in", "preferences"],
+      keywords: ["sync", "account", "sign in", "preferences", "appearance", "theme"],
       icon: Settings,
       shortcut: "mod+,",
       run: (ctx) => ctx.navigate({ kind: "settings" }),

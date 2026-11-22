@@ -100,6 +100,10 @@ describe("colour themes", () => {
     ]);
     offMine();
     expect(r.get("theme")).toHaveLength(5);
+    // ⌘K: one toggle and a command per built-in theme.
+    expect(r.command("theme.toggleDark")?.title).toBe("Toggle dark mode");
+    expect(r.command("theme.toggleDark")?.shortcut).toBeUndefined();
+    expect(r.command("theme.palette.paper")?.title).toBe("Theme: Paper");
     off();
     expect(r.get("theme")).toHaveLength(0);
   });

@@ -4,13 +4,26 @@ import { Input } from "@nota/ui/input";
 import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Cloud, ExternalLink, FolderOpen, LoaderCircle } from "lucide-react";
+import {
+  Check,
+  Cloud,
+  ExternalLink,
+  FolderOpen,
+  LoaderCircle,
+  type LucideIcon,
+  Monitor,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { fail } from "../actions.ts";
 import { DeviceList } from "../auth/Devices.tsx";
 import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
 import { keys, useVaultInfo } from "../queries.ts";
+import { useContributions } from "../registry.ts";
+import { type ThemeMode, themeStore } from "../theme/store.ts";
+import { useTheme } from "../theme/useTheme.ts";
 import { TopBar } from "./TopBar.tsx";
 
 function Section({
@@ -37,6 +50,102 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="text-muted-foreground">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
+  );
+}
+
+const MODES: { id: ThemeMode; label: string; icon: LucideIcon }[] = [
+  { id: "system", label: "System", icon: Monitor },
+  { id: "light", label: "Light", icon: Sun },
+  { id: "dark", label: "Dark", icon: Moon },
+];
+
+/** Mode and colour theme. Applies at once; kept on this device. */
+function Appearance() {
+  const theme = useTheme();
+  const themes = useContributions("theme");
+  const store = themeStore();
+  return (
+    <Section title="Appearance" description="Applies at once, on this device only.">
+      <Field label="Mode">
+        <div
+          role="radiogroup"
+          aria-label="Mode"
+          className="inline-flex gap-0.5 rounded-md bg-chip p-0.5"
+        >
+          {MODES.map((m) => {
+            const on = theme.mode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => store.setMode(m.id)}
+                className={cn(
+                  "flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150",
+                  on
+                    ? "bg-surface text-foreground shadow-card"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <m.icon className="size-3.5" strokeWidth={1.75} aria-hidden />
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+      <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-ui max-[520px]:grid-cols-1 max-[520px]:gap-1">
+        <span className="pt-1 text-muted-foreground">Theme</span>
+        <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-x-2.5 gap-y-3">
+          {themes.map((t) => {
+            const c = t[theme.resolved];
+            const on = theme.palette === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={t.name}
+                onClick={() => store.setPalette(t.id)}
+                className="flex w-[68px] flex-col items-center gap-1.5 rounded-lg focus-visible:outline-offset-4"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "flex h-11 w-full overflow-hidden rounded-[9px] shadow-card transition-shadow duration-150",
+                    on && "ring-2 ring-ink ring-offset-2 ring-offset-background",
+                  )}
+                  style={{ background: c.background }}
+                >
+                  <span className="w-[30%]" style={{ background: c.sidebar }} />
+                  <span className="flex flex-1 flex-col justify-center gap-[5px] px-2">
+                    <span className="h-[3px] w-3/4 rounded-full" style={{ background: c.ink }} />
+                    <span
+                      className="h-[3px] w-full rounded-full opacity-30"
+                      style={{ background: c.text }}
+                    />
+                    <span
+                      className="h-[3px] w-2/3 rounded-full opacity-30"
+                      style={{ background: c.text }}
+                    />
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "text-small",
+                    on ? "font-medium text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {t.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </Section>
   );
 }
 
@@ -309,6 +418,7 @@ export function Settings() {
       <TopBar crumbs={[{ label: "Settings" }]} />
       <div className="mx-auto w-full max-w-[640px] px-14 pt-10 pb-24 max-[720px]:px-5 max-[720px]:pt-5">
         <h1 className="mb-5 text-[26px] font-bold tracking-[-0.015em] text-foreground">Settings</h1>
+        <Appearance />
         <Section
           title="Vault"
           description="A folder of Markdown files. Any editor can open it; Nota keeps its index and settings in .nota."

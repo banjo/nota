@@ -1,3 +1,4 @@
+import type { ShellApi } from "@nota/client";
 import { useEffect, useSyncExternalStore } from "react";
 import { type ThemeState, themeStore } from "./store.ts";
 import type { ColorTheme } from "./themes.ts";
@@ -16,16 +17,26 @@ export function currentBackground(name = "--background"): string {
 
 /**
  * Keeps what lives outside the page's CSS in step with the theme: the
- * theme-color metas (browser and phone chrome).
+ * theme-color metas (browser and phone chrome) and, on the desktop, the
+ * windows' native appearance and the colour behind the page.
  */
-export function useThemeChrome(theme: ThemeState) {
+export function useThemeChrome(theme: ThemeState, shell?: ShellApi) {
   useEffect(() => {
     const bg = currentBackground();
-    if (!bg) return;
-    for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
-      m.setAttribute("content", bg);
+    if (bg) {
+      for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
+        m.setAttribute("content", bg);
+      }
     }
-  }, [theme.mode, theme.palette, theme.resolved]);
+    void shell
+      ?.setAppearance?.({
+        mode: theme.mode,
+        resolved: theme.resolved,
+        background: bg,
+        captureBackground: currentBackground("--surface"),
+      })
+      .catch(() => {}); // cosmetic: the page is already right
+  }, [theme.mode, theme.palette, theme.resolved, shell]);
 }
 
 /**

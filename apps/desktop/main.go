@@ -37,6 +37,9 @@ type Desktop struct {
 	main    *mygo.Window
 	capture *mygo.Window
 	dir     string
+
+	appearance     Appearance // the last SetAppearance
+	appearanceFile string     // where it is kept; "" for nowhere
 }
 
 // HideCapture hides the quick-capture window (after saving, or on
@@ -123,6 +126,7 @@ func menu(d *Desktop) *mygo.Menu {
 		{Label: "View", Submenu: []*mygo.MenuItem{
 			{Label: "Command Palette", Accelerator: "CmdOrCtrl+K", Click: send("palette.toggle")},
 			{Label: "Toggle Sidebar", Accelerator: "CmdOrCtrl+\\", Click: send("sidebar.toggle")},
+			{Label: "Toggle Dark Mode", Click: send("theme.toggleDark")},
 			mygo.Separator(),
 			{Role: mygo.RoleResetZoom},
 			{Role: mygo.RoleZoomIn},
@@ -158,8 +162,16 @@ func main() {
 	defer func() { s.syn.Load().stop() }()
 	acc := newAccount(s)
 	acc.refreshEmail()
-	d := &Desktop{dir: loc.Dir}
+	d := &Desktop{dir: loc.Dir, appearanceFile: appearancePath()}
 	mygo.Bind(s, acc, d)
+
+	// Open in the last appearance, so neither the window chrome nor the
+	// colour behind the page flashes the other mode before the page has
+	// loaded and called SetAppearance.
+	look := loadAppearance(d.appearanceFile)
+	d.appearance = look
+	mygo.Theme.SetSource(look.source())
+	mainBackground, captureBackground := look.backgrounds()
 
 	// Sign-in comes back as nota://auth?code=… (registered at install;
 	// portable builds register it here).
@@ -198,7 +210,7 @@ func main() {
 			MinHeight:       480,
 			StateKey:        "main",
 			URL:             "/",
-			BackgroundColor: "light-dark(#ffffff, #1c1c1e)",
+			BackgroundColor: mainBackground,
 		})
 		w.OnClosed(func() {
 			if runtime.GOOS != "darwin" {
@@ -216,7 +228,7 @@ func main() {
 			Width:           560,
 			Height:          150,
 			AlwaysOnTop:     true,
-			BackgroundColor: "light-dark(#ffffff, #232325)",
+			BackgroundColor: captureBackground,
 		})
 		c.OnClose(func(e *mygo.CloseEvent) {
 			if quitting.Load() {

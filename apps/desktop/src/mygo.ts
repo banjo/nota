@@ -27,6 +27,27 @@ export interface AccountState {
 }
 
 /**
+ * Appearance is the frontend's light/dark mode and page colours, for
+ * what the page cannot paint itself: the windows' native appearance
+ * (NSAppearance on macOS, GTK's dark preference on Linux) and the
+ * colour behind the page while it loads or a resize outruns it. The
+ * frontend keeps the choice in localStorage (nota:theme, nota:palette);
+ * this copy lets the next start open in it before any page has loaded.
+ */
+export interface Appearance {
+  /** Mode is the choice: "system", "light" or "dark". */
+  mode: string;
+  /** Resolved is the mode in effect when the colours were read. */
+  resolved?: string;
+  /**
+   * Background is the main window's page colour, CaptureBackground the
+   * quick-capture panel's, as #rrggbb. Others are ignored.
+   */
+  background?: string;
+  captureBackground?: string;
+}
+
+/**
  * Changes tells the frontend which notes changed: by the app itself,
  * the sync engine, a hook, or another program editing the files.
  */
@@ -382,6 +403,12 @@ export const Desktop = {
   platform: bind<[], string>("Desktop.Platform", () => []),
   /** RevealVault opens the vault folder in the file manager. */
   revealVault: bind<[], void>("Desktop.RevealVault", () => []),
+  /**
+   * SetAppearance gives the windows the frontend's mode and page colours
+   * and remembers them for the next start. The frontend calls it whenever
+   * the theme changes, the OS's mode included while the mode is System.
+   */
+  setAppearance: bind<[Appearance], void>("Desktop.SetAppearance", (a: Appearance) => [a]),
   /** ShowCapture shows the quick-capture window over other apps. */
   showCapture: bind<[], void>("Desktop.ShowCapture", () => []),
   /**

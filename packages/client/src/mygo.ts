@@ -68,6 +68,12 @@ export interface MygoBindings {
     hideCapture(): Promise<void>;
     showMain(): Promise<void>;
     revealVault(): Promise<void>;
+    setAppearance(appearance: {
+      mode: string;
+      resolved?: string;
+      background?: string;
+      captureBackground?: string;
+    }): Promise<void>;
   };
   events: {
     changed: MygoEvent<{ paths: string[] | null; seq: number }>;
@@ -137,6 +143,7 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       revealVault: () => b.Desktop.revealVault(),
       hideCapture: () => b.Desktop.hideCapture(),
       showMain: () => b.Desktop.showMain(),
+      setAppearance: (a) => b.Desktop.setAppearance(a),
       onCommand: (listener) => b.events.command.on((c) => listener(c.id)),
     },
   };
