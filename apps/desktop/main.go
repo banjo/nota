@@ -14,6 +14,7 @@ import (
 
 	"github.com/banjo/nota/internal/frontmatter"
 	"github.com/banjo/nota/internal/index"
+	"github.com/banjo/nota/internal/vault"
 	"github.com/egoist/mygo"
 )
 
@@ -78,25 +79,30 @@ func (v Vault) Save(path, body string) error {
 	return os.WriteFile(p, append(append([]byte{}, head...), body...), 0o644)
 }
 
-// Search runs a full-text query over the vault. It rebuilds an in-memory
-// index on every call, which is enough for the spike and proves that the
-// pure-Go SQLite runs on every target, phones included.
+// Search runs a full-text query over the vault, using the persistent
+// index in .nota/ (brought up to date first).
 func (v Vault) Search(q string) ([]string, error) {
-	notes, err := v.List()
+	vlt, err := vault.Open(v.dir, vault.Options{})
 	if err != nil {
 		return nil, err
 	}
-	ix, err := index.Open(":memory:")
+	ix, err := index.OpenVault(vlt)
 	if err != nil {
 		return nil, err
 	}
 	defer ix.Close()
-	for _, n := range notes {
-		if err := ix.Put(n.Path, n.Title, n.Body); err != nil {
-			return nil, err
-		}
+	if _, err := ix.Sync(vlt); err != nil {
+		return nil, err
 	}
-	return ix.Search(q)
+	es, err := ix.Search(q, index.Query{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(es))
+	for i, e := range es {
+		out[i] = e.Path
+	}
+	return out, nil
 }
 
 // ensureVault creates the vault with a welcome note the first time, so a

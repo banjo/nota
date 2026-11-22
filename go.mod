@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/egoist/mygo v0.10.0
 	github.com/goccy/go-yaml v1.19.2
+	github.com/yuin/goldmark v1.8.7
 	golang.org/x/text v0.44.0
 	modernc.org/sqlite v1.63.0
 )
