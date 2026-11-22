@@ -34,7 +34,7 @@ export function App() {
             const q = e.target.value;
             setQuery(q);
             if (!q.trim()) return setHits(null);
-            Vault.search(`${q.trim()}*`)
+            Vault.search(q.trim())
               .then((r) => setHits(r ?? []))
               .catch(() => setHits([]));
           }}

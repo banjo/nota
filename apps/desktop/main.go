@@ -1,18 +1,15 @@
 // Command desktop is the Nota desktop app. It serves the React frontend in
 // the system webview and gives it the vault through bound Go services: the
-// frontend never reads files itself.
+// frontend never reads files itself. All vault IO goes through the same
+// core packages as the nota CLI (internal/vault, internal/index).
 package main
 
 import (
-	"errors"
-	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
+	"log/slog"
+	"sync"
 
-	"github.com/banjo/nota/internal/frontmatter"
+	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/egoist/mygo"
@@ -27,74 +24,91 @@ type Note struct {
 }
 
 // Vault exposes the notes of one folder to the frontend.
-type Vault struct{ dir string }
+type Vault struct {
+	mu sync.Mutex // bound methods run on their own goroutines
+	v  *vault.Vault
+	ix *index.Index
+}
 
-// List returns every note in the vault, sorted by path.
-func (v Vault) List() ([]Note, error) {
-	var out []Note
-	err := filepath.WalkDir(v.dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() && strings.HasPrefix(d.Name(), ".") && p != v.dir {
-			return filepath.SkipDir
-		}
-		if d.IsDir() || filepath.Ext(p) != ".md" {
-			return nil
-		}
-		src, err := os.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		doc := frontmatter.Split(src)
-		props, _ := doc.Properties()
-		rel, _ := filepath.Rel(v.dir, p)
-		n := Note{Path: filepath.ToSlash(rel), Body: string(doc.Body()), Title: titleOf(rel, doc.Body())}
-		if tags, ok := props["tags"].([]any); ok {
-			for _, t := range tags {
-				if s, ok := t.(string); ok {
-					n.Tags = append(n.Tags, s)
-				}
+// openVault opens the vault and its persistent index (.nota/index.db),
+// and keeps the index current on every write through the event bus.
+func openVault(dir, inbox string) (*Vault, error) {
+	bus := events.New()
+	v, err := vault.Open(dir, vault.Options{Inbox: inbox, Create: true, Bus: bus})
+	if err != nil {
+		return nil, err
+	}
+	ix, err := index.OpenVault(v)
+	if err != nil {
+		return nil, err
+	}
+	s := &Vault{v: v, ix: ix}
+	bus.Subscribe(func(e events.Event) {
+		// Runs inside a locked method: the write that emitted the event.
+		var err error
+		switch e.Type {
+		case events.NoteMoved:
+			if err = ix.Remove(e.OldPath); err == nil {
+				err = ix.Update(v, e.Path)
 			}
+		case events.NoteDeleted:
+			err = ix.Remove(e.Path)
+		default:
+			err = ix.Update(v, e.Path)
 		}
-		out = append(out, n)
-		return nil
-	})
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out, err
+		if err != nil {
+			slog.Warn("index update failed", "path", e.Path, "err", err)
+		}
+	}, events.NoteCreated, events.NoteSaved, events.NoteMoved, events.NoteDeleted)
+	return s, nil
+}
+
+// List returns every note in the vault, sorted by path. The index is
+// brought up to date with the files first, so outside edits show up.
+func (s *Vault) List() ([]Note, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.ix.Sync(s.v); err != nil {
+		return nil, err
+	}
+	es, err := s.ix.Query(index.Query{})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Note, 0, len(es))
+	for _, e := range es {
+		n, err := s.v.Read(e.Path)
+		if err != nil {
+			continue // deleted since the sync
+		}
+		out = append(out, Note{Path: e.Path, Title: e.Title, Tags: e.Tags, Body: n.Body})
+	}
+	return out, nil
 }
 
 // Save writes a note's body back, keeping its frontmatter byte for byte.
-func (v Vault) Save(path, body string) error {
-	p := filepath.Join(v.dir, filepath.FromSlash(path))
-	if !strings.HasPrefix(p, filepath.Clean(v.dir)+string(filepath.Separator)) {
-		return errors.New("path outside the vault")
-	}
-	src, err := os.ReadFile(p)
+func (s *Vault) Save(path, body string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n, err := s.v.Read(path)
 	if err != nil {
 		return err
 	}
-	doc := frontmatter.Split(src)
-	head := src[:len(src)-len(doc.Body())]
-	return os.WriteFile(p, append(append([]byte{}, head...), body...), 0o644)
+	head := n.Raw[:len(n.Raw)-len(n.Body)]
+	_, _, err = s.v.Write(n.Path, append(append([]byte{}, head...), body...))
+	return err
 }
 
-// Search runs a full-text query over the vault, using the persistent
-// index in .nota/ (brought up to date first).
-func (v Vault) Search(q string) ([]string, error) {
-	vlt, err := vault.Open(v.dir, vault.Options{})
-	if err != nil {
+// Search runs a full-text query over the vault and returns the paths of
+// the matching notes, best match first. All words must match, the last
+// one as a prefix.
+func (s *Vault) Search(q string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.ix.Sync(s.v); err != nil {
 		return nil, err
 	}
-	ix, err := index.OpenVault(vlt)
-	if err != nil {
-		return nil, err
-	}
-	defer ix.Close()
-	if _, err := ix.Sync(vlt); err != nil {
-		return nil, err
-	}
-	es, err := ix.Search(q, index.Query{})
+	es, err := s.ix.Search(q, index.Query{})
 	if err != nil {
 		return nil, err
 	}
@@ -105,39 +119,33 @@ func (v Vault) Search(q string) ([]string, error) {
 	return out, nil
 }
 
-// ensureVault creates the vault with a welcome note the first time, so a
-// fresh install (or a phone, which has no NOTA_VAULT) opens on something.
-func ensureVault(dir string) error {
-	if _, err := os.Stat(dir); err == nil {
-		return nil
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+// welcome is written into a vault that has no notes yet, so a fresh
+// install (or a phone, which has no NOTA_VAULT) opens on something.
+const welcome = "---\ntags: [nota]\n---\n# Välkommen till Nota\n\nAnteckningarna är vanliga .md-filer i den här mappen.\n"
+
+func ensureWelcome(s *Vault) error {
+	es, err := s.v.List()
+	if err != nil || len(es) > 0 {
 		return err
 	}
-	welcome := "---\ntags: [nota]\n---\n# Välkommen till Nota\n\nAnteckningarna är vanliga .md-filer i den här mappen.\n"
-	return os.WriteFile(filepath.Join(dir, "Välkommen.md"), []byte(welcome), 0o644)
-}
-
-// titleOf takes the first line of the body, without a leading "# ".
-func titleOf(rel string, body []byte) string {
-	for _, l := range strings.Split(string(body), "\n") {
-		if l = strings.TrimSpace(strings.TrimLeft(l, "#")); l != "" {
-			return l
-		}
-	}
-	return strings.TrimSuffix(filepath.Base(rel), ".md")
+	_, _, err = s.v.Write("Välkommen.md", []byte(welcome))
+	return err
 }
 
 func main() {
-	dir := os.Getenv("NOTA_VAULT")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, "Notes")
-	}
-	if err := ensureVault(dir); err != nil {
+	loc, err := vault.Discover("")
+	if err != nil {
 		log.Fatal(err)
 	}
-	mygo.Bind(Vault{dir: dir})
+	s, err := openVault(loc.Dir, loc.Config.Inbox)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer s.ix.Close()
+	if err := ensureWelcome(s); err != nil {
+		log.Fatal(err)
+	}
+	mygo.Bind(s)
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{
 			Title:     "Nota",

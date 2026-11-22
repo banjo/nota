@@ -16,14 +16,17 @@ export interface Note {
 
 /** Vault exposes the notes of one folder to the frontend. */
 export const Vault = {
-  /** List returns every note in the vault, sorted by path. */
+  /**
+   * List returns every note in the vault, sorted by path. The index is
+   * brought up to date with the files first, so outside edits show up.
+   */
   list: bind<[], Note[]>("Vault.List", () => []),
   /** Save writes a note's body back, keeping its frontmatter byte for byte. */
   save: bind<[string, string], void>("Vault.Save", (path: string, body: string) => [path, body]),
   /**
-   * Search runs a full-text query over the vault. It rebuilds an in-memory
-   * index on every call, which is enough for the spike and proves that the
-   * pure-Go SQLite runs on every target, phones included.
+   * Search runs a full-text query over the vault and returns the paths of
+   * the matching notes, best match first. All words must match, the last
+   * one as a prefix.
    */
   search: bind<[string], string[]>("Vault.Search", (q: string) => [q]),
 } as const;
