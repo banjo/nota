@@ -17,12 +17,15 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/banjo/nota/internal/protocol"
 )
@@ -42,6 +45,40 @@ type Config struct {
 	Blobs BlobStore
 	// KeepAlive is the SSE keepalive interval; 25 s if 0.
 	KeepAlive time.Duration
+
+	// PublicURL is where the API is reached from outside, e.g.
+	// https://nota.app.banjoanton.com.
+	PublicURL string
+	// WebURL is the web app's base URL (e.g. https://nota.banjoanton.com):
+	// sign-in links point at WebURL/app/connect. The first WebOrigins
+	// entry when empty.
+	WebURL string
+	// WebOrigins are the browser origins of the web app: CORS with
+	// credentials is allowed for them and passkeys are accepted from them.
+	WebOrigins []string
+	// RPID is the WebAuthn relying party id (the web app's domain, e.g.
+	// nota.banjoanton.com). Passkeys are off when empty.
+	RPID string
+	// CookieDomain is the session cookie's Domain (e.g. banjoanton.com,
+	// so the cookie set by the API also covers the web app's site). Host
+	// only when empty.
+	CookieDomain string
+	// CookieInsecure drops the Secure flag of the session cookie, for
+	// local development over plain http only.
+	CookieInsecure bool
+	// Signup is who may create an account (default SignupInvite).
+	Signup SignupMode
+	// SessionTTL is how long an unused browser session lives
+	// (DefaultSessionTTL if 0); each use extends it.
+	SessionTTL time.Duration
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For is
+	// believed (see ParseProxies).
+	TrustedProxies []netip.Prefix
+	// AuthRateLimit is how many sign-in attempts one IP may make per
+	// minute (default 30, burst 20); negative turns the limit off.
+	AuthRateLimit int
+	// Now is the clock (time.Now if nil); tests move it.
+	Now func() time.Time
 }
 
 // Server is the sync server. Create it with New and serve Handler.
@@ -52,6 +89,8 @@ type Server struct {
 	log    *slog.Logger
 	mux    *http.ServeMux
 	broker *broker
+	wa     *webauthn.WebAuthn
+	limit  *limiter
 }
 
 // DBFile is the database file name inside the data directory.
@@ -80,10 +119,35 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	if cfg.KeepAlive <= 0 {
 		cfg.KeepAlive = 25 * time.Second
 	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
+	if cfg.Signup == "" {
+		cfg.Signup = SignupInvite
+	}
+	if cfg.SessionTTL <= 0 {
+		cfg.SessionTTL = DefaultSessionTTL
+	}
+	if cfg.WebURL == "" && len(cfg.WebOrigins) > 0 {
+		cfg.WebURL = cfg.WebOrigins[0]
+	}
+	cfg.WebURL = strings.TrimRight(cfg.WebURL, "/")
+	var wa *webauthn.WebAuthn
+	if cfg.RPID != "" {
+		if len(cfg.WebOrigins) == 0 {
+			return nil, errors.New("server: passkeys need at least one web origin (NOTA_SERVER_WEB_ORIGIN)")
+		}
+		var err error
+		wa, err = webauthn.New(&webauthn.Config{RPID: cfg.RPID, RPDisplayName: "Nota", RPOrigins: cfg.WebOrigins})
+		if err != nil {
+			return nil, fmt.Errorf("server: passkeys: %w", err)
+		}
+	}
 	st, err := OpenData(ctx, cfg.DataDir)
 	if err != nil {
 		return nil, err
 	}
+	st.now = cfg.Now
 	blobs := cfg.Blobs
 	if blobs == nil {
 		if blobs, err = NewDiskBlobs(filepath.Join(cfg.DataDir, "blobs")); err != nil {
@@ -91,7 +155,14 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	s := &Server{cfg: cfg, store: st, blobs: blobs, log: cfg.Logger, mux: http.NewServeMux(), broker: newBroker()}
+	s := &Server{cfg: cfg, store: st, blobs: blobs, log: cfg.Logger, mux: http.NewServeMux(), broker: newBroker(), wa: wa}
+	if cfg.AuthRateLimit >= 0 {
+		n := cfg.AuthRateLimit
+		if n == 0 {
+			n = 30
+		}
+		s.limit = newLimiter(n, 20, cfg.Now)
+	}
 	s.routes()
 	return s, nil
 }
@@ -111,7 +182,7 @@ func (s *Server) Close() error {
 func (s *Server) Handle(pattern string, h http.Handler) { s.mux.Handle(pattern, h) }
 
 // Handler returns the HTTP handler of the whole server.
-func (s *Server) Handler() http.Handler { return s.logged(s.mux) }
+func (s *Server) Handler() http.Handler { return s.logged(s.cors(s.mux)) }
 
 // handlerFunc is an API handler: it returns an error to send instead of
 // writing one itself.
@@ -132,6 +203,7 @@ func (s *Server) routes() {
 	v1("POST /v1/vaults/{vault}/moves", s.move)
 	v1("GET /v1/vaults/{vault}/history/{path...}", s.history)
 	v1("GET /v1/vaults/{vault}/events", s.events)
+	s.authRoutes()
 	s.mux.Handle("/v1/", s.v1(func(http.ResponseWriter, *http.Request, Principal) error {
 		return &apiErr{http.StatusNotFound, protocol.Error{Code: protocol.CodeNotFound, Message: "no such route"}}
 	}))

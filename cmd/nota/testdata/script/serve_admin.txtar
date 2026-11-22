@@ -4,11 +4,28 @@ env NOTA_SERVER_DATA=$WORK/data
 
 nota serve user add Anton@Example.com
 stdout '^created user anton@example.com$'
+stdout '^setup code ninv_[A-Za-z0-9_-]{24} \(valid until .*\): register a passkey with it$'
+env NOTA_SERVER_WEB_ORIGIN=https://notes.example.com
+nota serve user add --json eva@example.com
+stdout '"setup_link": "https://notes.example.com/app/signup\?invite=ninv_'
 exitcode 5 nota serve user add anton@example.com
 stderr 'already exists'
 exitcode 2 nota serve user add not-an-email
 nota serve user list
 stdout '^anton@example.com\t'
+
+# Invites: printed once, listed, revoked while unused.
+nota serve invite create --email friend@example.com --note 'for Kim'
+stdout '^ninv_'
+stdout '^https://notes.example.com/app/signup\?invite=ninv_'
+stderr '^invite 3, valid until .*; it is shown only once$'
+nota serve invite list
+stdout '^3 +friend@example.com +for Kim +.* open$'
+stdout '^1 +anton@example.com +setup '
+nota serve invite revoke 3
+stdout '^revoked invite 3$'
+exitcode 3 nota serve invite revoke 3
+exitcode 2 nota serve invite create --email nope
 
 exitcode 2 nota serve token create anton@example.com
 stderr '--device is required'

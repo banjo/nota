@@ -229,14 +229,6 @@ func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 	return nil
 }
 
-// Principal is who a request is authenticated as.
-type Principal struct {
-	UserID  int64
-	Email   string
-	TokenID int64
-	Device  string
-}
-
 // Authenticate looks up a device token. Unknown and revoked tokens fail
 // with ErrNotFound.
 func (s *Store) Authenticate(ctx context.Context, secret string) (Principal, error) {

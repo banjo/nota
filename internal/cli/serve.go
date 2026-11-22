@@ -26,6 +26,23 @@ const (
 	EnvServerData        = "NOTA_SERVER_DATA"
 	EnvServerMaxFileSize = "NOTA_SERVER_MAX_FILE_SIZE"
 	EnvServerLogFormat   = "NOTA_SERVER_LOG_FORMAT"
+	// EnvServerPublicURL is the API's own public URL.
+	EnvServerPublicURL = "NOTA_SERVER_PUBLIC_URL"
+	// EnvServerWebOrigin lists the web app's origins, comma-separated;
+	// the first is where sign-in links point.
+	EnvServerWebOrigin = "NOTA_SERVER_WEB_ORIGIN"
+	// EnvServerRPID is the WebAuthn relying party id (passkeys are off
+	// without it).
+	EnvServerRPID = "NOTA_SERVER_RP_ID"
+	// EnvServerCookieDomain is the session cookie's Domain.
+	EnvServerCookieDomain = "NOTA_SERVER_COOKIE_DOMAIN"
+	// EnvServerCookieInsecure=1 drops the cookie's Secure flag (local http only).
+	EnvServerCookieInsecure = "NOTA_SERVER_COOKIE_INSECURE"
+	// EnvServerSignup is invite (default), open or closed.
+	EnvServerSignup = "NOTA_SERVER_SIGNUP"
+	// EnvServerTrustedProxies lists proxies (IPs, CIDRs or "private")
+	// whose X-Forwarded-For is believed.
+	EnvServerTrustedProxies = "NOTA_SERVER_TRUSTED_PROXIES"
 )
 
 type serveFlags struct {
@@ -85,13 +102,23 @@ SQLite database nota.db and the blob store blobs/. Settings can come
 from the environment instead of flags: $NOTA_SERVER_ADDR,
 $NOTA_SERVER_DATA, $NOTA_SERVER_MAX_FILE_SIZE, $NOTA_SERVER_LOG_FORMAT.
 
+Accounts (email + passkey) are configured only through the environment:
+$NOTA_SERVER_PUBLIC_URL (this API), $NOTA_SERVER_WEB_ORIGIN (the web
+app's origins, comma-separated), $NOTA_SERVER_RP_ID (the passkey domain;
+passkeys are off without it), $NOTA_SERVER_COOKIE_DOMAIN,
+$NOTA_SERVER_SIGNUP (invite, open or closed; default invite) and
+$NOTA_SERVER_TRUSTED_PROXIES (proxies whose X-Forwarded-For is trusted,
+e.g. "private"). See docs/deploy.md.
+
 Bootstrap a user and a device token with
 
   nota serve user add you@example.com
   nota serve token create you@example.com --device laptop
 
-and give the token to "nota remote add". The server logs one line per
-request to stderr and shuts down gracefully on SIGINT or SIGTERM.`,
+and give the token to "nota remote add". "user add" also prints a setup
+code to register the account's first passkey in the web app. The server
+logs one line per request to stderr and shuts down gracefully on SIGINT
+or SIGTERM.`,
 		Args: exactArgs(0, "no arguments"),
 		RunE: func(cmd *cobra.Command, _ []string) error { return a.runServe(cmd, f) },
 	}
@@ -102,8 +129,101 @@ request to stderr and shuts down gracefully on SIGINT or SIGTERM.`,
 	fl.StringVar(&f.maxSize, "max-file-size", "", "largest file accepted, e.g. 100MB (default $NOTA_SERVER_MAX_FILE_SIZE or 100MiB)")
 	fl.StringVar(&f.logFormat, "log-format", "", "log format: text or json (default $NOTA_SERVER_LOG_FORMAT or text)")
 	fl.StringVar(&f.addrFile, "addr-file", "", "write the bound address to this file once listening (for scripts)")
-	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f))
+	cmd.AddCommand(a.serveUserCmd(f), a.serveTokenCmd(f), a.serveInviteCmd(f))
 	return cmd
+}
+
+// setupTTL is how long the setup code of `nota serve user add` lasts.
+const setupTTL = 30 * 24 * time.Hour
+
+func (a *app) serveInviteCmd(f *serveFlags) *cobra.Command {
+	cmd := &cobra.Command{Use: "invite", Short: "Manage sign-up invites",
+		Long: `With the default sign-up mode (NOTA_SERVER_SIGNUP=invite) people need an
+invite code to create an account. An invite works once; with --email only
+that address can use it.`}
+	var email, note string
+	var ttl time.Duration
+	create := &cobra.Command{
+		Use:   "create [--email addr]",
+		Short: "Create an invite code (printed once)",
+		Args:  exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				code, inv, err := st.CreateInvite(ctx, email, note, ttl)
+				if err != nil {
+					return usageErr("%v", err)
+				}
+				if a.json {
+					return a.printJSON(map[string]any{"invite": inv, "code": code, "link": signupLink(code)})
+				}
+				fmt.Fprintln(a.stdout, code)
+				if l := signupLink(code); l != "" {
+					fmt.Fprintln(a.stdout, l)
+				}
+				fmt.Fprintf(a.stderr, "invite %d, valid until %s; it is shown only once\n", inv.ID, inv.ExpiresAt.Format(time.RFC3339))
+				return nil
+			})
+		},
+	}
+	create.Flags().StringVar(&email, "email", "", "only this email can use the invite")
+	create.Flags().StringVar(&note, "note", "", "a note for the invite list")
+	create.Flags().DurationVar(&ttl, "expires", server.DefaultInviteTTL, "how long the invite is valid")
+	list := &cobra.Command{
+		Use:   "list",
+		Short: "List invites",
+		Args:  exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				invs, err := st.Invites(ctx)
+				if err != nil {
+					return err
+				}
+				if a.json {
+					return a.printJSON(invs)
+				}
+				tw := tabwriter.NewWriter(a.stdout, 0, 4, 2, ' ', 0)
+				fmt.Fprintln(tw, "ID	EMAIL	NOTE	EXPIRES	STATUS")
+				for _, inv := range invs {
+					status := "open"
+					if inv.UsedAt != nil {
+						status = "used " + inv.UsedAt.Format(time.RFC3339)
+					}
+					fmt.Fprintf(tw, "%d	%s	%s	%s	%s\n", inv.ID, dash(inv.Email), dash(inv.Note), inv.ExpiresAt.Format(time.RFC3339), status)
+				}
+				return tw.Flush()
+			})
+		},
+	}
+	revoke := &cobra.Command{
+		Use:   "revoke <id>",
+		Short: "Delete an unused invite",
+		Args:  exactArgs(1, "an invite id (see nota serve invite list)"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			id, err := strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return usageErr("bad invite id %q", args[0])
+			}
+			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
+				if err := st.RevokeInvite(ctx, id); err != nil {
+					return serverErr(err)
+				}
+				if a.json {
+					return a.printJSON(map[string]any{"revoked": id})
+				}
+				fmt.Fprintf(a.stdout, "revoked invite %d\n", id)
+				return nil
+			})
+		},
+	}
+	cmd.AddCommand(create, list, revoke)
+	return cmd
+}
+
+func dash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 func (f *serveFlags) dataDir() (string, error) {
@@ -147,6 +267,11 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 			return usageErr("--max-file-size: %v", err)
 		}
 	}
+	cfg, err := serverConfigFromEnv()
+	if err != nil {
+		return usageErr("%v", err)
+	}
+	cfg.DataDir, cfg.MaxFileSize = dir, maxSize
 	format := f.logFormat
 	if format == "" {
 		format = envOr(EnvServerLogFormat, "text")
@@ -164,13 +289,16 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	srv, err := server.New(ctx, server.Config{DataDir: dir, MaxFileSize: maxSize, Logger: log})
+	cfg.Logger = log
+	srv, err := server.New(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	defer srv.Close()
 	err = srv.ListenAndServe(ctx, addr, 10*time.Second, func(ln net.Addr) {
-		log.Info("nota serve: listening", "addr", ln.String(), "data", dir, "max_file_size", maxSize, "version", Version)
+		log.Info("nota serve: listening", "addr", ln.String(), "data", dir, "max_file_size", maxSize, "version", Version,
+			"public_url", cfg.PublicURL, "web_origins", strings.Join(cfg.WebOrigins, ","), "rp_id", cfg.RPID,
+			"signup", string(cfg.Signup), "trusted_proxies", len(cfg.TrustedProxies))
 		if f.addrFile != "" {
 			if err := os.WriteFile(f.addrFile, []byte(ln.String()+"\n"), 0o644); err != nil {
 				log.Error("write --addr-file", "err", err)
@@ -182,6 +310,53 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 	}
 	log.Info("nota serve: stopped")
 	return nil
+}
+
+// serverConfigFromEnv reads the account and web settings of the server
+// from the environment.
+func serverConfigFromEnv() (server.Config, error) {
+	var cfg server.Config
+	cfg.PublicURL = strings.TrimRight(os.Getenv(EnvServerPublicURL), "/")
+	cfg.WebOrigins = webOrigins()
+	cfg.RPID = strings.TrimSpace(os.Getenv(EnvServerRPID))
+	cfg.CookieDomain = strings.TrimSpace(os.Getenv(EnvServerCookieDomain))
+	cfg.CookieInsecure = truthy(os.Getenv(EnvServerCookieInsecure))
+	var err error
+	if cfg.Signup, err = server.ParseSignupMode(os.Getenv(EnvServerSignup)); err != nil {
+		return cfg, err
+	}
+	if cfg.TrustedProxies, err = server.ParseProxies(os.Getenv(EnvServerTrustedProxies)); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
+
+// webOrigins reads $NOTA_SERVER_WEB_ORIGIN as a list.
+func webOrigins() []string {
+	var out []string
+	for _, o := range strings.Split(os.Getenv(EnvServerWebOrigin), ",") {
+		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+func truthy(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// signupLink is where someone with an invite creates their account.
+func signupLink(code string) string {
+	o := webOrigins()
+	if len(o) == 0 {
+		return ""
+	}
+	return o[0] + "/app/signup?invite=" + code
 }
 
 // withStore opens the data directory for an admin command.
@@ -225,10 +400,21 @@ func (a *app) serveUserCmd(f *serveFlags) *cobra.Command {
 				if err != nil {
 					return serverErr(err)
 				}
+				// The user has no passkey yet: an invite bound to the
+				// email lets them register one in the web app.
+				code, inv, err := st.CreateInvite(ctx, u.Email, "setup", setupTTL)
+				if err != nil {
+					return err
+				}
 				if a.json {
-					return a.printJSON(u)
+					return a.printJSON(map[string]any{"user": u, "setup_code": code, "setup_link": signupLink(code), "expires_at": inv.ExpiresAt})
 				}
 				fmt.Fprintf(a.stdout, "created user %s\n", u.Email)
+				fmt.Fprintf(a.stdout, "setup code %s (valid until %s): register a passkey with it", code, inv.ExpiresAt.Format(time.RFC3339))
+				if l := signupLink(code); l != "" {
+					fmt.Fprintf(a.stdout, " at %s", l)
+				}
+				fmt.Fprintln(a.stdout)
 				return nil
 			})
 		},
