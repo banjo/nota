@@ -1,12 +1,13 @@
-// Command nota is the Nota CLI. Phase 1 fills in the subcommands.
+// Command nota is the Nota CLI: local-first markdown notes from the shell.
+// See `nota --help`; the commands live in internal/cli.
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/banjo/nota/internal/cli"
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "nota: not implemented yet")
-	os.Exit(1)
+	os.Exit(cli.Main(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }

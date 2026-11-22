@@ -245,6 +245,23 @@ func (v *Vault) Exists(rel string) bool {
 	return err == nil && r.exists
 }
 
+// DiskPath returns the absolute OS path of an existing note, with the name
+// as the file system stores it (which may be NFD on macOS).
+func (v *Vault) DiskPath(rel string) (string, error) {
+	rel, err := NotePath(rel)
+	if err != nil {
+		return "", err
+	}
+	r, err := v.resolve(rel)
+	if err != nil {
+		return "", err
+	}
+	if !r.exists {
+		return "", &PathError{Op: "open", Path: rel, Existing: r.collision, Err: ErrNotFound}
+	}
+	return r.disk, nil
+}
+
 // Read reads a note by vault-relative path. The ".md" may be left out.
 func (v *Vault) Read(rel string) (*Note, error) {
 	rel, err := NotePath(rel)
