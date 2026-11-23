@@ -104,7 +104,7 @@ func TestMCPStdio(t *testing.T) {
 		names = append(names, tl.Name)
 	}
 	for _, want := range []string{"search_notes", "read_note", "list_notes", "create_note", "append_to_note",
-		"update_note", "update_frontmatter", "move_note", "list_tags", "list_views", "get_backlinks"} {
+		"update_note", "update_frontmatter", "move_note", "create_folder", "list_folders", "list_tags", "list_views", "get_backlinks"} {
 		if !slices.Contains(names, want) {
 			t.Errorf("tools/list lacks %s: %q", want, names)
 		}

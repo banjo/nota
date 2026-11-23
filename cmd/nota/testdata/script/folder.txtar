@@ -1,0 +1,83 @@
+# folder add makes real, empty folders (nested paths make the parents) and
+# prints the canonical path.
+nota folder add Arkiv
+stdout '^Arkiv$'
+exists vault/Arkiv
+nota folder add Projekt/Idéer/2027
+stdout '^Projekt/Idéer/2027$'
+exists vault/Projekt/Idéer/2027
+
+# Several at once; backslashes become slashes; an NFD name is stored as given.
+nota folder add Ett 'Två\Tre'
+stdout '^Ett$'
+stdout '^Två/Tre$'
+exists vault/Två/Tre
+
+# --json: one path, or paths for several.
+nota folder add --json Json
+stdout '"path": "Json"'
+nota folder add --json J1 J2
+stdout '"paths": \['
+
+# folder ls lists every folder, empty ones too, with the notes in it
+# (subfolders included).
+nota folder ls
+stdout '^Arkiv\s+0$'
+stdout '^Projekt\s+1$'
+stdout '^Projekt/Idéer\s+0$'
+stdout '^Projekt/Idéer/2027\s+0$'
+stdout '^Två\s+0$'
+! stdout '\.nota'
+! stdout '\.trash'
+nota folder ls --json
+stdout '"path": "Projekt/Idéer"'
+stdout '"name": "2027"'
+stdout '"notes": 1'
+
+# Empty folders hold no notes.
+nota ls
+stdout '^Projekt/Plan.md'
+! stdout 'Arkiv'
+
+# A note can be filed into an empty folder, which then counts it.
+nota mv Projekt/Plan Arkiv
+nota folder ls
+stdout '^Arkiv\s+1$'
+stdout '^Projekt\s+0$'
+
+# Existing folder, folder with notes, and case collisions: exit 5.
+exitcode 5 nota folder add Arkiv
+stderr 'already exists'
+exitcode 5 nota folder add arkiv
+stderr 'differs only in case'
+exitcode 5 nota folder add --json ARKIV/Under
+stderr '"code":"case_collision"'
+exitcode 5 nota folder add Projekt/Idéer
+
+# A failure in a list stops there, after the earlier ones were made.
+exitcode 5 nota folder add Fin Arkiv
+exists vault/Fin
+
+# Bad names are usage errors (exit 2); nothing is created.
+exitcode 2 nota folder add .nota
+exitcode 2 nota folder add .trash/x
+exitcode 2 nota folder add ../outside
+stderr 'leaves the vault'
+exitcode 2 nota folder add 'a:b'
+exitcode 2 nota folder add CON
+exitcode 2 nota folder add 'x.md'
+exitcode 2 nota folder add /
+nota folder
+stdout 'Available Commands'
+! exists vault/.nota/x
+! exists vault/a:b
+
+# Ignored folders (.notaignore) are refused.
+exitcode 2 nota folder add build
+nota folder ls
+! stdout 'build'
+
+-- vault/Projekt/Plan.md --
+# Plan
+-- vault/.notaignore --
+build/

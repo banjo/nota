@@ -123,7 +123,7 @@ func TestTools(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"append_to_note", "create_note", "get_backlinks", "list_notes", "list_tags", "list_views",
+	want := []string{"append_to_note", "create_folder", "create_note", "get_backlinks", "list_folders", "list_notes", "list_tags", "list_views",
 		"move_note", "read_note", "search_notes", "update_frontmatter", "update_note"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools %q, want %q", names, want)
@@ -205,6 +205,28 @@ func TestTools(t *testing.T) {
 	}
 	if _, err := m.Stat("Projekt/Möten/Möte med Åsa.md"); err != nil {
 		t.Fatal(err)
+	}
+
+	var fo FolderOutput
+	call(t, cs, "create_folder", map[string]any{"path": "Arkiv/2027"}, &fo)
+	if fo.Path != "Arkiv/2027" {
+		t.Fatalf("create_folder %+v", fo)
+	}
+	if msg := toolError(t, cs, "create_folder", map[string]any{"path": "Arkiv/2027"}); !strings.Contains(msg, "already exists") {
+		t.Fatalf("create_folder twice: %q", msg)
+	}
+	if msg := toolError(t, cs, "create_folder", map[string]any{"path": ".nota/x"}); !strings.Contains(msg, "hidden") {
+		t.Fatalf("create_folder hidden: %q", msg)
+	}
+	var fl FoldersOutput
+	call(t, cs, "list_folders", nil, &fl)
+	wantFolders := []index.FolderInfo{
+		{Path: "Arkiv", Name: "Arkiv"}, {Path: "Arkiv/2027", Name: "2027"},
+		{Path: "Inbox", Name: "Inbox"}, // empty since the note was filed
+		{Path: "Projekt", Name: "Projekt", Notes: 3}, {Path: "Projekt/Möten", Name: "Möten", Notes: 1},
+	}
+	if !slices.Equal(fl.Folders, wantFolders) {
+		t.Fatalf("list_folders %+v, want %+v", fl.Folders, wantFolders)
 	}
 
 	var tags TagsOutput

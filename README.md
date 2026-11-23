@@ -27,7 +27,7 @@
 
 - 📄 Plain files: every note is a `.md` file with optional YAML frontmatter, kept byte for byte. Any editor and `git` work on the same folder.
 - ⌨️ CLI first: everything exists as a command before it exists as a button, and every command takes `--json`.
-- 🤖 Built for agents: `nota mcp` serves 11 MCP tools over stdio, and the sync server offers the same tools over HTTP.
+- 🤖 Built for agents: `nota mcp` serves 13 MCP tools over stdio, and the sync server offers the same tools over HTTP.
 - ⚡️ Light: one 20 MB binary for the CLI, MCP and server; a search over 10,000 notes takes about 18 ms.
 - 🔄 Sync you host: three-way merge per file, conflict copies instead of lost edits, a version history for every note.
 - 🔑 No passwords: accounts are an e-mail address and a passkey, only needed for sync.

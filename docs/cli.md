@@ -14,6 +14,8 @@ nota cat Plan                                  # By path, title or unique prefix
 nota set Plan status=done priority=2           # Frontmatter, edited line by line.
 nota tag Plan +nota -draft                     # Flags go before the note.
 nota mv Plan Archive
+nota folder add Projects/Ideas                  # Empty folders, nested paths too.
+nota folder ls                                 # Every folder with its note count.
 nota inbox
 nota ls --view drafts                          # .nota/views/drafts.yaml
 nota backlinks Plan

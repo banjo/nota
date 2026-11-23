@@ -30,6 +30,8 @@ args to pick a vault other than the default.
 | `update_note` | replaces a body; pass `expected_hash` from `read_note` to avoid overwriting newer edits |
 | `update_frontmatter` | properties and tags, line by line |
 | `move_note` | files a note into a folder |
+| `create_folder` | an empty folder (`a/b` makes both); fails if it exists |
+| `list_folders` | every folder, empty ones too, with note counts |
 | `list_tags` | every tag with its count |
 | `list_views` | the saved views in `.nota/views` |
 | `get_backlinks` | the notes that link to a note |
