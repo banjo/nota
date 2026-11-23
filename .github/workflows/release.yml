@@ -256,6 +256,9 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: |
+          # GitHub turns the "~" of prerelease packages (nota_1.2.0~rc.1_amd64.deb)
+          # into "." on upload; name them that way first so checksums.txt matches.
+          for f in *~*; do [ -e "$f" ] && mv -v -- "$f" "${f//\~/.}"; done
           sha256sum -- * > checksums.txt
           cat checksums.txt
       - name: Create the GitHub release
