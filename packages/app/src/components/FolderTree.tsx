@@ -87,6 +87,8 @@ export function FolderTree() {
               right: 0,
               height: rowHeight,
               transform: `translateY(${item.start - margin}px)`,
+              // The draft row's error hangs over the rows below it.
+              zIndex: row.kind === "draft" ? 1 : undefined,
             }}
           >
             {row.kind === "draft" ? (
