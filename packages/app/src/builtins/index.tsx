@@ -1,6 +1,7 @@
 import {
   FilePlus2,
   FolderInput,
+  FolderPlus,
   Inbox,
   PanelLeft,
   Palette,
@@ -10,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createNote, deleteNote, newNoteFolder } from "../actions.ts";
+import { baseFolder } from "../lib/folders.ts";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
 
@@ -57,14 +59,36 @@ export function registerBuiltins(r: Registry): () => void {
       },
     }),
     r.register("command", {
-      id: "note.move",
-      title: "Move note to…",
+      id: "note.addToFolder",
+      title: "Add to folder…",
       group: "Notes",
-      keywords: ["folder", "file", "flytta"],
+      keywords: ["move", "folder", "file", "mapp", "flytta"],
       icon: FolderInput,
       shortcut: "mod+shift+m",
       when: (ctx) => !!ctx.notePath,
       run: (ctx) => useUI.getState().openPalette("move", ctx.notePath),
+    }),
+    r.register("command", {
+      id: "note.newInFolder",
+      title: "New note in folder…",
+      group: "Notes",
+      keywords: ["folder", "create", "add", "file", "mapp", "ny"],
+      icon: FilePlus2,
+      run: () => useUI.getState().openPalette("noteIn"),
+    }),
+    r.register("command", {
+      id: "folder.add",
+      title: "Add folder…",
+      group: "Notes",
+      keywords: ["mkdir", "new", "create", "folder", "mapp", "skapa"],
+      icon: FolderPlus,
+      run: async (ctx) => {
+        const tree = await ctx.queryClient.ensureQueryData({
+          queryKey: keys.tree,
+          queryFn: () => ctx.client.tree(),
+        });
+        useUI.getState().openPalette("newFolder", baseFolder(ctx.route, tree.inbox));
+      },
     }),
     r.register("command", {
       id: "note.delete",

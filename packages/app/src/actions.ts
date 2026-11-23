@@ -1,6 +1,7 @@
 import { type NotesClient, NotaError } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
+import { rememberFolder } from "./lib/folders.ts";
 import { folderLabel, folderOf, resolveLink } from "./lib/notes.ts";
 import { keys, noteWritten } from "./queries.ts";
 import { type Route, useUI } from "./state.ts";
@@ -65,6 +66,59 @@ export async function moveNote(
     fail("Couldn't move the note", e);
     return undefined;
   }
+}
+
+/** Makes an empty folder (nested paths make the parents) and shows it in the tree. */
+export async function addFolder(client: NotesClient, qc: QueryClient, path: string) {
+  try {
+    const p = await client.createFolder(path);
+    void qc.invalidateQueries({ queryKey: keys.tree });
+    useUI.getState().reveal(`${p}/_`);
+    toast.success(`Created ${folderLabel(p)}`);
+    return p;
+  } catch (e) {
+    fail("Couldn't create the folder", e);
+    return undefined;
+  }
+}
+
+/** Creates a folder, then moves a note into it. Nothing moves when the folder is refused. */
+export async function createFolderAndMove(
+  client: NotesClient,
+  qc: QueryClient,
+  path: string,
+  folder: string,
+) {
+  let made: string;
+  try {
+    made = await client.createFolder(folder);
+  } catch (e) {
+    fail("Couldn't create the folder", e);
+    return undefined;
+  }
+  rememberFolder(made);
+  void qc.invalidateQueries({ queryKey: keys.tree });
+  return moveNote(client, qc, path, made);
+}
+
+/** Creates a folder, then a new note in it. */
+export async function addFolderThenNote(client: NotesClient, qc: QueryClient, folder: string) {
+  const made = await addFolder(client, qc, folder);
+  return made === undefined ? undefined : createNoteIn(client, qc, made);
+}
+
+/** Moves a note into a folder chosen in the palette and remembers the choice. */
+export async function fileNote(client: NotesClient, qc: QueryClient, path: string, folder: string) {
+  const r = await moveNote(client, qc, path, folder);
+  if (r) rememberFolder(folder);
+  return r;
+}
+
+/** Makes a note in a folder chosen in the palette and remembers the choice. */
+export async function createNoteIn(client: NotesClient, qc: QueryClient, folder: string) {
+  const n = await createNote(client, qc, folder);
+  if (n) rememberFolder(folder);
+  return n;
 }
 
 export async function deleteNote(client: NotesClient, qc: QueryClient, path: string) {
