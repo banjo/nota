@@ -61,8 +61,9 @@ describe("theme store", () => {
     expect(readPalette("paper")).toBe("paper");
     expect(readPalette('x"]{}')).toBe("nota");
     expect(readPalette(null)).toBe("nota");
-    // Forest became the default palette's colour; its old id maps there.
-    expect(readPalette("forest")).toBe("nota");
+    // Jade became the default palette's colour; its old id maps there.
+    expect(readPalette("jade")).toBe("nota");
+    expect(readPalette("forest")).toBe("forest");
     expect(readPalette("indigo")).toBe("indigo");
   });
 
@@ -89,9 +90,9 @@ describe("theme store", () => {
     expect(f.root.dataset.mode).toBe("light");
     expect(seen).toHaveBeenCalledTimes(2);
 
-    s.setPalette("jade");
-    expect(f.data.get(PALETTE_KEY)).toBe("jade");
-    expect(f.root.dataset.palette).toBe("jade");
+    s.setPalette("forest");
+    expect(f.data.get(PALETTE_KEY)).toBe("forest");
+    expect(f.root.dataset.palette).toBe("forest");
     s.setPalette("nota");
     expect(f.data.has(PALETTE_KEY)).toBe(false);
 
@@ -102,9 +103,14 @@ describe("theme store", () => {
     expect(again.get()).toEqual({ mode: "light", palette: "rose", resolved: "light" });
   });
 
-  test("a device that had picked Forest gets the default, now Forest green", () => {
-    const s = createThemeStore(fakeEnv({ [PALETTE_KEY]: "forest" }, false).env);
+  test("a device that had picked Jade gets the default, now Jade", () => {
+    const s = createThemeStore(fakeEnv({ [PALETTE_KEY]: "jade" }, false).env);
     expect(s.get().palette).toBe("nota");
+  });
+
+  test("Forest is a real palette again", () => {
+    const s = createThemeStore(fakeEnv({ [PALETTE_KEY]: "forest" }, false).env);
+    expect(s.get().palette).toBe("forest");
   });
 
   test("System follows the OS live", () => {

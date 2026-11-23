@@ -35,13 +35,13 @@ export function readMode(v: string | null | undefined): ThemeMode {
 }
 
 /**
- * Palette ids that were renamed or folded into another one. "forest" was
- * a green option next to the indigo default; when Forest green became
- * Nota's brand colour the default palette took it over, so a device that
- * had picked Forest now simply has the default. The inline pre-paint
- * scripts in index.html map it the same way.
+ * Palette ids that were renamed or folded into another one. "jade" was
+ * an optional blue-green next to the default; when Jade became Nota's
+ * brand colour the default palette took it over, so a device that had
+ * picked Jade now simply has the default. The inline pre-paint scripts
+ * in index.html map it the same way.
  */
-const RENAMED_PALETTES: Record<string, string> = { forest: DEFAULT_PALETTE };
+const RENAMED_PALETTES: Record<string, string> = { jade: DEFAULT_PALETTE };
 
 /** The stored palette id, or the default for none or garbage. */
 export function readPalette(v: string | null | undefined): string {

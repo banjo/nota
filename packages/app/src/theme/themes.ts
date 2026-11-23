@@ -42,8 +42,8 @@ export const BUILTIN_THEMES: ColorTheme[] = [
     id: "nota",
     name: "Nota",
     order: 0,
-    light: { ...neutral.light, ink: "#256b4d", inkForeground: "#ffffff" },
-    dark: { ...neutral.dark, ink: "#5fd3a0", inkForeground: "#15161a" },
+    light: { ...neutral.light, ink: "#1e7363", inkForeground: "#ffffff" },
+    dark: { ...neutral.dark, ink: "#5fd9c4", inkForeground: "#15161a" },
   },
   {
     id: "indigo",
@@ -91,11 +91,11 @@ export const BUILTIN_THEMES: ColorTheme[] = [
     },
   },
   {
-    id: "jade",
-    name: "Jade",
+    id: "forest",
+    name: "Forest",
     order: 30,
-    light: { ...neutral.light, ink: "#1e7363", inkForeground: "#ffffff" },
-    dark: { ...neutral.dark, ink: "#5fd9c4", inkForeground: "#15161a" },
+    light: { ...neutral.light, ink: "#256b4d", inkForeground: "#ffffff" },
+    dark: { ...neutral.dark, ink: "#5fd3a0", inkForeground: "#15161a" },
   },
   {
     id: "rose",

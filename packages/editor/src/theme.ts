@@ -22,12 +22,12 @@ export const notaTheme = EditorView.theme({
   },
   ".cm-content": {
     padding: "0 0 40vh",
-    caretColor: v("ink", "#256b4d"),
+    caretColor: v("ink", "#1e7363"),
   },
   ".cm-line": { padding: "0" },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: v("ink", "#256b4d"), borderLeftWidth: "1.5px" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: v("ink", "#1e7363"), borderLeftWidth: "1.5px" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
-    backgroundColor: `color-mix(in srgb, ${v("ink", "#256b4d")} 22%, transparent) !important`,
+    backgroundColor: `color-mix(in srgb, ${v("ink", "#1e7363")} 22%, transparent) !important`,
   },
   ".cm-placeholder": { color: v("faint", "#9ca0a8") },
 
@@ -61,15 +61,15 @@ export const notaTheme = EditorView.theme({
   ".cm-marker": { color: v("faint", "#9ca0a8") },
 
   ".cm-wikilink, .cm-link": {
-    color: v("ink", "#256b4d"),
+    color: v("ink", "#1e7363"),
     textDecoration: "underline",
-    textDecorationColor: `color-mix(in srgb, ${v("ink", "#256b4d")} 32%, transparent)`,
+    textDecorationColor: `color-mix(in srgb, ${v("ink", "#1e7363")} 32%, transparent)`,
     textUnderlineOffset: "3px",
     cursor: "pointer",
   },
   ".cm-tag": {
     color: v("ink-strong", "#2f40b3"),
-    backgroundColor: v("ink-soft", "#e8f3ee"),
+    backgroundColor: v("ink-soft", "#e6f3f0"),
     borderRadius: "5px",
     padding: "0.05em 0.3em",
     fontSize: "0.9em",
@@ -139,8 +139,8 @@ export const notaTheme = EditorView.theme({
   // on every theme's ink (near-white in Graphite dark).
   '.cm-task-checkbox[data-checked="true"]': {
     position: "relative",
-    backgroundColor: v("ink", "#256b4d"),
-    borderColor: v("ink", "#256b4d"),
+    backgroundColor: v("ink", "#1e7363"),
+    borderColor: v("ink", "#1e7363"),
   },
   '.cm-task-checkbox[data-checked="true"]::after': {
     content: '""',
