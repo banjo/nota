@@ -72,6 +72,7 @@ check() {
 
 if $dry_run; then
   out=${out:-${TMPDIR:-/tmp}/nota.rb}
+  mkdir -p "$(dirname "$out")"
   render "$out"
   check "$out"
   echo "wrote $out (dry run, nothing committed)"
