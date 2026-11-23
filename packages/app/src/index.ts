@@ -5,6 +5,7 @@ export { DeviceList } from "./auth/Devices.tsx";
 export { DevicesPage } from "./auth/DevicesPage.tsx";
 export { useSession } from "./auth/session.ts";
 export { type AuthMode, SignInFlow } from "./auth/SignIn.tsx";
+export { Onboarding } from "./onboarding/Onboarding.tsx";
 export { CaptureApp } from "./components/Capture.tsx";
 export { registerBuiltins } from "./builtins/index.tsx";
 export {

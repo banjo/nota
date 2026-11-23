@@ -4,6 +4,7 @@ import type {
   ChangeEvent,
   CreateInput,
   Device,
+  FolderInfo,
   HistoryEntry,
   ListQuery,
   MoveResult,
@@ -14,6 +15,7 @@ import type {
   TagCount,
   Tree,
   VaultInfo,
+  VaultResult,
   ViewInfo,
   WriteResult,
 } from "./types.ts";
@@ -69,6 +71,19 @@ export interface MygoBindings {
     hideCapture(): Promise<void>;
     showMain(): Promise<void>;
     revealVault(): Promise<void>;
+    needsOnboarding(): Promise<boolean>;
+    defaultLocation(): Promise<string>;
+    vaultSource(): Promise<string>;
+    pickFolder(title: string, start: string): Promise<string>;
+    inspectFolder(path: string): Promise<FolderInfo>;
+    checkLocation(location: string): Promise<string>;
+    createVault(
+      location: string,
+      name: string,
+      inbox: string,
+      welcome: boolean,
+    ): Promise<VaultResult>;
+    useVault(path: string, inbox: string, welcome: boolean): Promise<VaultResult>;
     setAppearance(appearance: {
       mode: string;
       resolved?: string;
@@ -146,6 +161,17 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       hideCapture: () => b.Desktop.hideCapture(),
       showMain: () => b.Desktop.showMain(),
       setAppearance: (a) => b.Desktop.setAppearance(a),
+      setup: {
+        needsOnboarding: () => b.Desktop.needsOnboarding(),
+        defaultLocation: () => b.Desktop.defaultLocation(),
+        vaultSource: () => b.Desktop.vaultSource(),
+        pickFolder: (title, start = "") => b.Desktop.pickFolder(title, start),
+        inspectFolder: (path) => b.Desktop.inspectFolder(path),
+        checkLocation: (location) => b.Desktop.checkLocation(location),
+        createVault: (location, name, inbox, welcome) =>
+          b.Desktop.createVault(location, name, inbox, welcome),
+        useVault: (path, inbox, welcome) => b.Desktop.useVault(path, inbox, welcome),
+      },
       onCommand: (listener) => b.events.command.on((c) => listener(c.id)),
     },
   };

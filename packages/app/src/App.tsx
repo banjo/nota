@@ -2,9 +2,11 @@ import type { NotesClient } from "@nota/client";
 import { Toaster } from "@nota/ui/sonner";
 import { TooltipProvider } from "@nota/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { registerBuiltins } from "./builtins/index.tsx";
 import { Shell } from "./components/Shell.tsx";
+import { Onboarding } from "./onboarding/Onboarding.tsx";
 import { ClientContext } from "./context.ts";
 import { isMac } from "./lib/shortcuts.ts";
 import { useChangeSubscription } from "./queries.ts";
@@ -70,13 +72,33 @@ export function NotaProviders({
 }
 
 /**
+ * The first-run setup comes before anything else: a desktop app that
+ * started without a vault shows the wizard, and the vault's own screens
+ * (which would ask Go for a vault that isn't there) are not mounted.
+ * The web app has no setup, so it goes straight to the shell.
+ */
+function Gate({ client }: { client: NotesClient }) {
+  const setup = client.shell?.setup;
+  const needs = useQuery({
+    queryKey: ["setup", "needsOnboarding"],
+    queryFn: () => setup!.needsOnboarding(),
+    enabled: !!setup,
+    staleTime: Infinity,
+    retry: false,
+  });
+  if (!setup) return <Shell />;
+  if (needs.isPending) return <div className="h-full bg-background" />;
+  return needs.data ? <Onboarding flow="setup" /> : <Shell />;
+}
+
+/**
  * The whole Nota UI over a NotesClient. The desktop app passes the MyGo
  * client, the web app the HTTP one; nothing in here knows which.
  */
 export function NotaApp({ client, registry }: { client: NotesClient; registry?: Registry }) {
   return (
     <NotaProviders client={client} registry={registry}>
-      <Shell />
+      <Gate client={client} />
     </NotaProviders>
   );
 }
