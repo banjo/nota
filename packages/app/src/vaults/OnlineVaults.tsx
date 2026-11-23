@@ -155,7 +155,7 @@ export function OnlineVaults() {
                       <span className="min-w-0 flex-1 truncate text-foreground">{v.name}</span>
                       {on ? (
                         <span className="flex items-center gap-1 px-1 text-small text-muted-foreground">
-                          <Check className="size-3.5 text-ink" strokeWidth={2.25} /> Open
+                          <Check className="size-3.5 text-ink" strokeWidth={2.25} /> Current
                         </span>
                       ) : (
                         <Button
@@ -164,7 +164,7 @@ export function OnlineVaults() {
                           className="pointer-coarse:h-9"
                           onClick={() => switchVault(client, v.name)}
                         >
-                          Open
+                          Switch
                         </Button>
                       )}
                       <IconAction
