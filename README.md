@@ -1,4 +1,9 @@
-# Nota
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/lockup-dark.svg" />
+    <img alt="Nota" src="assets/brand/lockup-light.svg" height="48" />
+  </picture>
+</h1>
 
 Lightweight local-first markdown notes: CLI first, MCP, sync, desktop and phone app.
 
@@ -252,7 +257,7 @@ The desktop app (macOS/Linux, MyGo + React), from `scripts/demo-vault.sh`:
 
 Narrow windows switch to a navigation stack (`docs/screenshots/narrow.png`), and ⌃⌥N opens quick capture (`docs/screenshots/capture.png`).
 
-**Themes.** Settings › Appearance picks System, Light or Dark and one of five colour themes (Nota, Graphite, Paper, Forest, Rose); ⌘K has "Toggle dark mode" and "Theme: …". The choice is kept per device (`nota:theme`, shared with the landing page's toggle, and `nota:palette`), applied before the first paint, and followed by the quick-capture window and the desktop window chrome. Every theme keeps body text at ≥ 4.5:1 and its ink at ≥ 3:1 in both modes (`packages/app/tests/themes.test.ts`).
+**Themes.** Settings › Appearance picks System, Light or Dark and one of six colour themes (Nota — Forest green, the brand colour — Indigo, Graphite, Paper, Jade, Rose); ⌘K has "Toggle dark mode" and "Theme: …". The choice is kept per device (`nota:theme`, shared with the landing page's toggle, and `nota:palette`), applied before the first paint, and followed by the quick-capture window and the desktop window chrome. Every theme keeps body text at ≥ 4.5:1 and its ink at ≥ 3:1 in both modes (`packages/app/tests/themes.test.ts`).
 
 |                                                         |                                                  |
 | ------------------------------------------------------- | ------------------------------------------------ |
@@ -261,7 +266,7 @@ Narrow windows switch to a navigation stack (`docs/screenshots/narrow.png`), and
 | ![Appearance](docs/screenshots/settings-appearance.png) | ![Paper](docs/screenshots/theme-paper-light.png) |
 | Settings › Appearance                                   | Paper, for reading                               |
 
-More: [Graphite dark](docs/screenshots/theme-graphite-dark.png), [Paper dark](docs/screenshots/theme-paper-dark.png), [Forest](docs/screenshots/theme-forest-light.png), [Rose dark](docs/screenshots/theme-rose-dark.png), [Appearance in dark](docs/screenshots/settings-appearance-dark.png), [theme commands in ⌘K](docs/screenshots/palette-themes.png), [quick capture in dark](docs/screenshots/capture-dark.png) and [the web app in dark](docs/screenshots/web-app-dark.png).
+More: [Graphite dark](docs/screenshots/theme-graphite-dark.png), [Paper dark](docs/screenshots/theme-paper-dark.png), [Indigo](docs/screenshots/theme-indigo-light.png), [Jade](docs/screenshots/theme-jade-light.png), [Rose dark](docs/screenshots/theme-rose-dark.png), [Appearance in dark](docs/screenshots/settings-appearance-dark.png), [theme commands in ⌘K](docs/screenshots/palette-themes.png), [quick capture in dark](docs/screenshots/capture-dark.png) and [the web app in dark](docs/screenshots/web-app-dark.png).
 
 In the browser: [sign in with a passkey](docs/screenshots/web-signin.png), the same app over HTTP (`web-app.png`), [approving a desktop sign-in](docs/screenshots/connect.png), the [device list](docs/screenshots/web-devices.png), and the [recovery codes](docs/screenshots/web-recovery-codes.png) shown once at sign-up.
 
