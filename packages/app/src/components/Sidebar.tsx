@@ -2,7 +2,7 @@ import { Kbd } from "@nota/ui/kbd";
 import { MarkTile } from "@nota/ui/logo";
 import { ScrollArea } from "@nota/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Settings } from "lucide-react";
+import { FolderPlus, Plus, Search, Settings } from "lucide-react";
 import { useState } from "react";
 import { createNote, newNoteFolder } from "../actions.ts";
 import { useClient } from "../context.ts";
@@ -11,6 +11,7 @@ import { useTree, useVaultInfo } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { SidebarScroll } from "./FolderTree.tsx";
+import { IconButton, startNewFolder } from "./NewFolder.tsx";
 import { SyncStatusRow } from "./SyncStatus.tsx";
 
 /** The Träd sidebar: workspace, search, the registered sections, new note, sync. */
@@ -55,21 +56,30 @@ export function Sidebar() {
         </SidebarScroll.Provider>
       </ScrollArea>
       <div className="flex flex-col gap-0.5 border-t border-divider px-2 pt-1.5 pb-2">
-        <button
-          type="button"
-          onClick={() =>
-            void createNote(
-              client,
-              qc,
-              newNoteFolder(useUI.getState().route, tree.data?.inbox ?? "Inbox"),
-            )
-          }
-          className="flex h-8 items-center gap-2 rounded-sm px-2 text-ui text-muted-foreground outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover pointer-coarse:h-11"
-        >
-          <Plus className="size-[15px]" strokeWidth={1.75} />
-          New note
-          <Kbd className="ml-auto">{label("mod+n")}</Kbd>
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() =>
+              void createNote(
+                client,
+                qc,
+                newNoteFolder(useUI.getState().route, tree.data?.inbox ?? "Inbox"),
+              )
+            }
+            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-ui text-muted-foreground outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover pointer-coarse:h-11"
+          >
+            <Plus className="size-[15px]" strokeWidth={1.75} />
+            New note
+            <Kbd className="ml-auto">{label("mod+n")}</Kbd>
+          </button>
+          <IconButton
+            label="New folder"
+            onClick={() => startNewFolder("")}
+            className="size-8 pointer-coarse:size-11"
+          >
+            <FolderPlus strokeWidth={1.75} />
+          </IconButton>
+        </div>
         <div className="flex items-center">
           <SyncStatusRow />
           <button

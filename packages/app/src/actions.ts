@@ -70,16 +70,26 @@ export async function moveNote(
   }
 }
 
-/** Makes an empty folder (nested paths make the parents) and shows it in the tree. */
-export async function addFolder(client: NotesClient, qc: QueryClient, path: string) {
+/**
+ * Makes an empty folder (nested paths make the parents) and shows it in the
+ * tree. ⌘K "Add folder…" and the sidebar's new-folder row both end here;
+ * the row passes `inline` to show the outcome in place instead of a toast.
+ */
+export async function addFolder(
+  client: NotesClient,
+  qc: QueryClient,
+  path: string,
+  inline?: { onError: (message: string) => void },
+) {
   try {
     const p = await client.createFolder(path);
-    void qc.invalidateQueries({ queryKey: keys.tree });
+    await qc.invalidateQueries({ queryKey: keys.tree });
     useUI.getState().reveal(`${p}/_`);
-    toast.success(`Created ${folderLabel(p)}`);
+    if (!inline) toast.success(`Created ${folderLabel(p)}`);
     return p;
   } catch (e) {
-    fail("Couldn't create the folder", e);
+    if (inline) inline.onError(message(e));
+    else fail("Couldn't create the folder", e);
     return undefined;
   }
 }

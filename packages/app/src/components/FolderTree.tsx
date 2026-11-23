@@ -1,10 +1,12 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder, FolderOpen } from "lucide-react";
 import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { withDraft } from "../lib/newFolder.ts";
 import { buildTree, flattenTree } from "../lib/notes.ts";
 import { useTree } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
+import { FolderActions, NewFolderRow, useFolderDraft } from "./NewFolder.tsx";
 import { NoteRow } from "./NoteRow.tsx";
 import { Row } from "./Row.tsx";
 
@@ -25,9 +27,14 @@ export function FolderTree() {
   const rowHeight = coarse() ? 44 : 28;
 
   const root = useMemo(() => (tree.data ? buildTree(tree.data) : null), [tree.data]);
+  const draft = useFolderDraft((s) => s.draft);
   const rows = useMemo(
-    () => (root ? flattenTree(root, (p) => !!expanded[`folder:${p}`], tree.data?.inbox) : []),
-    [root, expanded, tree.data?.inbox],
+    () =>
+      withDraft(
+        root ? flattenTree(root, (p) => !!expanded[`folder:${p}`], tree.data?.inbox) : [],
+        draft,
+      ),
+    [root, expanded, tree.data?.inbox, draft],
   );
 
   // Where the list starts inside the scroller (sections above it vary).
@@ -48,6 +55,7 @@ export function FolderTree() {
     scrollMargin: margin,
     getItemKey: (i) => {
       const r = rows[i]!;
+      if (r.kind === "draft") return `d:${r.parent}`;
       return r.kind === "folder" ? `f:${r.node.path}` : `n:${r.note.path}`;
     },
   });
@@ -70,6 +78,8 @@ export function FolderTree() {
             role="treeitem"
             aria-level={row.depth + 1}
             aria-expanded={row.kind === "folder" ? row.open : undefined}
+            aria-label={row.kind === "draft" ? "New folder" : undefined}
+            className="group/item"
             style={{
               position: "absolute",
               top: 0,
@@ -79,26 +89,35 @@ export function FolderTree() {
               transform: `translateY(${item.start - margin}px)`,
             }}
           >
-            {row.kind === "folder" ? (
-              <Row
-                chevron={row.open}
-                icon={row.open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />}
-                label={row.node.name}
-                depth={row.depth}
-                onClick={() => toggle(`folder:${row.node.path}`)}
-                count={
-                  decorators
-                    .map((d) =>
-                      d.decorate({
-                        kind: "folder",
-                        path: row.node.path,
-                        name: row.node.name,
-                        notes: row.node.count,
-                      }),
-                    )
-                    .find((d) => d?.badge !== undefined)?.badge
-                }
-              />
+            {row.kind === "draft" ? (
+              <NewFolderRow parent={row.parent} depth={row.depth} />
+            ) : row.kind === "folder" ? (
+              <>
+                <Row
+                  chevron={row.open}
+                  icon={
+                    row.open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />
+                  }
+                  label={row.node.name}
+                  // Room for the row's buttons, which are always shown under a finger.
+                  className="pointer-coarse:pr-[88px]"
+                  depth={row.depth}
+                  onClick={() => toggle(`folder:${row.node.path}`)}
+                  count={
+                    decorators
+                      .map((d) =>
+                        d.decorate({
+                          kind: "folder",
+                          path: row.node.path,
+                          name: row.node.name,
+                          notes: row.node.count,
+                        }),
+                      )
+                      .find((d) => d?.badge !== undefined)?.badge
+                  }
+                />
+                <FolderActions path={row.node.path} name={row.node.name} />
+              </>
             ) : (
               // Notes line up under their folder's name, past the chevron.
               <NoteRow
