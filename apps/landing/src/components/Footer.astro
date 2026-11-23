@@ -17,7 +17,7 @@ const { release } = Astro.props;
       {
         release?.mac ? (
           <a class="btn btn-primary" href={release.mac.url}>
-            Download for macOS
+            Download for Mac
           </a>
         ) : (
           <a class="btn btn-primary" href={site.releases}>
@@ -25,6 +25,7 @@ const { release } = Astro.props;
           </a>
         )
       }
+      <a class="btn btn-ghost" href={site.signIn}>Sign in online</a>
       <a class="btn btn-ghost" href={site.repo}><GitHubIcon />GitHub</a>
     </div>
   </div>

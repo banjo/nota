@@ -1,0 +1,73 @@
+---
+// The local app, early: the real desktop UI in a Mac window. The shortcut
+// hints read ⌘ because that is what the app prints on a Mac.
+---
+
+<figure class="mac">
+  <div class="window">
+    <div class="bar" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+    <img class="shot light" src="/app-light.png" width="1278" height="770" alt="The Nota Mac app: a folder tree and views on the left, a Markdown note with tags and status properties on the right." fetchpriority="high" decoding="async" />
+    <img class="shot dark" src="/app-dark.png" width="1278" height="770" alt="" decoding="async" />
+  </div>
+  <figcaption>The Mac app. A folder of Markdown files, no account needed.</figcaption>
+</figure>
+
+<style>
+  .mac {
+    width: min(1100px, 100% - 40px);
+    margin: clamp(40px, 5vw, 60px) auto 0;
+  }
+
+  .window {
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--background);
+    box-shadow: var(--shadow-window);
+  }
+
+  .bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    background: var(--sidebar);
+  }
+
+  .bar i {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+  .r { background: #ff5f57; }
+  .y { background: #febc2e; }
+  .g { background: #28c840; }
+
+  .shot {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .dark,
+  :global(:root[data-mode="dark"]) .light {
+    display: none;
+  }
+
+  :global(:root[data-mode="dark"]) .dark {
+    display: block;
+  }
+
+  figcaption {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 520px) {
+    .mac {
+      width: calc(100% - 24px);
+    }
+  }
+</style>

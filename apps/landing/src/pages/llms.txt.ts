@@ -14,7 +14,8 @@ export const GET: APIRoute = async () => {
 > Nota is a local-first Markdown notes app. Notes are \`.md\` files in a folder (the vault); a SQLite index for search, tags and backlinks sits beside them and can be rebuilt. One small Go codebase gives a desktop app (macOS, Linux; system webview), a web app, a CLI and an MCP server. Sync is optional, to a server you run.
 
 ${app}
-- CLI and MCP server: \`${site.goInstall}\` (Go 1.27+)
+- CLI and MCP server: ${release ? `the Homebrew cask installs both the app and \`nota\`` : `\`${site.goInstall}\` (Go 1.27+)`}; Go users can also run \`${site.goInstall}\`
+- Web app, sign in with a passkey: ${site.url}${site.signIn}
 - Free and open source, MIT: ${site.repo}
 - A vault is a folder: \`--vault\`, \`$NOTA_VAULT\`, else ~/Notes. New notes land in \`Inbox/\`.
 - Frontmatter is the metadata (tags, status, created/updated, custom keys). Edits are line-based, unknown keys survive.

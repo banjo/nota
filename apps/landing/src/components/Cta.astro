@@ -1,7 +1,7 @@
 ---
 // The download call to action, from the release read at build time
 // (src/data/release.ts). No release with app assets yet: watch the
-// releases and install the CLI, which works today. Never a dead button.
+// releases. Brew is the install story; the sign-in goes to the web app.
 import type { AppRelease } from "../data/release.ts";
 import { formatSize } from "../data/release.ts";
 import { site } from "../data/site.ts";
@@ -15,38 +15,38 @@ const linux = release?.appImage ?? release?.deb;
 ---
 
 <div class="cta">
-  {
-    release ? (
-      <>
-        <div class="row">
-          {release.mac && (
-            <a class="btn btn-primary" href={release.mac.url}>
-              Download for macOS <small>{formatSize(release.mac.size)}</small>
-            </a>
-          )}
+  <div class="row">
+    {
+      release?.mac ? (
+        <a class="btn btn-primary" href={release.mac.url}>
+          Download for Mac <small>{formatSize(release.mac.size)}</small>
+        </a>
+      ) : (
+        <a class="btn btn-primary" href={release?.url ?? site.releases}>
+          {release ? "Download" : "Watch releases"}
+        </a>
+      )
+    }
+    <a class="btn btn-ghost" href={site.signIn}>Sign in online</a>
+  </div>
+  <Cmd command={site.brewCask} class="cta-cmd" />
+  <p class="meta">
+    {
+      release ? (
+        <>
+          Nota {release.version} for Apple silicon, macOS 12+.{" "}
           {linux && (
-            <a class="btn btn-ghost" href={linux.url}>
-              Linux <small>{linux.name.endsWith(".deb") ? ".deb" : "AppImage"}</small>
-            </a>
+            <>
+              <a href={linux.url}>{linux.name.endsWith(".deb") ? "Linux .deb" : "Linux AppImage"}</a>,{" "}
+            </>
           )}
-        </div>
-        <Cmd command={site.brewCask} class="cta-cmd" />
-        <p class="meta">
-          Version {release.version}. <a href={release.url}>Release notes</a>
-        </p>
-      </>
-    ) : (
-      <>
-        <p class="meta">The desktop app ships with the first release. The CLI works today:</p>
-        <div class="row">
-          <a class="btn btn-primary" href={site.releases}>
-            Watch releases
-          </a>
-          <Cmd command={site.goInstall} class="cta-cmd" />
-        </div>
-      </>
-    )
-  }
+          <a href={release.url}>release notes</a>.
+        </>
+      ) : (
+        <>The Mac app lands with the first release (Apple silicon, macOS 12+). Watch it on GitHub.</>
+      )
+    }
+  </p>
 </div>
 
 <style>
@@ -73,5 +73,25 @@ const linux = release?.appImage ?? release?.deb;
 
   .cta > :global(.cta-cmd) {
     width: min(420px, 100%);
+  }
+
+  .meta {
+    margin: 0;
+    max-width: 34em;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--muted);
+    text-wrap: balance;
+  }
+
+  .meta a {
+    color: inherit;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 440px) {
+    .cta :global(.cta-cmd code) {
+      font-size: 12.5px;
+    }
   }
 </style>
