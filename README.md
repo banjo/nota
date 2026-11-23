@@ -71,10 +71,17 @@ go install github.com/banjo/nota/cmd/nota@latest
 > Security** and click **Open Anyway** after the first attempt, or run
 > `xattr -dr com.apple.quarantine /Applications/Nota.app`.
 
+The first launch of the app asks where to keep your notes: a new folder (you pick the name and
+the location) or one you already have, which Nota opens without moving or rewriting anything.
+It also asks for the inbox folder and offers to sign in to sync, both optional. The choice goes
+into `~/.config/nota/config.toml`, so the `nota` CLI uses the same vault. Settings › Vault can
+switch to another folder or make a new vault later
+([screenshots](docs/screenshots.md#first-run)).
+
 ## Quick start
 
-Nota uses `~/Notes` unless you pass `--vault`, set `$NOTA_VAULT` or set `vault` in
-`~/.config/nota/config.toml`.
+The CLI uses `~/Notes` unless you pass `--vault`, set `$NOTA_VAULT` or set `vault` in
+`~/.config/nota/config.toml` (which the app's first-run setup writes for you).
 
 ```sh
 nota add "Call the plumber" --tag home      # A new note in Inbox/.

@@ -12,6 +12,31 @@ The desktop app (MyGo + React) over the demo vault from `scripts/demo-vault.sh`:
 Narrow windows switch to a navigation stack ([narrow.png](screenshots/narrow.png)), and ⌃⌥N
 opens quick capture ([light](screenshots/capture.png), [dark](screenshots/capture-dark.png)).
 
+## First run
+
+The first launch, with no vault chosen yet, walks through one decision per screen (↵ continues,
+Esc goes back). Taken headless with a clean home folder.
+
+| | | |
+| --- | --- | --- |
+| ![Welcome](screenshots/onboarding-1-welcome.png) | ![Vault](screenshots/onboarding-2-vault-create.png) | ![Open existing](screenshots/onboarding-2d-open-existing-found.png) |
+| Welcome | Create a vault: name, location, live path | Open an existing folder: notes found, nothing moved |
+| ![Inbox](screenshots/onboarding-3-inbox.png) | ![Sync](screenshots/onboarding-4-sync.png) | ![Done](screenshots/onboarding-5-done.png) |
+| Inbox folder, skippable | Sign in to sync, skippable | Done, with the welcome-note checkbox |
+
+Errors show under the field: [a name with a slash](screenshots/onboarding-2b-badname.png), [a folder
+that exists and isn't empty](screenshots/onboarding-2c-exists-nonempty.png) (with "Use existing
+folder instead"), [a bad inbox name](screenshots/onboarding-3b-inbox-error.png) and
+[waiting for the browser](screenshots/onboarding-4b-sync-waiting.png). "Choose…" opens the system's
+[folder chooser](screenshots/onboarding-2f-folder-picker.png). Finishing writes the config and
+Nota restarts into [the new vault](screenshots/onboarding-6-opened.png); the next launch
+[goes straight in](screenshots/onboarding-7-restart-opens-vault.png).
+
+[Settings › Vault](screenshots/onboarding-8-settings-vault.png) and ⌘K
+([Switch vault…, New vault…](screenshots/onboarding-8b-palette-vault-commands.png)) run the same
+screens over the app ([switching](screenshots/onboarding-9-switch-vault.png),
+[done](screenshots/onboarding-9d-switch-done.png)), then [open the other vault](screenshots/onboarding-10-switched.png).
+
 ## Reading and source
 
 Each note has three views, switched from the top bar or ⌘K ("View: Source mode"); ⌘E swaps Live and
