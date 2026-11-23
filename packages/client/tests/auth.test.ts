@@ -262,4 +262,49 @@ describe("createHttpAuth", () => {
     });
     expect(f.call(0).url.pathname).toBe("/v1/auth/device/lookup");
   });
+
+  test("lists, creates, renames and deletes vaults with camelCase fields", async () => {
+    const raw = (name: string) => ({ name, cursor: 3, created_at: "2026-11-23T08:00:00Z" });
+    const f = mockFetch(
+      json({ vaults: [raw("Notes"), raw("Work")] }),
+      json(raw("Ideas"), 201),
+      json(raw("Work notes")),
+      json({}, 204),
+    );
+    const auth = createHttpAuth({ baseUrl: BASE, fetch: f.fn as unknown as typeof fetch });
+    const want = (name: string) => ({ name, cursor: 3, createdAt: "2026-11-23T08:00:00Z" });
+    expect(await auth.vaults()).toEqual([want("Notes"), want("Work")]);
+    expect(await auth.createVault("Ideas")).toEqual(want("Ideas"));
+    expect(f.call(1)).toMatchObject({ method: "POST", body: { name: "Ideas" } });
+
+    expect(await auth.renameVault("Work", "Work notes")).toEqual(want("Work notes"));
+    const rename = f.call(2);
+    expect(rename.method).toBe("PATCH");
+    expect(rename.url.pathname).toBe("/v1/api/vaults/Work");
+    expect(rename.body).toEqual({ name: "Work notes" });
+    expect(rename.headers.get("Nota-Client")).toBe("web");
+    expect(rename.credentials).toBe("include");
+
+    await expect(auth.deleteVault("Work notes", "Work notes")).resolves.toBeUndefined();
+    const del = f.call(3);
+    expect(del.method).toBe("DELETE");
+    expect(del.url.pathname).toBe("/v1/api/vaults/Work%20notes");
+    expect(del.body).toEqual({ confirm: "Work notes" });
+  });
+
+  test("passes the server's error code through on a rename conflict", async () => {
+    const f = mockFetch(
+      json({ code: "exists", message: "vault main: already exists" }, 409),
+      json({ code: "bad_request", message: "type the vault's name, Work, to delete it" }, 400),
+    );
+    const auth = createHttpAuth({ baseUrl: BASE, fetch: f.fn as unknown as typeof fetch });
+    await expect(auth.renameVault("Work", "main")).rejects.toMatchObject({
+      code: "exists",
+      status: 409,
+    });
+    await expect(auth.deleteVault("Work", "work")).rejects.toMatchObject({
+      code: "bad_request",
+      status: 400,
+    });
+  });
 });
