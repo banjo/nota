@@ -1,11 +1,14 @@
 import type { Base, Note } from "@nota/client";
-import { createEditor, type EditorView, replaceDoc } from "@nota/editor";
+import { createEditor, type EditorView, replaceDoc, setEditorMode } from "@nota/editor";
 import { toast } from "@nota/ui/sonner";
+import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { fail, openExternal, openWikilink } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { label } from "../lib/shortcuts.ts";
 import { filename, joinTitle, splitTitle, stem, type TitleParts } from "../lib/notes.ts";
+import type { NoteMode } from "../lib/noteMode.ts";
 import { keys, noteBase, noteWritten, setNoteBase } from "../queries.ts";
 import { useUI } from "../state.ts";
 
@@ -16,6 +19,10 @@ import { useUI } from "../state.ts";
 // it is also kept in localStorage.
 
 const SAVE_DELAY = 600;
+const HINT_KEY = "nota:reading-hint";
+
+/** What the editor holds: the whole body in Source mode, else the body below the title. */
+const editorText = (mode: NoteMode, p: TitleParts) => (mode === "source" ? joinTitle(p) : p.rest);
 const draftKey = (path: string) => `nota:draft:${path}`;
 
 interface Draft {
@@ -51,6 +58,8 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
   const queued = useRef(false);
   const inConflict = useRef(false);
   const path = note.path;
+  const mode = useUI((s) => s.noteMode);
+  const modeRef = useRef(mode);
   const loadedTitle = useRef(splitTitle(note.body).title);
 
   const body = () => joinTitle(parts.current);
@@ -99,7 +108,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
   function load(text: string) {
     parts.current = splitTitle(text);
     if (titleRef.current) titleRef.current.value = parts.current.title;
-    if (view.current) replaceDoc(view.current, parts.current.rest);
+    if (view.current) replaceDoc(view.current, editorText(modeRef.current, parts.current));
     autosize();
   }
 
@@ -183,10 +192,17 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     if (titleRef.current) titleRef.current.value = parts.current.title;
     autosize();
     const v = createEditor(host.current!, {
-      doc: parts.current.rest,
+      doc: editorText(modeRef.current, parts.current),
+      mode: modeRef.current,
       placeholder: "Start writing…",
-      onChange: (rest) => {
-        parts.current = { ...parts.current, rest };
+      onChange: (text) => {
+        if (modeRef.current === "source") {
+          // Source mode edits the title line too.
+          parts.current = splitTitle(text);
+          if (titleRef.current) titleRef.current.value = parts.current.title;
+        } else {
+          parts.current = { ...parts.current, rest: text };
+        }
         schedule();
       },
       onWikilink: (target) => void openWikilink(client, qc, target, path),
@@ -198,6 +214,10 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     window.addEventListener("blur", flush);
     window.addEventListener("beforeunload", flush);
     const focusTitle = (e: Event) => {
+      if (modeRef.current === "source") {
+        v.focus();
+        return;
+      }
       titleRef.current?.focus();
       if ((e as CustomEvent<{ select?: boolean }>).detail?.select) titleRef.current?.select();
     };
@@ -212,6 +232,45 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     };
     // The editor is keyed by path; later note updates arrive below.
   }, [path]);
+
+  // The mode changed (⌘E, ⌘K, the top bar): same editor, other extensions.
+  // Source holds the title line too, so the text swaps when entering or
+  // leaving it.
+  useEffect(() => {
+    const v = view.current;
+    const prev = modeRef.current;
+    modeRef.current = mode;
+    if (!v) return;
+    if (prev !== mode) {
+      if (prev === "source") {
+        parts.current = splitTitle(v.state.doc.toString());
+        if (titleRef.current) titleRef.current.value = parts.current.title;
+        autosize();
+      }
+      replaceDoc(v, editorText(mode, parts.current));
+      setEditorMode(v, mode);
+      if (mode === "reading") v.contentDOM.blur();
+    }
+  }, [mode]);
+
+  // Reading mode ignores typing; say why once.
+  useEffect(() => {
+    if (mode !== "reading") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, [contenteditable=true], [role=dialog]")) return;
+      try {
+        if (localStorage.getItem(HINT_KEY)) return;
+        localStorage.setItem(HINT_KEY, "1");
+      } catch {
+        // No storage: the hint shows each time, which is fine.
+      }
+      toast(`This note is in reading mode. Press ${label("mod+e")} to edit.`);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode]);
 
   // The note changed outside the editor (another app, sync, a property
   // edit). Without unsaved edits, show it; with some, the next save
@@ -235,6 +294,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
         aria-label="Title"
         placeholder="Untitled"
         spellCheck={false}
+        readOnly={mode === "reading"}
         onChange={(e) => {
           parts.current = { ...parts.current, title: e.target.value.replace(/\n/g, " ") };
           if (
@@ -264,9 +324,12 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
           if (e.currentTarget.closest("article")?.contains(e.relatedTarget as Node | null)) return;
           void save().then(renameToTitle);
         }}
-        className="mb-[18px] block w-full resize-none overflow-hidden bg-transparent text-[34px] leading-[1.15] font-bold tracking-[-0.02em] text-foreground outline-none placeholder:text-faint pointer-coarse:text-[30px]"
+        className={cn(
+          "mb-[18px] w-full resize-none overflow-hidden bg-transparent text-[34px] leading-[1.15] font-bold tracking-[-0.02em] text-foreground outline-none placeholder:text-faint pointer-coarse:text-[30px]",
+          mode === "source" ? "hidden" : "block",
+        )}
       />
-      {between}
+      {mode === "reading" ? null : between}
       <div ref={host} className="nota-editor min-h-[40vh] text-editor" />
     </div>
   );

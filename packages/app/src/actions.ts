@@ -32,6 +32,8 @@ export async function createNote(
 ) {
   try {
     const note = await client.create({ title, folder });
+    // A new note is for writing: leave reading mode.
+    if (useUI.getState().noteMode === "reading") useUI.getState().setNoteMode("live");
     noteWritten(qc, note);
     void qc.invalidateQueries({ queryKey: keys.tree });
     void qc.invalidateQueries({ queryKey: keys.inbox });

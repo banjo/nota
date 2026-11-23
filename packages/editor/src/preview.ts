@@ -82,7 +82,11 @@ export interface PreviewHandlers {
 }
 
 /** The live-preview extension: decorations plus clickable widgets. */
-export function livePreview(handlers: PreviewHandlers = {}): Extension {
+export function livePreview(
+  handlers: PreviewHandlers = {},
+  opts: { reading?: boolean } = {},
+): Extension {
+  const reading = !!opts.reading;
   const plugin = ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
@@ -96,7 +100,9 @@ export function livePreview(handlers: PreviewHandlers = {}): Extension {
       build(view: EditorView) {
         return toDecorations(
           previewSpecs(view.state, {
-            activeLines: activeLines(view.state, view.hasFocus),
+            // Reading mode has no cursor line: every marker is hidden.
+            activeLines: reading ? new Set<number>() : activeLines(view.state, view.hasFocus),
+            reading,
             ranges: view.visibleRanges,
           }),
         );
@@ -122,7 +128,7 @@ export function livePreview(handlers: PreviewHandlers = {}): Extension {
       const clickable = target.closest<HTMLElement>("[data-wikilink], [data-tag], [data-href]");
       if (!clickable) return false;
       const lineNo = view.state.doc.lineAt(view.posAtDOM(clickable)).number;
-      const onSourceLine = activeLines(view.state, view.hasFocus).has(lineNo);
+      const onSourceLine = !reading && activeLines(view.state, view.hasFocus).has(lineNo);
       if (onSourceLine && !(event.metaKey || event.ctrlKey)) return false;
       const wl = target.closest<HTMLElement>("[data-wikilink]");
       if (wl && handlers.onWikilink) {

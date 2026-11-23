@@ -7,6 +7,7 @@ import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { EmptyState } from "./EmptyState.tsx";
 import { NoteEditor } from "./NoteEditor.tsx";
+import { ModeSwitch } from "./ModeSwitch.tsx";
 import { NoteMenu } from "./NoteRow.tsx";
 import { PropertiesPanel } from "./PropertiesPanel.tsx";
 import { TopBar } from "./TopBar.tsx";
@@ -17,6 +18,7 @@ export function NotePage({ path }: { path: string }) {
   const panels = useContributions("panel");
   const navigate = useUI((s) => s.navigate);
   const toggle = useUI((s) => s.toggle);
+  const mode = useUI((s) => s.noteMode);
 
   if (note.isError) {
     const missing =
@@ -61,9 +63,15 @@ export function NotePage({ path }: { path: string }) {
         ]}
         right={
           <>
+            {mode === "reading" ? (
+              <span className="mr-1 rounded-sm bg-ink-soft px-1.5 py-0.5 text-[11.5px] font-medium text-ink-strong">
+                Reading
+              </span>
+            ) : null}
             <span className="mr-1 whitespace-nowrap max-[720px]:hidden">
               Edited {relativeTime(n.modified).replace(/^[A-Z]/, (c) => c.toLowerCase())}
             </span>
+            <ModeSwitch />
             <div className="relative size-7 pointer-coarse:size-11">
               <NoteMenu path={n.path} active />
             </div>

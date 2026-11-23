@@ -22,6 +22,15 @@ export {
   type TreeDecorator,
   type TreeItem,
 } from "./registry.ts";
+export {
+  NOTE_MODE_KEY,
+  loadNoteMode,
+  readNoteMode,
+  saveNoteMode,
+  toggledNoteMode,
+  watchNoteMode,
+  type NoteMode,
+} from "./lib/noteMode.ts";
 export { useUI, type ListSpec, type Route } from "./state.ts";
 export {
   createThemeStore,

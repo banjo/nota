@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  loadNoteMode,
+  type NoteMode,
+  saveNoteMode,
+  toggledNoteMode,
+  watchNoteMode,
+} from "./lib/noteMode.ts";
 
 // UI state: what is on screen. Data lives in TanStack Query.
 
@@ -26,7 +33,12 @@ interface UIState {
   palette: { open: boolean; mode: PaletteMode; path?: string };
   /** Expanded folders, views and sections, by key. */
   expanded: Record<string, boolean>;
+  /** How notes are shown, per device (localStorage nota:note-mode), not per note. */
+  noteMode: NoteMode;
 
+  setNoteMode: (mode: NoteMode) => void;
+  /** Live ↔ Reading (⌘E). */
+  toggleNoteMode: () => void;
   navigate: (route: Route) => void;
   back: () => void;
   toggleSidebar: () => void;
@@ -39,6 +51,14 @@ interface UIState {
   moved: (from: string, to: string) => void;
 }
 
+function deviceStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export const useUI = create<UIState>()(
   persist(
     (set, get) => ({
@@ -47,6 +67,13 @@ export const useUI = create<UIState>()(
       pane: "nav",
       palette: { open: false, mode: "all" },
       expanded: { "section:folders": true, "section:views": true },
+      noteMode: loadNoteMode(deviceStorage()),
+
+      setNoteMode: (mode) => {
+        saveNoteMode(deviceStorage(), mode);
+        set({ noteMode: mode });
+      },
+      toggleNoteMode: () => get().setNoteMode(toggledNoteMode(get().noteMode)),
 
       navigate: (route) => {
         set({ route, pane: "main" });
@@ -87,3 +114,8 @@ export const useUI = create<UIState>()(
 
 /** The path of the note on screen, if any. */
 export const currentPath = (r: Route) => (r.kind === "note" ? r.path : undefined);
+
+// Another window changed the mode: follow it.
+watchNoteMode(typeof window === "undefined" ? null : window, deviceStorage(), (noteMode) =>
+  useUI.setState({ noteMode }),
+);
