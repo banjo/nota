@@ -23,6 +23,9 @@ type Config struct {
 	Vault string `toml:"vault"`
 	// Inbox is the vault-relative folder for unsorted notes.
 	Inbox string `toml:"inbox"`
+	// Onboarded is set when the desktop app's first-run setup finished,
+	// so it never asks again, even if the vault later goes missing.
+	Onboarded bool `toml:"onboarded"`
 }
 
 // ConfigPath returns the config file location: $XDG_CONFIG_HOME/nota/config.toml,
