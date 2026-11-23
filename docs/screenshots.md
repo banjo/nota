@@ -53,7 +53,7 @@ On a narrow window the switch shows icons only ([narrow](screenshots/mode-narrow
 ## Themes
 
 Settings › Appearance picks System, Light or Dark and one of six colour themes (Nota, Indigo,
-Graphite, Paper, Jade, Rose); ⌘K has "Toggle dark mode" and "Theme: …". The choice is kept per
+Graphite, Paper, Forest, Rose; Nota is the default, in Jade); ⌘K has "Toggle dark mode" and "Theme: …". The choice is kept per
 device, applied before the first paint, and followed by the quick-capture window and the desktop
 window chrome. Every theme keeps body text at ≥ 4.5:1 and its ink at ≥ 3:1 in both modes
 (`packages/app/tests/themes.test.ts`).
@@ -67,7 +67,7 @@ window chrome. Every theme keeps body text at ≥ 4.5:1 and its ink at ≥ 3:1 i
 
 More: [Graphite dark](screenshots/theme-graphite-dark.png),
 [Paper dark](screenshots/theme-paper-dark.png), [Indigo](screenshots/theme-indigo-light.png),
-[Jade](screenshots/theme-jade-light.png), [Rose dark](screenshots/theme-rose-dark.png),
+[Forest](screenshots/theme-forest-light.png), [Rose dark](screenshots/theme-rose-dark.png),
 [Appearance in dark](screenshots/settings-appearance-dark.png) and
 [theme commands in ⌘K](screenshots/palette-themes.png).
 
