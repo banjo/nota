@@ -42,6 +42,27 @@ describe("pickRelease", () => {
     expect(r?.appImage?.name).toBe("Nota.AppImage");
     expect(r?.deb?.name).toBe("nota.deb");
   });
+
+  test("finds the files the release workflow uploads", () => {
+    const r = pickRelease(
+      rel(
+        [
+          asset("nota_0.1.0_darwin_arm64.tar.gz"),
+          asset("Nota-0.1.0-arm64.zip"),
+          asset("Nota-0.1.0-arm64.dmg"),
+          asset("Nota-0.1.0-x86_64.AppImage"),
+          asset("nota_0.1.0_amd64.deb"),
+          asset("nota-0.1.0-1.x86_64.rpm"),
+          asset("checksums.txt"),
+        ],
+        { tag_name: "v0.1.0" },
+      ),
+    );
+    expect(r?.version).toBe("0.1.0");
+    expect(r?.mac?.name).toBe("Nota-0.1.0-arm64.dmg");
+    expect(r?.appImage?.name).toBe("Nota-0.1.0-x86_64.AppImage");
+    expect(r?.deb?.name).toBe("nota_0.1.0_amd64.deb");
+  });
 });
 
 describe("formatSize", () => {
@@ -58,7 +79,7 @@ describe("fetchRelease", () => {
       throw new Error("no network in this test");
     }) as unknown as typeof fetch;
     expect(await fetchRelease({ NOTA_LANDING_RELEASE: "none" }, fail)).toBeNull();
-    expect((await fetchRelease({ NOTA_LANDING_RELEASE: "fixture" }, fail))?.version).toBe("1.0.0");
+    expect((await fetchRelease({ NOTA_LANDING_RELEASE: "fixture" }, fail))?.version).toBe("0.1.0");
   });
 
   test("a 404 or a network error is the not-released state", async () => {

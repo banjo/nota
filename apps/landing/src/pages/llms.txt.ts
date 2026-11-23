@@ -7,7 +7,7 @@ export const GET: APIRoute = async () => {
   const release = await fetchRelease();
   const app = release
     ? `- Desktop app ${release.version}: ${release.url}. Homebrew: \`${site.brewCask}\``
-    : `- The desktop app ships with v1 and is not released yet: ${site.releasesFeed}. The CLI and the MCP server work today.`;
+    : `- The desktop app ships with the first release, which is not out yet: ${site.releasesFeed}. The CLI and the MCP server work today.`;
 
   const body = `# Nota
 
