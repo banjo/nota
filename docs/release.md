@@ -10,7 +10,7 @@ afterwards.
 | --- | --- | --- |
 | `version` | ubuntu | the version: the tag without `v`; a prerelease when it has a `-` suffix (`v1.2.0-rc.1`) |
 | `cli` (×4) | ubuntu | `nota_<v>_{darwin,linux}_{amd64,arm64}.tar.gz` (pure Go, `CGO_ENABLED=0`, cross-compiled), each with `nota`, `LICENSE`, `README.md` |
-| `macos` | macos-14 (arm64) | `Nota-<v>-arm64.dmg` and `Nota-<v>-arm64.zip` from `mygo build -platform darwin/arm64`, signed ad hoc, with the CLI inside at `Contents/Resources/bin/nota` |
+| `macos` | macos-latest (arm64) | `Nota-<v>-arm64.dmg` and `Nota-<v>-arm64.zip` from `mygo build -platform darwin/arm64`, signed ad hoc, with the CLI inside at `Contents/Resources/bin/nota` |
 | `linux` | ubuntu-24.04 | `nota_<v>_amd64.deb`, `nota-<v>-1.x86_64.rpm`, `Nota-<v>-linux-amd64.tar.gz` (MyGo) and `Nota-<v>-x86_64.AppImage` (`scripts/appimage.sh`) |
 | `publish` | ubuntu | the GitHub release (not a draft; `--prerelease` for `-` versions, else `--latest`) with every file and `checksums.txt` |
 

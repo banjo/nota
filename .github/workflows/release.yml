@@ -101,7 +101,7 @@ jobs:
   macos:
     needs: version
     name: Desktop macOS arm64
-    runs-on: macos-14
+    runs-on: macos-latest # arm64
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
