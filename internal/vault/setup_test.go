@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -8,46 +9,39 @@ import (
 	"testing"
 )
 
+// names.json is shared with the frontend, which checks names as the user
+// types (packages/app/tests/setup.test.ts): both must give the same answers.
 func TestCheckName(t *testing.T) {
-	long := strings.Repeat("a", 101)
-	tests := []struct {
-		in   string
-		kind NameKind
-		want string // cleaned name, or "" with msg
-		msg  string
-	}{
-		{"Notes", VaultName, "Notes", ""},
-		{"  Notes  ", VaultName, "Notes", ""},
-		{"Anteckningar & idéer", VaultName, "Anteckningar & idéer", ""},
-		{"Cafe\u0301", VaultName, "Café", ""}, // NFD in, NFC out
-		{"", VaultName, "", "Give the vault a name."},
-		{"   ", VaultName, "", "Give the vault a name."},
-		{"", InboxName, "", "Give the folder a name, or skip to use “Inbox”."},
-		{"a/b", VaultName, "", "A name can’t contain slashes. Use Location to choose where it goes."},
-		{`a\b`, VaultName, "", "A name can’t contain slashes. Use Location to choose where it goes."},
-		{"a/b", InboxName, "", "Use a single folder name, without slashes."},
-		{"a:b*c", VaultName, "", "A name can’t contain “:” “*”."},
-		{"a\x01b", VaultName, "", "A name can’t contain control characters."},
-		{".hidden", VaultName, "", "A name can’t start with a dot, because the folder would be hidden."},
-		{"..", InboxName, "", "A name can’t start with a dot, because the folder would be hidden."},
-		{"notes.", VaultName, "", "A name can’t end with a dot."},
-		{"CON", VaultName, "", "“CON” is reserved by the operating system."},
-		{"nul.txt", VaultName, "", "“nul.txt” is reserved by the operating system."},
-		{"COM1", InboxName, "", "“COM1” is reserved by the operating system."},
-		{"CONSOLE", VaultName, "CONSOLE", ""},
-		{long, VaultName, "", "That name is too long (100 characters at most)."},
-		{long[:100], VaultName, long[:100], ""},
+	b, err := os.ReadFile("testdata/names.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		got, err := CheckName(tt.in, tt.kind)
-		if tt.msg != "" {
-			if err == nil || err.Error() != tt.msg || !errors.Is(err, ErrName) {
-				t.Errorf("CheckName(%q) = %q, %v; want error %q", tt.in, got, err, tt.msg)
+	var cases []struct {
+		In    string `json:"in"`
+		Kind  string `json:"kind"`
+		Name  string `json:"name"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(b, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) < 20 {
+		t.Fatalf("only %d cases", len(cases))
+	}
+	for _, tt := range cases {
+		kind := VaultName
+		if tt.Kind == "inbox" {
+			kind = InboxName
+		}
+		got, err := CheckName(tt.In, kind)
+		if tt.Error != "" {
+			if err == nil || err.Error() != tt.Error || !errors.Is(err, ErrName) {
+				t.Errorf("CheckName(%q) = %q, %v; want error %q", tt.In, got, err, tt.Error)
 			}
 			continue
 		}
-		if err != nil || got != tt.want {
-			t.Errorf("CheckName(%q) = %q, %v; want %q", tt.in, got, err, tt.want)
+		if err != nil || got != tt.Name {
+			t.Errorf("CheckName(%q) = %q, %v; want %q", tt.In, got, err, tt.Name)
 		}
 	}
 }

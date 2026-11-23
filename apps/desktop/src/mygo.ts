@@ -95,6 +95,27 @@ export interface Device {
   current: boolean;
 }
 
+/** FolderInfo is what InspectFolder found. */
+export interface FolderInfo {
+  /** Path is the cleaned absolute path. */
+  path: string;
+  /** Exists says the path exists, IsDir that it is a folder. */
+  exists: boolean;
+  isDir: boolean;
+  /** Empty says the folder has nothing in it at all. */
+  empty: boolean;
+  /**
+   * Notes counts the .md files in it (subfolders included, hidden
+   * folders and .nota left out), Files the other files.
+   */
+  notes: number;
+  files: number;
+  /** Truncated says the count stopped at inspectLimit entries. */
+  truncated: boolean;
+  /** Writable says Nota can create its .nota folder in it. */
+  writable: boolean;
+}
+
 /** HistoryEntry is one server version of a note. */
 export interface HistoryEntry {
   path: string;
@@ -263,6 +284,13 @@ export interface VaultInfo {
   inbox: string;
 }
 
+/** VaultResult is the vault the setup made or chose. */
+export interface VaultResult {
+  /** Path is the vault folder, Name its last element. */
+  path: string;
+  name: string;
+}
+
 /** ViewInfo is a saved view (.nota/views/*.yaml) with its note count. */
 export interface ViewInfo {
   id: string;
@@ -404,10 +432,45 @@ export const Account = {
  */
 export const Desktop = {
   /**
+   * CheckLocation says why a folder can't hold a new vault ("" when it
+   * can): not a full path, a drive root or system folder, or a file. The
+   * folder need not exist yet; creating the vault makes it.
+   */
+  checkLocation: bind<[string], string>("Desktop.CheckLocation", (location: string) => [location]),
+  /**
+   * CreateVault makes the vault folder <location>/<name> and makes it
+   * the vault of the app, which then relaunches. A folder that exists and
+   * has files in it is refused (use UseVault for that). With welcome set,
+   * a new vault gets an English starter note.
+   */
+  createVault: bind<[string, string, string, boolean], VaultResult>("Desktop.CreateVault", (location: string, name: string, inbox: string, welcome: boolean) => [location, name, inbox, welcome]),
+  /**
+   * DefaultLocation is where a new vault goes unless the user picks
+   * another folder: ~/Documents when it exists (easy to find, and backed
+   * up by iCloud on macOS), else the home folder.
+   */
+  defaultLocation: bind<[], string>("Desktop.DefaultLocation", () => []),
+  /**
    * HideCapture hides the quick-capture window (after saving, or on
    * Escape). It keeps running, so it shows at once the next time.
    */
   hideCapture: bind<[], void>("Desktop.HideCapture", () => []),
+  /**
+   * InspectFolder looks at a folder the user typed or picked: whether it
+   * exists, is empty, how many Markdown notes it holds and whether Nota
+   * can write to it. It changes nothing.
+   */
+  inspectFolder: bind<[string], FolderInfo>("Desktop.InspectFolder", (path: string) => [path]),
+  /**
+   * NeedsOnboarding reports that the app started without a vault, so the
+   * window shows the setup instead of the notes.
+   */
+  needsOnboarding: bind<[], boolean>("Desktop.NeedsOnboarding", () => []),
+  /**
+   * PickFolder shows the system's folder chooser, starting in start when
+   * given, and returns the chosen folder, or "" when the user cancelled.
+   */
+  pickFolder: bind<[string, string], string>("Desktop.PickFolder", (title: string, start: string) => [title, start]),
   /**
    * Platform is the OS the app runs on ("darwin", "linux", "windows"),
    * for shortcut labels.
@@ -428,6 +491,19 @@ export const Desktop = {
    * captured in the quick-capture window.
    */
   showMain: bind<[], void>("Desktop.ShowMain", () => []),
+  /**
+   * UseVault makes an existing folder the vault of the app, which then
+   * relaunches. Nothing in the folder is moved or rewritten; Nota adds
+   * only its .nota folder. A starter note is added only when the folder
+   * is empty and welcome is set.
+   */
+  useVault: bind<[string, string, boolean], VaultResult>("Desktop.UseVault", (path: string, inbox: string, welcome: boolean) => [path, inbox, welcome]),
+  /**
+   * VaultSource says what chose the open vault: "config" (the config
+   * file), "env" ($NOTA_VAULT) or "default" (~/Notes). With "env" a
+   * switch has no effect, because the variable wins over the config.
+   */
+  vaultSource: bind<[], string>("Desktop.VaultSource", () => []),
 } as const;
 
 // ---- Events ----

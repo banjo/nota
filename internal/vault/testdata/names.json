@@ -1,0 +1,146 @@
+[
+  {
+    "in": "Notes",
+    "kind": "vault",
+    "name": "Notes",
+    "error": ""
+  },
+  {
+    "in": "  Notes  ",
+    "kind": "vault",
+    "name": "Notes",
+    "error": ""
+  },
+  {
+    "in": "Anteckningar & idéer",
+    "kind": "vault",
+    "name": "Anteckningar & idéer",
+    "error": ""
+  },
+  {
+    "in": "Café",
+    "kind": "vault",
+    "name": "Café",
+    "error": ""
+  },
+  {
+    "in": "",
+    "kind": "vault",
+    "name": "",
+    "error": "Give the vault a name."
+  },
+  {
+    "in": "   ",
+    "kind": "vault",
+    "name": "",
+    "error": "Give the vault a name."
+  },
+  {
+    "in": "",
+    "kind": "inbox",
+    "name": "",
+    "error": "Give the folder a name, or skip to use “Inbox”."
+  },
+  {
+    "in": "a/b",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t contain slashes. Use Location to choose where it goes."
+  },
+  {
+    "in": "a\\b",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t contain slashes. Use Location to choose where it goes."
+  },
+  {
+    "in": "a/b",
+    "kind": "inbox",
+    "name": "",
+    "error": "Use a single folder name, without slashes."
+  },
+  {
+    "in": "a:b*c",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t contain “:” “*”."
+  },
+  {
+    "in": "a:b:c",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t contain “:”."
+  },
+  {
+    "in": "a\u0001b",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t contain control characters."
+  },
+  {
+    "in": ".hidden",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t start with a dot, because the folder would be hidden."
+  },
+  {
+    "in": "..",
+    "kind": "inbox",
+    "name": "",
+    "error": "A name can’t start with a dot, because the folder would be hidden."
+  },
+  {
+    "in": "notes.",
+    "kind": "vault",
+    "name": "",
+    "error": "A name can’t end with a dot."
+  },
+  {
+    "in": "CON",
+    "kind": "vault",
+    "name": "",
+    "error": "“CON” is reserved by the operating system."
+  },
+  {
+    "in": "nul.txt",
+    "kind": "vault",
+    "name": "",
+    "error": "“nul.txt” is reserved by the operating system."
+  },
+  {
+    "in": "COM1",
+    "kind": "inbox",
+    "name": "",
+    "error": "“COM1” is reserved by the operating system."
+  },
+  {
+    "in": "CONSOLE",
+    "kind": "vault",
+    "name": "CONSOLE",
+    "error": ""
+  },
+  {
+    "in": "日本語ノート",
+    "kind": "vault",
+    "name": "日本語ノート",
+    "error": ""
+  },
+  {
+    "in": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "kind": "vault",
+    "name": "",
+    "error": "That name is too long (100 characters at most)."
+  },
+  {
+    "in": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "kind": "vault",
+    "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "error": ""
+  },
+  {
+    "in": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+    "kind": "vault",
+    "name": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+    "error": ""
+  }
+]

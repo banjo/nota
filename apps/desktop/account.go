@@ -168,10 +168,16 @@ func deviceName() string {
 
 // newAccount sets up sign-in for the vault s, with the app's credential
 // store and browser.
-func newAccount(s *Vault) *Account {
+func newAccount(s *Vault) *Account { return newAccountFor(s.v.MetaDir(), s.Info().Name, s.restartSync) }
+
+// newAccountFor sets up sign-in for the vault whose .nota folder is
+// metaDir ("" while the first-run setup has not made a vault yet: the
+// sign-in can finish, and attachVault links the vault later). restart
+// runs after the sync settings change.
+func newAccountFor(metaDir, vaultName string, restart func()) *Account {
 	a := &Account{
-		metaDir:   s.v.MetaDir(),
-		vaultName: s.Info().Name,
+		metaDir:   metaDir,
+		vaultName: vaultName,
 		web:       envOr("NOTA_WEB_URL", defaultWeb),
 		openURL:   mygo.Shell.OpenExternal,
 		saveToken: func(account, token string) (string, error) {
@@ -190,7 +196,7 @@ func newAccount(s *Vault) *Account {
 			return nsync.DeleteToken(account, store)
 		},
 		loadToken: loadToken,
-		restart:   s.restartSync,
+		restart:   restart,
 		publish:   func(st AccountState) { _ = accountEvent.Broadcast(st) },
 	}
 	a.state = a.initial()
@@ -201,7 +207,7 @@ func newAccount(s *Vault) *Account {
 func (a *Account) initial() AccountState {
 	st := AccountState{State: "signed-out", Server: envOr("NOTA_SERVER_URL", defaultServer), Web: a.web,
 		Device: deviceName(), Vaults: []RemoteVault{}}
-	r, ok, err := nsync.LoadRemote(a.metaDir)
+	r, ok, err := a.loadRemote()
 	switch {
 	case err != nil:
 		st.State, st.Error = "error", err.Error()
@@ -209,6 +215,18 @@ func (a *Account) initial() AccountState {
 		st.State, st.Server, st.Vault, st.Device = "signed-in", r.URL, r.Vault, r.Device
 	}
 	return st
+}
+
+// loadRemote reads the vault's sync settings; there are none before the
+// first-run setup has made the vault.
+func (a *Account) loadRemote() (nsync.Remote, bool, error) {
+	a.mu.Lock()
+	meta := a.metaDir
+	a.mu.Unlock()
+	if meta == "" {
+		return nsync.Remote{}, false, nil
+	}
+	return nsync.LoadRemote(meta)
 }
 
 // refreshEmail looks up the signed-in account's email in the background.
@@ -278,9 +296,7 @@ func (a *Account) SignIn(server string) (string, error) {
 
 // CancelSignIn forgets a sign-in that has not come back.
 func (a *Account) CancelSignIn() {
-	a.mu.Lock()
-	a.pending, a.token = nil, ""
-	a.mu.Unlock()
+	a.discardPending(context.Background())
 	start := a.initial()
 	a.update(func(st *AccountState) { *st = start })
 }
@@ -354,7 +370,7 @@ func (a *Account) ChooseVault(name string, create bool) error {
 		return errors.New("give the vault a name")
 	}
 	a.mu.Lock()
-	tok, store, st := a.token, a.store, a.state
+	tok, store, st, meta := a.token, a.store, a.state, a.metaDir
 	a.mu.Unlock()
 	if tok == "" || st.State != "choose-vault" {
 		return errors.New("sign in first")
@@ -368,7 +384,10 @@ func (a *Account) ChooseVault(name string, create bool) error {
 		}
 	}
 	r := nsync.Remote{URL: st.Server, Vault: name, Device: st.Device, TokenStore: store}
-	if err := nsync.SaveRemote(a.metaDir, r); err != nil {
+	if meta == "" {
+		return errors.New("there is no vault to sync yet")
+	}
+	if err := nsync.SaveRemote(meta, r); err != nil {
 		return err
 	}
 	a.mu.Lock()
@@ -386,7 +405,7 @@ func (a *Account) ChooseVault(name string, create bool) error {
 // client is a server client with the stored device token; nil when not
 // signed in.
 func (a *Account) client() *nsync.Client {
-	r, ok, err := nsync.LoadRemote(a.metaDir)
+	r, ok, err := a.loadRemote()
 	if err != nil || !ok {
 		return nil
 	}
@@ -426,7 +445,8 @@ func (a *Account) RevokeDevice(ctx context.Context, id int64) error {
 // SignOut stops sync, revokes this device's token and forgets it. The
 // local vault stays exactly as it is.
 func (a *Account) SignOut(ctx context.Context) error {
-	r, ok, err := nsync.LoadRemote(a.metaDir)
+	a.discardPending(ctx)
+	r, ok, err := a.loadRemote()
 	if err != nil {
 		return err
 	}
@@ -441,9 +461,6 @@ func (a *Account) SignOut(ctx context.Context) error {
 			return err
 		}
 	}
-	a.mu.Lock()
-	a.pending, a.token = nil, ""
-	a.mu.Unlock()
 	a.update(func(st *AccountState) {
 		*st = AccountState{State: "signed-out", Server: st.Server, Device: st.Device}
 	})
@@ -451,4 +468,41 @@ func (a *Account) SignOut(ctx context.Context) error {
 		a.restart()
 	}
 	return nil
+}
+
+// discardPending forgets a sign-in that is not linked to a vault yet:
+// one still waiting for the browser, or one that has a device token but
+// no vault chosen (the first-run setup, or "choose-vault" in Settings).
+// The token is revoked on the server (best effort) and removed from the
+// credential store, so abandoning the sign-in leaves nothing behind.
+func (a *Account) discardPending(ctx context.Context) {
+	a.mu.Lock()
+	tok, store, st := a.token, a.store, a.state
+	a.pending, a.token, a.store = nil, "", ""
+	a.mu.Unlock()
+	if tok == "" {
+		return
+	}
+	c := &nsync.Client{BaseURL: st.Server, Token: tok, HTTP: a.httpClient, UserAgent: "nota-desktop"}
+	rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	_ = c.RevokeSelf(rctx) // offline: stays valid until revoked from another device
+	if a.deleteToken != nil {
+		_ = a.deleteToken(nsync.Remote{URL: st.Server, Device: st.Device}.Account(), store)
+	}
+}
+
+// attachVault points the account at the vault the first-run setup made
+// (or the one switched to) and, when the user signed in during setup,
+// links it: the vault syncs as name, created on the server when it is
+// not there yet. It does nothing for a user who did not sign in.
+func (a *Account) attachVault(metaDir, name string) error {
+	a.mu.Lock()
+	a.metaDir, a.vaultName = metaDir, name
+	linking := a.state.State == "choose-vault" && a.token != ""
+	a.mu.Unlock()
+	if !linking {
+		return nil
+	}
+	return a.ChooseVault(name, true)
 }

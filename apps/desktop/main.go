@@ -40,6 +40,12 @@ type Desktop struct {
 
 	appearance     Appearance // the last SetAppearance
 	appearanceFile string     // where it is kept; "" for nowhere
+
+	onboarding bool     // started without a vault: the window shows the setup
+	source     string   // what chose the vault: "config", "env" or "default"
+	acc        *Account // signs in to sync; linked to the vault at the end of setup
+	configPath string   // the config file; "" for the default one
+	relaunch   func()   // opens the new vault; nil means mygo.App.Relaunch
 }
 
 // HideCapture hides the quick-capture window (after saving, or on
@@ -84,25 +90,15 @@ func (d *Desktop) ShowMain() {
 
 // RevealVault opens the vault folder in the file manager.
 func (d *Desktop) RevealVault() error {
+	if d.dir == "" {
+		return ErrNoVault
+	}
 	return mygo.Shell.OpenPath(d.dir)
 }
 
 // Platform is the OS the app runs on ("darwin", "linux", "windows"),
 // for shortcut labels.
 func (d *Desktop) Platform() string { return runtime.GOOS }
-
-// welcome is written into a vault that has no notes yet, so a fresh
-// install (or a phone, which has no NOTA_VAULT) opens on something.
-const welcome = "---\ntags: [nota]\n---\n# Välkommen till Nota\n\nAnteckningarna är vanliga .md-filer i den här mappen.\n"
-
-func ensureWelcome(s *Vault) error {
-	es, err := s.v.List()
-	if err != nil || len(es) > 0 {
-		return err
-	}
-	_, _, err = s.v.Write("Välkommen.md", []byte(welcome))
-	return err
-}
 
 func send(id string) func(*mygo.MenuItem, *mygo.Window) {
 	return func(*mygo.MenuItem, *mygo.Window) { _ = commandEvent.Broadcast(Command{ID: id}) }
@@ -149,23 +145,34 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	s, err := openVault(loc.Dir, loc.Config.Inbox)
+	needsSetup, err := vault.NeedsOnboarding(loc)
 	if err != nil {
-		log.Fatal(err)
+		warn("could not tell whether this is a first run", "err", err)
 	}
-	defer s.ix.Close()
-	if s.hooks != nil {
-		defer s.hooks.Wait()
+	d := &Desktop{appearanceFile: appearancePath(), onboarding: needsSetup, source: loc.Source}
+	// Without a vault yet (first run) the services are bound empty: the
+	// window shows the setup, and the setup relaunches the app once it
+	// has made the vault. Otherwise the vault opens before the window.
+	s := &Vault{}
+	var acc *Account
+	if needsSetup {
+		acc = newAccountFor("", "", nil)
+	} else {
+		if s, err = openVault(loc.Dir, loc.Config.Inbox); err != nil {
+			log.Fatal(err)
+		}
+		defer s.ix.Close()
+		if s.hooks != nil {
+			defer s.hooks.Wait()
+		}
+		// Sync runs in the background when the vault has a remote.
+		s.syn.Store(startSync(s, loc.Dir, loc.Config.Inbox))
+		defer func() { s.syn.Load().stop() }()
+		acc = newAccount(s)
+		acc.refreshEmail()
+		d.dir = loc.Dir
 	}
-	if err := ensureWelcome(s); err != nil {
-		log.Fatal(err)
-	}
-	// Sync runs in the background when the vault has a remote.
-	s.syn.Store(startSync(s, loc.Dir, loc.Config.Inbox))
-	defer func() { s.syn.Load().stop() }()
-	acc := newAccount(s)
-	acc.refreshEmail()
-	d := &Desktop{dir: loc.Dir, appearanceFile: appearancePath()}
+	d.acc = acc
 	mygo.Bind(s, acc, d)
 
 	// Open in the last appearance, so neither the window chrome nor the
@@ -220,6 +227,13 @@ func main() {
 				mygo.App.Quit()
 			}
 		})
+		if needsSetup {
+			// Nothing to capture into yet; the setup relaunches the app.
+			d.mu.Lock()
+			d.main = w
+			d.mu.Unlock()
+			return
+		}
 		// Quick capture: a small panel above every app, summoned from
 		// anywhere with ⌥⌘N. It hides rather than closes.
 		c := mygo.NewWindow(mygo.WindowOptions{
