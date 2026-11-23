@@ -1,0 +1,15 @@
+---
+interface Props {
+  command: string;
+  label?: string;
+  class?: string;
+}
+const { command, label = "Copy", class: className } = Astro.props;
+---
+
+<div class:list={["cmd", className]}>
+  <code>{command}</code>
+  <button class="copy" type="button" data-copy={command} aria-label={`Copy: ${command}`}>
+    {label}
+  </button>
+</div>

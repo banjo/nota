@@ -1,0 +1,95 @@
+---
+import { site } from "../data/site.ts";
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = site.title, description = site.description } = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL("/og.png", Astro.site);
+// Cloudflare Web Analytics: a token can only be set at build time.
+const beacon = import.meta.env.PUBLIC_CF_BEACON_TOKEN as string | undefined;
+
+const app = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Nota",
+  description,
+  url: `${site.url}/`,
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "macOS, Linux",
+  license: "https://opensource.org/licenses/MIT",
+  codeRepository: site.repo,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-1024.png" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#161618" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nota" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Nota app beside the words Your notes are files." />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script is:inline>
+      // Appearance before the first paint, with the app's key: nota:theme
+      // ("light" | "dark", absent = System). data-mode is the mode in
+      // effect; tokens.css keys the dark colours on it. data-js lets the
+      // copy buttons show.
+      (function () {
+        var d = document.documentElement;
+        var t = null;
+        try {
+          t = localStorage.getItem("nota:theme");
+        } catch (e) {}
+        if (t === "light" || t === "dark") d.dataset.theme = t;
+        else t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        d.dataset.mode = t;
+        d.dataset.js = "";
+      })();
+    </script>
+    <script type="application/ld+json" set:html={JSON.stringify(app)} />
+    {
+      beacon && (
+        <script
+          is:inline
+          defer
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon={JSON.stringify({ token: beacon })}
+        />
+      )
+    }
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <slot />
+    <script>
+      import { initSite } from "../scripts/site.ts";
+      initSite();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,88 @@
+---
+import { site } from "../data/site.ts";
+import GitHubIcon from "./GitHubIcon.astro";
+---
+
+<header class="wrap top">
+  <a class="brand" href="/" aria-label="Nota, home"><img src="/icon.svg" alt="" width="26" height="26" />Nota</a>
+  <nav class="top-links" aria-label="Elsewhere">
+    <a class="icon-btn" href={site.repo} aria-label="Nota on GitHub"><GitHubIcon /></a>
+    <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch to dark mode" hidden>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"
+        ><circle cx="12" cy="12" r="4"></circle><path
+          d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg
+      >
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+        ><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"></path></svg
+      >
+    </button>
+  </nav>
+</header>
+
+<style>
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 650;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+
+  .top-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      transform 160ms var(--ease-out);
+  }
+
+  .icon-btn:active {
+    transform: scale(0.96);
+  }
+
+  .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* The icon shows the mode you get by pressing it. */
+  .moon,
+  :global(:root[data-mode="dark"]) .sun {
+    display: none;
+  }
+
+  :global(:root[data-mode="dark"]) .moon {
+    display: block;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .icon-btn:hover {
+      background: var(--hover);
+      color: var(--foreground);
+    }
+  }
+</style>

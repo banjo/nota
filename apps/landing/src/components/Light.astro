@@ -1,0 +1,87 @@
+---
+import { measured } from "../data/site.ts";
+---
+
+<section class="wrap section" aria-labelledby="light-title">
+  <h2 class="sec-title" id="light-title">Light on purpose.</h2>
+  <dl class="stats">
+    {
+      measured.map((m) => (
+        <div class="stat">
+          <dt>{m.label}</dt>
+          <dd>
+            {m.value}
+            <span class="unit">{m.unit}</span>
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+  <p class="note">Measured on Linux.</p>
+</section>
+
+<style>
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 40px 0 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 24px 24px 0 0;
+  }
+
+  .stat + .stat {
+    padding-left: 24px;
+    border-left: 1px solid var(--hairline);
+  }
+
+  dd {
+    margin: 0;
+    font-size: clamp(48px, 5.6vw, 76px);
+    line-height: 1;
+    font-weight: 650;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    color: var(--foreground);
+  }
+
+  .unit {
+    margin-left: 2px;
+    font-size: 0.4em;
+    font-weight: 550;
+    letter-spacing: -0.01em;
+    color: var(--muted);
+  }
+
+  dt {
+    max-width: 14em;
+    font-size: 14.5px;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+
+  .note {
+    margin: 22px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .stats {
+      grid-template-columns: 1fr 1fr;
+    }
+    .stat:nth-child(3) {
+      padding-left: 0;
+      border-left: 0;
+    }
+    .stat:nth-child(n + 3) {
+      margin-top: 28px;
+    }
+  }
+</style>

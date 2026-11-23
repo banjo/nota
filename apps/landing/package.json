@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
-    "build": "vp build",
-    "preview": "vp preview",
-    "test": "vp test --passWithNoTests"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "vp test"
   },
   "dependencies": {
-    "@nota/ui": "workspace:*"
+    "@nota/ui": "workspace:*",
+    "astro": "^7.4.13"
   },
   "devDependencies": {
     "typescript": "catalog:",

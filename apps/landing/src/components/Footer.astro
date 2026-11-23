@@ -1,0 +1,86 @@
+---
+// The closing line, the call to action once more, and the footer.
+import type { AppRelease } from "../data/release.ts";
+import { site } from "../data/site.ts";
+import GitHubIcon from "./GitHubIcon.astro";
+
+interface Props {
+  release: AppRelease | null;
+}
+const { release } = Astro.props;
+---
+
+<footer class="footer">
+  <div class="wrap closing">
+    <h2>Plain text outlasts apps.</h2>
+    <div class="btns">
+      {
+        release?.mac ? (
+          <a class="btn btn-primary" href={release.mac.url}>
+            Download for macOS
+          </a>
+        ) : (
+          <a class="btn btn-primary" href={site.releases}>
+            Watch releases
+          </a>
+        )
+      }
+      <a class="btn btn-ghost" href={site.repo}><GitHubIcon />GitHub</a>
+    </div>
+  </div>
+  <div class="wrap base">
+    <span><img src="/icon.svg" alt="" width="18" height="18" />Nota, MIT licensed</span>
+    <a href="/llms.txt">llms.txt</a>
+  </div>
+</footer>
+
+<style>
+  .closing {
+    padding: clamp(110px, 14vw, 170px) 0 clamp(72px, 9vw, 110px);
+    text-align: center;
+  }
+
+  h2 {
+    margin: 0 0 30px;
+    font-size: clamp(44px, 7vw, 92px);
+    line-height: 0.98;
+    font-weight: 700;
+    letter-spacing: -0.036em;
+  }
+
+  .btns {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .base {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px 20px;
+    padding: 22px 0 40px;
+    border-top: 1px solid var(--hairline);
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .base span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .base a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .base a:hover {
+      color: var(--foreground);
+    }
+  }
+</style>
