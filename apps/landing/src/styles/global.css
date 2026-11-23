@@ -146,7 +146,7 @@ h3 {
 }
 
 .sec-lead {
-  margin: 14px 0 0;
+  margin: 18px 0 0;
   max-width: 30em;
   font-size: 17px;
   color: var(--muted);
@@ -287,7 +287,7 @@ h3 {
 .link {
   color: var(--text);
   text-underline-offset: 3px;
-  text-decoration-color: var(--hairline);
+  text-decoration-color: var(--faint);
   transition: text-decoration-color 150ms ease;
 }
 

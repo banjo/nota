@@ -12,7 +12,7 @@ const shell = docker
   <div>
     <h2 class="sec-title" id="sync-title">Sync through your own server.</h2>
     <p class="sec-lead">
-      A small Go binary and a SQLite file. Passkeys, not passwords. Without a server, Nota works offline forever.
+      A Go binary and SQLite. Passkeys, not passwords. Nota works offline forever without it.
     </p>
     <p class="more"><a class="link" href={site.deployDoc}>Deploy guide</a></p>
   </div>
@@ -73,7 +73,7 @@ const shell = docker
 
   @media (max-width: 900px) {
     .sync {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

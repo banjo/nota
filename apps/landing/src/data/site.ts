@@ -28,9 +28,9 @@ export const measured = [
   // cd apps/desktop && bunx mygo build → build/linux-amd64/nota, 20,242,695 bytes
   { value: "21", unit: "MB", label: "Desktop app, no bundled browser" },
   // nota serve, empty data dir, ps -o rss after startup → 18,596 KiB (19.0 MB)
-  { value: "20", unit: "MB", label: "Server memory at idle" },
+  { value: "20", unit: "MB", label: "Idle server memory" },
   // go test -bench Search10k ./internal/index → 17,450,094 ns/op
-  { value: "18", unit: "ms", label: "Search across 10,000 notes" },
+  { value: "18", unit: "ms", label: "Search, 10,000 notes" },
 ];
 
 /** The MCP tools `nota mcp` and the server's /mcp expose (internal/mcp). */

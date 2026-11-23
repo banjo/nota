@@ -12,7 +12,7 @@ const check = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
 ---
 
 <section class="hero" aria-labelledby="hero-title">
-  <div class="wrap copy">
+  <div class="wrap intro">
     <h1 id="hero-title">Your notes are files.</h1>
     <p class="lead">Local Markdown notes in a small Go app for desktop and web, synced through your own server.</p>
     <Cta release={release} />
@@ -74,11 +74,12 @@ const check = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
 
 <style>
   .hero {
-    padding-top: clamp(40px, 6.5vw, 96px);
+    padding-top: clamp(36px, 5.5vw, 80px);
   }
 
-  .copy {
+  .intro {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     text-align: center;
   }
@@ -89,7 +90,8 @@ const check = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
     line-height: 0.96;
     font-weight: 700;
     /* Tight, but "Your notes" must not touch at display size. */
-    letter-spacing: -0.034em;
+    letter-spacing: -0.026em;
+    word-spacing: 0.06em;
   }
 
   .lead {
@@ -104,7 +106,7 @@ const check = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
   /* One file, two programs */
   .stage {
     width: min(1240px, 100% - 40px);
-    margin: clamp(48px, 6vw, 76px) auto 0;
+    margin: clamp(44px, 5vw, 64px) auto 0;
   }
 
   .split {
@@ -387,7 +389,7 @@ const check = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
 
   @media (max-width: 900px) {
     .split {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       height: auto;
     }
     .pane {

@@ -52,7 +52,9 @@ const linux = release?.appImage ?? release?.deb;
 <style>
   .cta {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
+    width: 100%;
     gap: 14px;
   }
 
@@ -62,7 +64,7 @@ const linux = release?.appImage ?? release?.deb;
     justify-content: center;
     align-items: center;
     gap: 10px;
-    max-width: 100%;
+    width: 100%;
   }
 
   .row :global(.cta-cmd) {

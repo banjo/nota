@@ -5,8 +5,8 @@ import { esc } from "../scripts/frames.ts";
 // Three layers (issue #1, Plugins): views and hooks ship today; the UI
 // plugin API (manifest, permissions, sandbox) does not yet.
 const layers = [
-  { name: "Views", text: "Saved searches as folders, in YAML." },
-  { name: "Hooks", text: "Scripts that run when notes change, on your machine or your server." },
+  { name: "Views", text: "Saved searches as folders." },
+  { name: "Hooks", text: "Scripts on note events, also on your server." },
   { name: "UI plugins", text: "Commands, panels and editor widgets.", soon: true },
 ];
 
@@ -64,7 +64,7 @@ const toml = hookExample
 
   .layers div {
     display: grid;
-    grid-template-columns: 130px 1fr;
+    grid-template-columns: 150px 1fr;
     gap: 16px;
     padding: 15px 0;
     border-bottom: 1px solid var(--hairline);
@@ -129,10 +129,10 @@ const toml = hookExample
 
   @media (max-width: 900px) {
     .plugins {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
     .layers div {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: 2px;
     }
   }
