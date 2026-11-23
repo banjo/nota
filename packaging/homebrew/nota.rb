@@ -1,5 +1,5 @@
 # Template for Casks/nota.rb in banjo/homebrew-tap.
-# scripts/bump-cask.sh fills in @VERSION@ and @SHA256@; don't edit the tap's copy by hand.
+# scripts/bump-cask.sh fills in @VERSION@ (e.g. 0.1.0) and @SHA256@; don't edit the tap's copy by hand.
 cask "nota" do
   version "@VERSION@"
   sha256 "@SHA256@"

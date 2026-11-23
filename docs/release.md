@@ -8,7 +8,7 @@ afterwards.
 
 | Job | Runner | Output |
 | --- | --- | --- |
-| `version` | ubuntu | the version: the tag without `v`; a prerelease when it has a `-` suffix (`v1.2.0-rc.1`) |
+| `version` | ubuntu | the version: the tag without `v`; a prerelease when it has a `-` suffix (`v0.1.1-rc.1`) |
 | `cli` (×4) | ubuntu | `nota_<v>_{darwin,linux}_{amd64,arm64}.tar.gz` (pure Go, `CGO_ENABLED=0`, cross-compiled), each with `nota`, `LICENSE`, `README.md` |
 | `macos` | macos-latest (arm64) | `Nota-<v>-arm64.dmg` and `Nota-<v>-arm64.zip` from `mygo build -platform darwin/arm64`, signed ad hoc, with the CLI inside at `Contents/Resources/bin/nota` |
 | `linux` | ubuntu-24.04 | `nota_<v>_amd64.deb`, `nota-<v>-1.x86_64.rpm`, `Nota-<v>-linux-amd64.tar.gz` (MyGo) and `Nota-<v>-x86_64.AppImage` (`scripts/appimage.sh`) |
@@ -17,8 +17,8 @@ afterwards.
 The version is linked into every binary: `-X github.com/banjo/nota/internal/cli.Version` for
 the CLI (`nota --version`) and `NOTA_VERSION` for the app (`apps/desktop/mygo.config.ts`:
 Info.plist, the packages). Nothing in the repository needs a version bump before tagging.
-MyGo writes a prerelease such as `1.2.0-rc.1` as `1.2.0~rc.1` in the .deb and .rpm, so it
-sorts before `1.2.0`.
+MyGo writes a prerelease such as `0.1.1-rc.1` as `0.1.1~rc.1` in the .deb and .rpm, so it
+sorts before `0.1.1`.
 
 The macOS job checks the app before uploading it: Info.plist version, `codesign -dv` (ad hoc),
 `codesign --verify --deep --strict`, `hdiutil verify` and a mount of the DMG, the bundled
@@ -27,23 +27,36 @@ CLI's `--version`, and that the app is still running 10 s after start.
 A manual run (Actions → Release → Run workflow) builds everything as run artifacts and
 publishes nothing unless it runs on a tag.
 
+## Versions
+
+The first release is **v0.1.0**. Every release after it is a **patch bump** (v0.1.1, v0.1.2,
+…); minor and major bumps wait until they are decided. `scripts/next-version.sh` prints the
+next tag from the latest `vX.Y.Z` tag on origin (v0.1.0 when there is none), and
+`scripts/next-version.sh --rc` the next prerelease of it (`v0.1.1-rc.1`, `-rc.2`, …).
+
 ## Steps
 
-1. Make sure `main` is green (CI) and contains what should ship.
-2. Optionally try the pipeline with a prerelease first:
-
-   ```sh
-   git tag v1.2.0-rc.1 && git push origin v1.2.0-rc.1
-   gh run watch "$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
-   ```
-
-   Delete it afterwards with `gh release delete v1.2.0-rc.1 --cleanup-tag --yes`.
-
-3. Tag the release on `main` and push the tag:
+1. Make sure `main` is green (CI) and contains what should ship, then:
 
    ```sh
    git switch main && git pull
-   git tag -a v1.2.0 -m "Nota 1.2.0" && git push origin v1.2.0
+   tag=$(scripts/next-version.sh)     # v0.1.0 for the first release, then v0.1.1, …
+   ```
+
+2. Optionally try the pipeline with a prerelease first. The landing page never shows it, but
+   delete it afterwards anyway:
+
+   ```sh
+   rc=$(scripts/next-version.sh --rc) # e.g. v0.1.0-rc.1
+   git tag "$rc" && git push origin "$rc"
+   gh run watch "$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+   gh release delete "$rc" --cleanup-tag --yes
+   ```
+
+3. Tag the release and push the tag:
+
+   ```sh
+   git tag -a "$tag" -m "Nota ${tag#v}" && git push origin "$tag"
    ```
 
 4. Wait for the workflow (about 10 minutes) and check the release page: 10 files plus
@@ -51,11 +64,11 @@ publishes nothing unless it runs on a tag.
 5. Bump the Homebrew cask (needs your own push access to `banjo/homebrew-tap`):
 
    ```sh
-   scripts/bump-cask.sh 1.2.0 --dry-run      # print the cask, check it with ruby -c / brew style
-   scripts/bump-cask.sh 1.2.0                # clone the tap, write Casks/nota.rb, commit, push
+   scripts/bump-cask.sh 0.1.0 --dry-run      # print the cask, check it with ruby -c / brew style
+   scripts/bump-cask.sh 0.1.0                # clone the tap, write Casks/nota.rb, commit, push
    ```
 
-   The script downloads `Nota-1.2.0-arm64.zip`, checks it against `checksums.txt` and fills in
+   The script downloads `Nota-0.1.0-arm64.zip`, checks it against `checksums.txt` and fills in
    `packaging/homebrew/nota.rb`. It refuses prereleases unless `--dry-run` or
    `--allow-prerelease`. Then `brew update && brew install --cask banjo/tap/nota` to try it.
 

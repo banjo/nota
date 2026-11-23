@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Point the Homebrew cask (banjo/homebrew-tap, Casks/nota.rb) at a release.
 #
-#   scripts/bump-cask.sh 1.2.3                 clone the tap, write, commit, push
-#   scripts/bump-cask.sh 1.2.3 --tap ~/code/homebrew-tap   use a checkout
-#   scripts/bump-cask.sh 1.2.3 --dry-run [--out FILE]      only write FILE
+#   scripts/bump-cask.sh 0.1.0                 clone the tap, write, commit, push
+#   scripts/bump-cask.sh 0.1.0 --tap ~/code/homebrew-tap   use a checkout
+#   scripts/bump-cask.sh 0.1.0 --dry-run [--out FILE]      only write FILE
 #
 # It downloads Nota-<version>-arm64.zip from the GitHub release v<version>,
 # checks it against the release's checksums.txt, and renders
@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$version" ] || usage
 if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-  echo "bump-cask: '$version' is not a version like 1.2.3" >&2
+  echo "bump-cask: '$version' is not a version like 0.1.0" >&2
   exit 2
 fi
 if [[ "$version" == *-* ]] && ! $dry_run && ! $allow_prerelease; then

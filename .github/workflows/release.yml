@@ -1,7 +1,9 @@
 # Builds Nota for a version tag and publishes the GitHub release.
 #
-#   git tag v1.2.3 && git push origin v1.2.3        a release
-#   git tag v1.2.3-rc.1 && git push origin v1.2.3-rc.1  a prerelease
+#   git tag v0.1.0 && git push origin v0.1.0            a release
+#   git tag v0.1.1-rc.1 && git push origin v0.1.1-rc.1  a prerelease
+#
+# Releases are patch bumps for now; scripts/next-version.sh prints the next tag.
 #
 # The version comes from the tag and is linked into every binary:
 # `nota --version`, the app's Info.plist and the Linux packages. A manual
@@ -15,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version for a manual build without a tag (e.g. 0.0.0-dev.1)"
+        description: "Version for a manual build without a tag (e.g. 0.1.0-dev.1)"
         required: false
 
 permissions:
@@ -47,7 +49,7 @@ jobs:
             v="${v#v}"
           fi
           if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::'$v' is not a version like 1.2.3 or 1.2.3-rc.1"
+            echo "::error::'$v' is not a version like 0.1.0 or 0.1.1-rc.1"
             exit 1
           fi
           pre=false
