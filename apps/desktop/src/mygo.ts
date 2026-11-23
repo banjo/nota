@@ -246,8 +246,8 @@ export interface Tree {
 }
 
 /**
- * TreeFolder is a folder that holds notes, with its note count
- * (subfolders included).
+ * TreeFolder is a folder with its note count (subfolders included);
+ * empty folders are listed with 0.
  */
 export interface TreeFolder {
   path: string;
@@ -288,6 +288,13 @@ export const Vault = {
    * may file it elsewhere: the result shows where it ended up.
    */
   create: bind<[CreateRequest], Note>("Vault.Create", (req: CreateRequest) => [req]),
+  /**
+   * CreateFolder makes an empty folder (and missing parents) and returns
+   * its path. It fails when the folder exists, differs from one only in
+   * letter case, or has a name that is not allowed. Empty folders are
+   * local until they hold a note (docs/sync.md).
+   */
+  createFolder: bind<[string], string>("Vault.CreateFolder", (path: string) => [path]),
   /** Delete moves a note to .trash/ and returns where it went. */
   delete: bind<[string], string>("Vault.Delete", (path: string) => [path]),
   /** Get returns one note with its content, hash, links and backlinks. */
@@ -343,7 +350,7 @@ export const Vault = {
   syncStatus: bind<[], SyncStatus>("Vault.SyncStatus", () => []),
   /** Tags returns every tag with its note count. */
   tags: bind<[], TagCount[]>("Vault.Tags", () => []),
-  /** Tree returns every folder that holds notes and every note, by path. */
+  /** Tree returns every folder (empty ones too) and every note, by path. */
   tree: bind<[], Tree>("Vault.Tree", () => []),
   /** Views returns the saved views of .nota/views with their note counts. */
   views: bind<[], ViewInfo[]>("Vault.Views", () => []),

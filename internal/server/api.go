@@ -35,6 +35,7 @@ func (s *Server) apiRoutes() {
 	s.route("PATCH /v1/api/vaults/{vault}/notes/{path...}", ro, s.apiPatch)
 	s.route("DELETE /v1/api/vaults/{vault}/notes/{path...}", ro, s.apiDelete)
 	s.route("POST /v1/api/vaults/{vault}/move", ro, s.apiMove)
+	s.route("POST /v1/api/vaults/{vault}/folders", ro, s.apiCreateFolder)
 	s.route("GET /v1/api/vaults/{vault}/search", ro, s.apiSearch)
 	s.route("GET /v1/api/vaults/{vault}/tags", ro, s.apiTags)
 	s.route("GET /v1/api/vaults/{vault}/views", ro, s.apiViews)
@@ -235,8 +236,20 @@ func (s *Server) apiTree(w http.ResponseWriter, r *http.Request, p Principal) er
 			counts[f]++
 		}
 	}
-	// Empty folders on disk (made by a move away) are not in the index;
-	// the tree shows folders that hold notes.
+	// Empty folders are on disk only; add them with a count of 0.
+	ws.mu.Lock()
+	dirs, err := ws.client.Folders()
+	ws.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	for _, d := range dirs {
+		for f := d; f != ""; f = nvault.Folder(f) {
+			if _, ok := counts[f]; !ok {
+				counts[f] = 0
+			}
+		}
+	}
 	out := Tree{Inbox: ws.client.Inbox(), Folders: []TreeFolder{}, Notes: noteInfos(es)}
 	for f, n := range counts {
 		out.Folders = append(out.Folders, TreeFolder{Path: f, Name: path.Base(f), Notes: n})
@@ -725,6 +738,43 @@ func (s *Server) apiMove(w http.ResponseWriter, r *http.Request, p Principal) er
 	}
 	info(r).attrs = append(info(r).attrs, "file", to, "from", from, "version", cur.Version)
 	writeJSON(w, http.StatusOK, MoveResponse{From: from, Path: to, Version: cur.Version})
+	return nil
+}
+
+// FolderRequest is the body of POST …/folders.
+type FolderRequest struct {
+	Path string `json:"path"`
+}
+
+// FolderResponse is the folder that was made.
+type FolderResponse struct {
+	Path string `json:"path"`
+}
+
+// apiCreateFolder makes an empty folder (POST …/folders). Empty folders
+// are not versions, so they stay on this server until a note lands in
+// them, and no event is sent.
+func (s *Server) apiCreateFolder(w http.ResponseWriter, r *http.Request, p Principal) error {
+	var req FolderRequest
+	if err := decodeJSON(r, &req); err != nil {
+		return err
+	}
+	ws, err := s.openWS(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	ed, err := ws.editor(p.Device)
+	if err != nil {
+		return err
+	}
+	np, err := ed.Mkdir(req.Path)
+	if err != nil {
+		return vaultErr(err)
+	}
+	info(r).attrs = append(info(r).attrs, "folder", np)
+	writeJSON(w, http.StatusCreated, FolderResponse{Path: np})
 	return nil
 }
 

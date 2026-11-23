@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -181,8 +182,28 @@ func TestWebAPINotes(t *testing.T) {
 	// Read-only views of the vault.
 	var tree Tree
 	if st, m := b.call("GET", api+"/tree", nil, &tree); st != 200 || len(tree.Notes) != 2 || tree.Inbox != "Inbox" ||
-		len(tree.Folders) != 1 || tree.Folders[0] != (TreeFolder{Path: "Projekt", Name: "Projekt", Notes: 1}) || tree.Cursor == 0 {
+		// Inbox is still on disk, empty, after its note was filed.
+		len(tree.Folders) != 2 || tree.Folders[0] != (TreeFolder{Path: "Inbox", Name: "Inbox"}) ||
+		tree.Folders[1] != (TreeFolder{Path: "Projekt", Name: "Projekt", Notes: 1}) || tree.Cursor == 0 {
 		t.Fatalf("tree: %d %v %+v", st, m, tree)
+	}
+	var fr FolderResponse
+	if st, m := b.call("POST", api+"/folders", FolderRequest{Path: "Tomt/Under"}, &fr); st != 201 || fr.Path != "Tomt/Under" {
+		t.Fatalf("create folder: %d %v %+v", st, m, fr)
+	}
+	if st, m := b.call("POST", api+"/folders", FolderRequest{Path: "Tomt/Under"}, nil); st != 409 || code(m) != protocol.CodeExists {
+		t.Fatalf("create folder again: %d %v", st, m)
+	}
+	if st, m := b.call("POST", api+"/folders", FolderRequest{Path: "tomt"}, nil); st != 409 || code(m) != protocol.CodeCaseCollision {
+		t.Fatalf("create folder, case: %d %v", st, m)
+	}
+	if st, m := b.call("POST", api+"/folders", FolderRequest{Path: ".nota/x"}, nil); st != 400 || code(m) != protocol.CodeInvalidPath {
+		t.Fatalf("create hidden folder: %d %v", st, m)
+	}
+	var withEmpty Tree
+	if st, m := b.call("GET", api+"/tree", nil, &withEmpty); st != 200 || !slices.Contains(withEmpty.Folders, TreeFolder{Path: "Tomt/Under", Name: "Under"}) ||
+		!slices.Contains(withEmpty.Folders, TreeFolder{Path: "Tomt", Name: "Tomt"}) {
+		t.Fatalf("tree with empty folders: %d %v %+v", st, m, withEmpty)
 	}
 	var list NotesList
 	if st, _ := b.call("GET", api+"/notes?tag=work", nil, &list); st != 200 || list.Count != 2 {

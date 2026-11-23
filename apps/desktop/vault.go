@@ -74,8 +74,8 @@ type Note struct {
 	Links     []Link `json:"links"`
 }
 
-// TreeFolder is a folder that holds notes, with its note count
-// (subfolders included).
+// TreeFolder is a folder with its note count (subfolders included);
+// empty folders are listed with 0.
 type TreeFolder struct {
 	Path  string `json:"path"`
 	Name  string `json:"name"`
@@ -305,7 +305,7 @@ func (s *Vault) Info() VaultInfo {
 	return VaultInfo{Name: filepath.Base(s.v.Root()), Dir: s.v.Root(), Inbox: s.v.Inbox()}
 }
 
-// Tree returns every folder that holds notes and every note, by path.
+// Tree returns every folder (empty ones too) and every note, by path.
 func (s *Vault) Tree() (Tree, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -317,6 +317,17 @@ func (s *Vault) Tree() (Tree, error) {
 	for _, e := range es {
 		for f := e.Folder; f != ""; f = vault.Folder(f) {
 			counts[f]++
+		}
+	}
+	dirs, err := s.v.Folders()
+	if err != nil {
+		return Tree{}, err
+	}
+	for _, d := range dirs {
+		for f := d; f != ""; f = vault.Folder(f) {
+			if _, ok := counts[f]; !ok {
+				counts[f] = 0
+			}
 		}
 	}
 	out := Tree{Inbox: s.v.Inbox(), Folders: []TreeFolder{}, Notes: noteInfos(es), Cursor: s.changes.seq()}
@@ -573,6 +584,21 @@ func (s *Vault) Create(req CreateRequest) (Note, error) {
 		return Note{}, err
 	}
 	return s.note(where(n.Path))
+}
+
+// CreateFolder makes an empty folder (and missing parents) and returns
+// its path. It fails when the folder exists, differs from one only in
+// letter case, or has a name that is not allowed. Empty folders are
+// local until they hold a note (docs/sync.md).
+func (s *Vault) CreateFolder(path string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, err := s.v.Mkdir(path)
+	if err != nil {
+		return "", err
+	}
+	s.changes.add(p)
+	return p, nil
 }
 
 // Move moves a note into folder, keeping its file name ("/" or "" is
