@@ -6,7 +6,6 @@
 apps/desktop/src
 apps/*/node_modules
 packages
-prototypes
 bun.lock
 *.log
 .env
