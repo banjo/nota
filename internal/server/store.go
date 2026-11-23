@@ -286,36 +286,213 @@ func (s *Store) Vaults(ctx context.Context, userID int64) ([]protocol.VaultInfo,
 }
 
 // CreateVault creates a vault for a user. It fails with ErrExists when
-// the user already has one with that name.
+// the user already has one with that name, or had one: an earlier name
+// of a renamed vault still leads to it (see vault_aliases).
 func (s *Store) CreateVault(ctx context.Context, userID int64, name string) (protocol.VaultInfo, error) {
-	if !protocol.ValidVaultName(name) {
-		return protocol.VaultInfo{}, &protocol.Error{Code: protocol.CodeBadRequest,
-			Message: fmt.Sprintf("bad vault name %q: use 1-64 letters, digits, '.', '_' or '-'", name)}
+	if err := checkVaultName(name); err != nil {
+		return protocol.VaultInfo{}, err
 	}
 	now := fromMS(ms(s.now()))
-	var id int64
-	err := s.db.QueryRowContext(ctx, `INSERT INTO vaults (user_id, name, created_at) VALUES (?, ?, ?)
-		ON CONFLICT (user_id, name) DO NOTHING RETURNING id`, userID, name, ms(now)).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return protocol.VaultInfo{}, fmt.Errorf("vault %s: %w", name, ErrExists)
-	}
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	defer tx.Rollback()
+	if err := nameFree(ctx, tx, userID, name, 0); err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO vaults (user_id, name, created_at) VALUES (?, ?, ?)`,
+		userID, name, ms(now)); err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return protocol.VaultInfo{}, err
 	}
 	return protocol.VaultInfo{Name: name, CreatedAt: now}, nil
 }
 
-// DeleteVault deletes a user's vault with its whole history. The blobs
-// stay in the blob store. Admin only (nota serve vault rm).
-func (s *Store) DeleteVault(ctx context.Context, userID int64, name string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM vaults WHERE user_id = ? AND name = ?`, userID, name)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("vault %s: %w", name, ErrNotFound)
+func checkVaultName(name string) error {
+	if !protocol.ValidVaultName(name) {
+		return &protocol.Error{Code: protocol.CodeBadRequest,
+			Message: fmt.Sprintf("bad vault name %q: use 1-64 letters, digits, '.', '_' or '-'", name)}
 	}
 	return nil
+}
+
+// nameFree fails with ErrExists when name is taken among the user's
+// vaults: the name of a vault, or an earlier name of a vault other than
+// self (0 for none).
+func nameFree(ctx context.Context, q querier, userID int64, name string, self int64) error {
+	var id int64
+	err := q.QueryRowContext(ctx, `SELECT id FROM vaults WHERE user_id = ? AND name = ?`, userID, name).Scan(&id)
+	if err == nil {
+		return fmt.Errorf("vault %s: %w", name, ErrExists)
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	var current string
+	err = q.QueryRowContext(ctx, `SELECT v.id, v.name FROM vault_aliases a JOIN vaults v ON v.id = a.vault_id
+		WHERE a.user_id = ? AND a.name = ?`, userID, name).Scan(&id, &current)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil
+	case err != nil:
+		return err
+	case id == self:
+		return nil
+	}
+	return fmt.Errorf("vault %s: %w: it is an earlier name of %s, and devices may still sync with it", name, ErrExists, current)
+}
+
+// RenameVault gives a user's vault a new name. The vault keeps its id,
+// history, working copy and devices: the old name stays an alias, so
+// sync clients that still use it keep reaching the same vault. Renaming
+// back to an earlier name is allowed; another vault's name or earlier
+// name is ErrExists.
+func (s *Store) RenameVault(ctx context.Context, userID int64, name, to string) (protocol.VaultInfo, error) {
+	if err := checkVaultName(to); err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	defer tx.Rollback()
+	v, err := vaultOf(ctx, tx, userID, name)
+	if err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	if v.Name == to {
+		return v.info(), nil
+	}
+	if err := nameFree(ctx, tx, userID, to, v.ID); err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`DELETE FROM vault_aliases WHERE user_id = ? AND name = ?`, []any{userID, to}},
+		{`INSERT INTO vault_aliases (user_id, name, vault_id) VALUES (?, ?, ?)`, []any{userID, v.Name, v.ID}},
+		{`UPDATE vaults SET name = ? WHERE id = ?`, []any{to, v.ID}},
+	} {
+		if _, err := tx.ExecContext(ctx, q.sql, q.args...); err != nil {
+			return protocol.VaultInfo{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return protocol.VaultInfo{}, err
+	}
+	v.Name = to
+	return v.info(), nil
+}
+
+// VaultRemoval is what deleting a vault removed.
+type VaultRemoval struct {
+	Vault RemovedVault `json:"vault"`
+	// Files is the number of live files the vault had.
+	Files int `json:"files"`
+	// Blobs is the number of the user's blob rows that went with it
+	// (content no other vault of the user has).
+	Blobs int `json:"blobs"`
+
+	// blobHashes are the hashes that lost their last row: their files
+	// go in RemoveVaultData unless something references them again.
+	blobHashes []string
+}
+
+// DeleteVault deletes a user's vault with its whole history and earlier
+// names, in one write transaction, plus the user's blob rows no other
+// vault of theirs references. The disk is left alone: the caller removes
+// the working copy and the unreferenced blob files with RemoveVaultData,
+// so the database stays the truth if that fails.
+func (s *Store) DeleteVault(ctx context.Context, userID int64, name string) (VaultRemoval, error) {
+	return s.deleteVault(ctx, userID, name, nil)
+}
+
+// deleteVault is DeleteVault with a check of the vault (the typed
+// confirmation of the web app) inside the transaction.
+func (s *Store) deleteVault(ctx context.Context, userID int64, name string, check func(vault) error) (VaultRemoval, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return VaultRemoval{}, err
+	}
+	defer tx.Rollback()
+	v, err := vaultOf(ctx, tx, userID, name)
+	if err != nil {
+		return VaultRemoval{}, err
+	}
+	if check != nil {
+		if err := check(v); err != nil {
+			return VaultRemoval{}, err
+		}
+	}
+	rm := VaultRemoval{Vault: RemovedVault{ID: v.ID, Name: v.Name, Cursor: v.Seq}}
+	if rm.Files, err = countRows(ctx, tx, `SELECT count(*) FROM files WHERE vault_id = ? AND deleted = 0`, v.ID); err != nil {
+		return VaultRemoval{}, err
+	}
+	var hashes []string
+	rows, err := tx.QueryContext(ctx, `SELECT hash FROM versions WHERE vault_id = ? AND hash <> ''
+		UNION SELECT hash FROM files WHERE vault_id = ? AND hash <> ''`, v.ID, v.ID)
+	if err != nil {
+		return VaultRemoval{}, err
+	}
+	for rows.Next() {
+		var h string
+		if err := rows.Scan(&h); err != nil {
+			rows.Close()
+			return VaultRemoval{}, err
+		}
+		hashes = append(hashes, h)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return VaultRemoval{}, err
+	}
+	// The vault's files, versions and aliases cascade.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM vaults WHERE id = ?`, v.ID); err != nil {
+		return VaultRemoval{}, err
+	}
+	for _, h := range hashes {
+		// Blob rows are per user: the row stays while another vault of
+		// the user still has the content in a version or a file.
+		var one int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM versions x JOIN vaults w ON w.id = x.vault_id
+			WHERE w.user_id = ? AND x.hash = ?
+			UNION ALL SELECT 1 FROM files x JOIN vaults w ON w.id = x.vault_id
+			WHERE w.user_id = ? AND x.hash = ? LIMIT 1`, userID, h, userID, h).Scan(&one)
+		switch {
+		case err == nil:
+			continue
+		case !errors.Is(err, sql.ErrNoRows):
+			return VaultRemoval{}, err
+		}
+		res, err := tx.ExecContext(ctx, `DELETE FROM blobs WHERE user_id = ? AND hash = ?`, userID, h)
+		if err != nil {
+			return VaultRemoval{}, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			rm.Blobs++
+		}
+		if !blobReferenced(ctx, tx, h) {
+			rm.blobHashes = append(rm.blobHashes, h)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return VaultRemoval{}, err
+	}
+	return rm, nil
+}
+
+// blobReferenced reports whether any user's row or version still
+// references a hash (errors count as referenced: the file stays).
+func blobReferenced(ctx context.Context, q querier, h string) bool {
+	var one int
+	err := q.QueryRowContext(ctx, `SELECT 1 FROM blobs WHERE hash = ?
+		UNION ALL SELECT 1 FROM versions WHERE hash = ? LIMIT 1`, h, h).Scan(&one)
+	return !errors.Is(err, sql.ErrNoRows)
 }
 
 // VaultID returns the id of a user's vault (its working copy is
@@ -330,13 +507,17 @@ type querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-// vaultOf finds a vault by name among the user's vaults. Another user's
-// vault is ErrNotFound, exactly like a missing one.
+// vaultOf finds a vault by name among the user's vaults: its current
+// name or an earlier one (vault_aliases); v.Name is the current name.
+// Another user's vault is ErrNotFound, exactly like a missing one.
 func vaultOf(ctx context.Context, q querier, userID int64, name string) (vault, error) {
-	v := vault{UserID: userID, Name: name}
+	v := vault{UserID: userID}
 	var created int64
-	err := q.QueryRowContext(ctx, `SELECT id, seq, created_at FROM vaults WHERE user_id = ? AND name = ?`,
-		userID, name).Scan(&v.ID, &v.Seq, &created)
+	err := q.QueryRowContext(ctx, `SELECT id, name, seq, created_at FROM vaults WHERE user_id = ? AND name = ?
+		UNION ALL
+		SELECT v.id, v.name, v.seq, v.created_at FROM vault_aliases a JOIN vaults v ON v.id = a.vault_id
+		WHERE a.user_id = ? AND a.name = ?
+		LIMIT 1`, userID, name, userID, name).Scan(&v.ID, &v.Name, &v.Seq, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return vault{}, fmt.Errorf("vault %s: %w", name, ErrNotFound)
 	}

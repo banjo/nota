@@ -29,7 +29,8 @@ func TestCollectBlobs(t *testing.T) {
 		map[string]string{protocol.HeaderBaseVersion: strconv.FormatInt(ent.Version, 10)}, ""); res.StatusCode != 200 {
 		t.Fatalf("delete hist: %d %s", res.StatusCode, body)
 	}
-	// A whole vault that goes away: its versions go, the blob row stays.
+	// A whole vault that went away while its blob row stayed (what
+	// servers before DeleteVault reclaimed rows left behind).
 	const scratch = "only in a deleted vault\n"
 	if res, body := e.do(tok, "POST", protocol.VaultsPath(), nil, `{"name":"scratch"}`); res.StatusCode != 201 {
 		t.Fatalf("create vault: %d %s", res.StatusCode, body)
@@ -41,7 +42,7 @@ func TestCollectBlobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.srv.Store().DeleteVault(ctx, u.ID, "scratch"); err != nil {
+	if _, err := e.srv.Store().db.ExecContext(ctx, `DELETE FROM vaults WHERE user_id = ? AND name = 'scratch'`, u.ID); err != nil {
 		t.Fatal(err)
 	}
 	// A file nothing knows about, as a crashed upload leaves it.

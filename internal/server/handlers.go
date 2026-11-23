@@ -207,7 +207,7 @@ func (s *Server) putFile(w http.ResponseWriter, r *http.Request, p Principal) er
 		return err
 	}
 	info(r).attrs = append(info(r).attrs, "file", path, "base", base, "version", e.Version)
-	s.broker.publish(brokerKey(p.UserID, name), e.Version)
+	s.broker.publish(brokerKey(ws.id), e.Version)
 	writeJSON(w, http.StatusOK, e)
 	return nil
 }
@@ -236,7 +236,7 @@ func (s *Server) deleteFile(w http.ResponseWriter, r *http.Request, p Principal)
 		return err
 	}
 	info(r).attrs = append(info(r).attrs, "file", path, "base", base, "version", e.Version)
-	s.broker.publish(brokerKey(p.UserID, name), e.Version)
+	s.broker.publish(brokerKey(ws.id), e.Version)
 	writeJSON(w, http.StatusOK, e)
 	return nil
 }
@@ -270,7 +270,7 @@ func (s *Server) move(w http.ResponseWriter, r *http.Request, p Principal) error
 		return err
 	}
 	info(r).attrs = append(info(r).attrs, "file", m.To, "from", m.From, "version", res.To.Version)
-	s.broker.publish(brokerKey(p.UserID, name), res.To.Version)
+	s.broker.publish(brokerKey(ws.id), res.To.Version)
 	writeJSON(w, http.StatusOK, res)
 	return nil
 }
@@ -297,14 +297,14 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request, p Principal) er
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request, p Principal) error {
 	name := r.PathValue("vault")
-	var cursor int64
+	var cursor, id int64
 	if err := s.store.read(r.Context(), p.UserID, name, func(_ querier, v vault) error {
-		cursor = v.Seq
+		cursor, id = v.Seq, v.ID
 		return nil
 	}); err != nil {
 		return err
 	}
-	ch, cancel := s.broker.subscribe(brokerKey(p.UserID, name))
+	ch, cancel := s.broker.subscribe(brokerKey(id))
 	defer cancel()
 	rc := http.NewResponseController(w)
 	_ = rc.SetWriteDeadline(time.Time{}) // a stream has no deadline

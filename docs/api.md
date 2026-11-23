@@ -149,7 +149,9 @@ Shapes:
 | Route | Body → response |
 | --- | --- |
 | `GET /v1/api/vaults` | → `{vaults: [{name, cursor, created_at}]}` |
-| `POST /v1/api/vaults` | `{name}` → `201` vault |
+| `POST /v1/api/vaults` | `{name}` → `201` vault; `409 exists` for a name the user's vaults have or had (see below) |
+| `PATCH /v1/api/vaults/{vault}` | session only; `{name}` → the vault with its new name. `400 bad_request` for an invalid name, `409 exists` for a name another of the user's vaults has or had, `404 not_found` |
+| `DELETE /v1/api/vaults/{vault}` | session only; `{confirm}` (must be the vault's current name, as typed by the user) → `204`. Deletes the files, every version, the earlier names and the server's working copy, plus the blob files nothing else references. `400 bad_request` when `confirm` does not match. Cannot be undone. |
 | `GET …/tree` | → `{inbox, folders: [{path, name, notes}], notes: [NoteInfo], cursor}` (every note, by path; every folder, empty ones too, with counts including subfolders) |
 | `GET …/notes?folder=&tag=&where=k=v&where=k!=v&view=&sort=&limit=` | → `{notes: [NoteInfo], count}`. `sort` is `path|title|created|updated|modified [asc|desc]`; `view` starts from a saved view and the other filters narrow it. |
 | `GET …/search?q=&folder=&tag=&limit=` | → `{notes, count}` best match first, with `snippet`; empty `q` is `400` |
@@ -169,6 +171,18 @@ Shapes:
 | `GET …/files/{path}` | the raw file (attachments), with the sync protocol's headers |
 | `GET …/changes?since=` | the sync change feed (to see which paths changed) |
 | `GET …/events?protocol=1` | SSE: `event: change` / `data: {"cursor": N}` on every new version (from any device, the web or a hook), `: keepalive` comments every 25 s. Use `new EventSource(url, {withCredentials: true})`. Responses send `X-Accel-Buffering: no` so proxies do not buffer. |
+
+**Vault names.** A vault is addressed by its name everywhere: these
+routes, the sync protocol, `.nota/sync.toml` (`nota remote`, the desktop
+app) and `/mcp?vault=`. Device tokens belong to the account, not to a
+vault. Renaming keeps the vault's id, history and working copy, and the
+old name stays an alias: a device still configured with it keeps
+syncing with the same vault (and gets its change events), and no other
+vault of the user can take that name until the vault is deleted. A
+vault may be renamed back to one of its own earlier names. Rename and
+delete need a browser session, so a device token (a synced laptop, an
+agent on `/mcp`) cannot do either; `nota serve vault rm` is the admin
+equivalent of the delete.
 
 Errors use the codes of the sync protocol (`not_found`, `version_mismatch`,
 `exists`, `case_collision`, `invalid_path`, `bad_request`, `too_large`)

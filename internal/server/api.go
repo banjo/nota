@@ -27,6 +27,8 @@ func (s *Server) apiRoutes() {
 	ro := routeOpts{auth: authAny}
 	s.route("GET /v1/api/vaults", ro, s.listVaults)
 	s.route("POST /v1/api/vaults", ro, s.createVault)
+	s.route("PATCH /v1/api/vaults/{vault}", routeOpts{auth: authSession}, s.renameVault)
+	s.route("DELETE /v1/api/vaults/{vault}", routeOpts{auth: authSession}, s.deleteVault)
 	s.route("GET /v1/api/vaults/{vault}/tree", ro, s.apiTree)
 	s.route("GET /v1/api/vaults/{vault}/notes", ro, s.apiList)
 	s.route("POST /v1/api/vaults/{vault}/notes", ro, s.apiCreate)

@@ -19,7 +19,9 @@ func newBroker() *broker {
 	return &broker{subs: map[string]map[chan int64]struct{}{}, done: make(chan struct{})}
 }
 
-func brokerKey(userID int64, vault string) string { return strconv.FormatInt(userID, 10) + "/" + vault }
+// brokerKey is a vault's topic. It is the vault id, not the name: a
+// client may follow a vault by an earlier name (vault_aliases).
+func brokerKey(vaultID int64) string { return strconv.FormatInt(vaultID, 10) }
 
 func (b *broker) subscribe(key string) (<-chan int64, func()) {
 	ch := make(chan int64, 1)

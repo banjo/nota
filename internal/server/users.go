@@ -223,11 +223,31 @@ func RemoveUserData(ctx context.Context, st *Store, dataDir string, rm UserRemov
 			errs = append(errs, err)
 		}
 	}
-	for _, h := range rm.blobHashes {
-		// Another user may have referenced the hash since the commit (a
+	files, bytes, err = removeBlobFiles(ctx, st, dataDir, rm.blobHashes)
+	return files, bytes, errors.Join(append(errs, err)...)
+}
+
+// RemoveVaultData removes what DeleteVault left on disk: the vault's
+// working copy and index, and the blob files that lost their last
+// reference. A running server must close its working copy first
+// (Server.RemoveVault does).
+func RemoveVaultData(ctx context.Context, st *Store, dataDir string, rm VaultRemoval) (files int, bytes int64, err error) {
+	var errs []error
+	if err := os.RemoveAll(filepath.Join(dataDir, "vaults", fmt.Sprint(rm.Vault.ID))); err != nil {
+		errs = append(errs, err)
+	}
+	files, bytes, err = removeBlobFiles(ctx, st, dataDir, rm.blobHashes)
+	return files, bytes, errors.Join(append(errs, err)...)
+}
+
+// removeBlobFiles removes the blob files of hashes that nothing
+// references any more.
+func removeBlobFiles(ctx context.Context, st *Store, dataDir string, hashes []string) (files int, bytes int64, err error) {
+	var errs []error
+	for _, h := range hashes {
+		// Someone may have referenced the hash since the commit (a
 		// concurrent upload of the same content).
-		var one int
-		if err := st.db.QueryRowContext(ctx, `SELECT 1 FROM blobs WHERE hash = ? LIMIT 1`, h).Scan(&one); err == nil {
+		if blobReferenced(ctx, st.db, h) {
 			continue
 		}
 		p := BlobPath(filepath.Join(dataDir, "blobs"), h)

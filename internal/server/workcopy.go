@@ -92,7 +92,9 @@ func (s *Server) workspace(ctx context.Context, userID int64, name string) (*wor
 	s.wsMu.Lock()
 	defer s.wsMu.Unlock()
 	if ws := s.workspaces[v.ID]; ws != nil {
-		if ws.userID == v.UserID && ws.name == v.Name && ws.created.Equal(v.CreatedAt) {
+		// A renamed vault keeps its working copy: ws.name, the name it was
+		// opened by, still leads to it (vault_aliases).
+		if ws.userID == v.UserID && ws.created.Equal(v.CreatedAt) {
 			return ws, nil
 		}
 		// The vault was deleted (by the admin, from another process) and
@@ -537,7 +539,7 @@ func (ws *workspace) commitMove(from, to, device string) error {
 
 // committed announces a version written on the server.
 func (ws *workspace) committed(e protocol.Entry) {
-	ws.srv.broker.publish(brokerKey(ws.userID, ws.name), e.Version)
+	ws.srv.broker.publish(brokerKey(ws.id), e.Version)
 	ws.log.Debug("server write", "path", e.Path, "version", e.Version, "device", e.DeviceID, "deleted", e.Deleted)
 }
 
