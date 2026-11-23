@@ -2,10 +2,10 @@ import type { AccountState, FolderInfo, SetupApi } from "@nota/client";
 import { Button } from "@nota/ui/button";
 import { Input } from "@nota/ui/input";
 import { cn } from "@nota/ui/utils";
+import { MarkTile } from "@nota/ui/logo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, CircleAlert, Cloud, Folder, Info, LoaderCircle } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Mark } from "../auth/chrome.tsx";
 import { useClient } from "../context.ts";
 import { keys } from "../queries.ts";
 import {
@@ -377,7 +377,7 @@ function Wizard({
       <Frame>
         <section className="animate-rise motion-reduce:animate-none rounded-xl bg-surface px-8 pt-9 pb-[30px] text-center shadow-card">
           <div className="mx-auto mb-[18px] w-fit">
-            <Mark size={84} />
+            <MarkTile size={84} />
           </div>
           <h1 className="text-[24px] font-semibold tracking-[-0.015em]">Welcome to Nota</h1>
           <p className="mx-auto mt-2.5 max-w-[340px] text-[14px] leading-[1.5] text-muted-foreground">
