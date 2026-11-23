@@ -9,6 +9,7 @@ import { label, matches } from "../lib/shortcuts.ts";
 import { type CommandContext, useRegistry } from "../registry.ts";
 import { currentPath, type Route, useUI } from "../state.ts";
 import { useList } from "../queries.ts";
+import { Onboarding } from "../onboarding/Onboarding.tsx";
 import { EmptyState } from "./EmptyState.tsx";
 import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
@@ -132,6 +133,8 @@ export function Shell({ children }: { children?: ReactNode }) {
   const sidebarOpen = useUI((s) => s.sidebarOpen);
   const pane = useUI((s) => s.pane);
   const run = useCommandRunner();
+  const vaultFlow = useUI((s) => s.vaultFlow);
+  const closeVaultFlow = useUI((s) => s.closeVaultFlow);
   return (
     <div
       data-pane={pane}
@@ -162,6 +165,11 @@ export function Shell({ children }: { children?: ReactNode }) {
       </main>
       <OpenRecent />
       <Palette />
+      {vaultFlow ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
+          <Onboarding flow="switch" initialMode={vaultFlow.mode} onCancel={closeVaultFlow} />
+        </div>
+      ) : null}
       {children}
     </div>
   );

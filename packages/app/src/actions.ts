@@ -159,3 +159,22 @@ export function openExternal(href: string) {
   const url = /^[a-z][a-z0-9+.-]*:/i.test(href) ? href : `https://${href}`;
   window.open(url, "_blank", "noopener");
 }
+
+/**
+ * Opens the vault wizard (Switch vault…, New vault…). With $NOTA_VAULT
+ * set the variable decides which vault opens, so a switch would not
+ * stick: say so instead.
+ */
+export async function openVaultFlow(client: NotesClient, mode: "create" | "open") {
+  try {
+    if ((await client.shell?.setup?.vaultSource()) === "env") {
+      toast("NOTA_VAULT is set, so it decides which vault opens", {
+        description: "Unset it to switch vaults from the app.",
+      });
+      return;
+    }
+  } catch {
+    // Not knowing is not a reason to refuse.
+  }
+  useUI.getState().openVaultFlow(mode);
+}

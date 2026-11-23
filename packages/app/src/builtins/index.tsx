@@ -3,6 +3,7 @@ import {
   Code2,
   FilePlus2,
   FolderInput,
+  FolderOpen,
   FolderPlus,
   Inbox,
   PanelLeft,
@@ -13,7 +14,7 @@ import {
   SunMoon,
   Trash2,
 } from "lucide-react";
-import { createNote, deleteNote, newNoteFolder } from "../actions.ts";
+import { createNote, deleteNote, newNoteFolder, openVaultFlow } from "../actions.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
@@ -190,6 +191,25 @@ export function registerBuiltins(r: Registry): () => void {
         run: () => themeStore().setPalette(t.id),
       }),
     ),
+    // Choosing the vault is the desktop's: the web app's vault is the server's.
+    r.register("command", {
+      id: "vault.switch",
+      title: "Switch vault…",
+      group: "Vault",
+      keywords: ["open", "folder", "change", "vault", "notes folder"],
+      icon: FolderOpen,
+      when: (ctx) => !!ctx.client.shell?.setup,
+      run: (ctx) => openVaultFlow(ctx.client, "open"),
+    }),
+    r.register("command", {
+      id: "vault.new",
+      title: "New vault…",
+      group: "Vault",
+      keywords: ["create", "folder", "vault", "notes folder"],
+      icon: FolderPlus,
+      when: (ctx) => !!ctx.client.shell?.setup,
+      run: (ctx) => openVaultFlow(ctx.client, "create"),
+    }),
     r.register("command", {
       id: "settings.open",
       title: "Settings",
