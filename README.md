@@ -35,14 +35,40 @@
 
 ## Install
 
-The desktop app (macOS and Linux) is coming with the first release, as
-`brew install --cask banjo/tap/nota` and downloads on the
-[releases page](https://github.com/banjo/nota/releases). Until then, install the CLI with
-[Go](https://go.dev/dl/) 1.27 or newer:
+> Until the first release is out, only `go install` below works.
+
+**macOS (Apple silicon), with Homebrew.** Installs the app and the `nota` CLI:
+
+```sh
+brew install --cask banjo/tap/nota
+```
+
+**Downloads.** Every [release](https://github.com/banjo/nota/releases) has:
+
+| File                                                      | What                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Nota-<version>-arm64.dmg`, `Nota-<version>-arm64.zip`    | macOS app, Apple silicon; the CLI is inside at `Nota.app/Contents/Resources/bin/nota` |
+| `Nota-<version>-x86_64.AppImage`                          | Linux app, any distribution (`chmod +x` and run)                                      |
+| `nota_<version>_amd64.deb`, `nota-<version>-1.x86_64.rpm` | Linux app packages, installed in `/opt/nota`                                          |
+| `Nota-<version>-linux-amd64.tar.gz`                       | Linux app archive; `sh install.sh` inside installs it to `~/.local`                   |
+| `nota_<version>_<os>_<arch>.tar.gz`                       | the CLI alone, for macOS and Linux on amd64 and arm64                                 |
+| `checksums.txt`                                           | SHA-256 of every file (`sha256sum -c checksums.txt --ignore-missing`)                 |
+
+The Linux app uses the system's WebKitGTK: `sudo apt install libwebkit2gtk-4.1-0` on Debian
+and Ubuntu (the .deb pulls it in), `webkit2gtk4.1` on Fedora.
+
+**The CLI with Go** 1.27 or newer:
 
 ```sh
 go install github.com/banjo/nota/cmd/nota@latest
 ```
+
+> [!IMPORTANT]
+> The macOS app is not notarized (it is signed ad hoc, without an Apple Developer ID), so
+> Gatekeeper blocks the first launch of a downloaded copy. The Homebrew cask clears the
+> quarantine flag for you. For the DMG or zip, either open **System Settings → Privacy &
+> Security** and click **Open Anyway** after the first attempt, or run
+> `xattr -dr com.apple.quarantine /Applications/Nota.app`.
 
 ## Quick start
 

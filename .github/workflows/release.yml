@@ -1,0 +1,277 @@
+# Builds Nota for a version tag and publishes the GitHub release.
+#
+#   git tag v0.1.0 && git push origin v0.1.0            a release
+#   git tag v0.1.1-rc.1 && git push origin v0.1.1-rc.1  a prerelease
+#
+# Releases are patch bumps for now; scripts/next-version.sh prints the next tag.
+#
+# The version comes from the tag and is linked into every binary:
+# `nota --version`, the app's Info.plist and the Linux packages. A manual
+# run (workflow_dispatch) builds everything and keeps it as run artifacts,
+# but publishes only when it runs on a tag. See docs/release.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version for a manual build without a tag (e.g. 0.1.0-dev.1)"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: "1.4.5"
+  NODE_VERSION: "24"
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="${INPUT_VERSION:-0.0.0-dev.${GITHUB_RUN_NUMBER}}"
+            v="${v#v}"
+          fi
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$v' is not a version like 0.1.0 or 0.1.1-rc.1"
+            exit 1
+          fi
+          pre=false
+          [[ "$v" == *-* ]] && pre=true
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
+          echo "Nota $v (prerelease: $pre)" >> "$GITHUB_STEP_SUMMARY"
+
+  cli:
+    needs: version
+    name: CLI ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        goos: [darwin, linux]
+        goarch: [amd64, arm64]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          name="nota_${VERSION}_${GOOS}_${GOARCH}"
+          mkdir -p "stage/$name" out
+          go build -trimpath -ldflags "-s -w -X github.com/banjo/nota/internal/cli.Version=${VERSION}" \
+            -o "stage/$name/nota" ./cmd/nota
+          cp LICENSE README.md "stage/$name/"
+          tar -C stage -czf "out/$name.tar.gz" "$name"
+          tar -tzvf "out/$name.tar.gz"
+      - name: Check the version it reports
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          got="$(stage/nota_${VERSION}_linux_amd64/nota --version)"
+          echo "$got"
+          [[ "$got" == *"$VERSION"* ]]
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: out/*.tar.gz
+          if-no-files-found: error
+
+  macos:
+    needs: version
+    name: Desktop macOS arm64
+    runs-on: macos-latest # arm64
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      - name: Put the CLI inside the app
+        # Ships as Nota.app/Contents/Resources/bin/nota (the Homebrew cask
+        # links it as `nota`); mygo build signs it with the app.
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go build -trimpath -ldflags "-s -w -X github.com/banjo/nota/internal/cli.Version=${VERSION}" \
+            -o apps/desktop/resources/darwin-arm64/bin/nota ./cmd/nota
+      - name: Build the app and the disk image
+        working-directory: apps/desktop
+        env:
+          NOTA_VERSION: ${{ needs.version.outputs.version }}
+        run: bunx mygo build -platform darwin/arm64
+      - name: Verify and package
+        run: |
+          set -x
+          dir=apps/desktop/build/darwin-arm64
+          ls -la "$dir"
+          app="$dir/Nota.app"
+          plist="$app/Contents/Info.plist"
+          plutil -p "$plist"
+          short="$(plutil -extract CFBundleShortVersionString raw "$plist")"
+          [[ "$short" == "$VERSION" || "$short" == "${VERSION%%-*}" ]]
+          codesign -dv --verbose=2 "$app" 2>&1 | tee codesign.txt
+          grep -q 'Signature=adhoc' codesign.txt
+          codesign --verify --deep --strict --verbose=2 "$app"
+          "$app/Contents/Resources/bin/nota" --version | grep -F "$VERSION"
+          file "$app/Contents/MacOS/"* "$app/Contents/Resources/bin/nota"
+
+          dmg="$(ls "$dir"/*.dmg | head -1)"
+          hdiutil verify "$dmg"
+          mnt="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          ls -la "$mnt"
+          plutil -extract CFBundleShortVersionString raw "$mnt/Nota.app/Contents/Info.plist"
+          codesign --verify --deep --strict "$mnt/Nota.app"
+          hdiutil detach "$mnt"
+
+          mkdir -p out
+          cp "$dmg" "out/Nota-${VERSION}-arm64.dmg"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "out/Nota-${VERSION}-arm64.zip"
+          ls -la out
+      - name: Smoke test (start the app for 10 s)
+        run: |
+          app=apps/desktop/build/darwin-arm64/Nota.app
+          export NOTA_VAULT="$RUNNER_TEMP/vault"
+          mkdir -p "$NOTA_VAULT"
+          "$app/Contents/MacOS/Nota" > app.log 2>&1 &
+          pid=$!
+          sleep 10
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "Nota is running after 10 s"; kill "$pid"
+          else
+            echo "::error::Nota exited early"; cat app.log; exit 1
+          fi
+          cat app.log
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-macos
+          path: out/*
+          if-no-files-found: error
+
+  linux:
+    needs: version
+    name: Desktop Linux amd64
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      - name: Build the app, .deb, .rpm and archive
+        working-directory: apps/desktop
+        env:
+          NOTA_VERSION: ${{ needs.version.outputs.version }}
+        run: bunx mygo build -platform linux/amd64
+      - name: AppImage
+        run: scripts/appimage.sh apps/desktop/build/linux-amd64 "$VERSION" "out/Nota-${VERSION}-x86_64.AppImage"
+      - name: Verify and collect
+        run: |
+          set -x
+          dir=apps/desktop/build/linux-amd64
+          ls -la "$dir"
+          dpkg-deb --info "$dir"/*.deb
+          dpkg-deb --contents "$dir"/*.deb
+          cp "$dir"/*.deb "$dir"/*.rpm out/
+          # MyGo's archive (app + install.sh), renamed so it is not
+          # mistaken for the CLI's nota_<version>_linux_amd64.tar.gz.
+          cp "$dir"/nota-*-linux-amd64.tar.gz "out/Nota-${VERSION}-linux-amd64.tar.gz"
+          out/Nota-*.AppImage --appimage-extract >/dev/null
+          cat squashfs-root/nota.desktop
+          rm -rf squashfs-root
+          ls -la out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    needs: [version, cli, macos, linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          # GitHub turns the "~" of prerelease packages (nota_1.2.0~rc.1_amd64.deb)
+          # into "." on upload; name them that way first so checksums.txt matches.
+          for f in *~*; do [ -e "$f" ] && mv -v -- "$f" "${f//\~/.}"; done
+          sha256sum -- * > checksums.txt
+          cat checksums.txt
+      - name: Create the GitHub release
+        run: |
+          tag="$GITHUB_REF_NAME"
+          flags=()
+          if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); else flags+=(--latest); fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # A re-run: replace the files of the existing release.
+            gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "Nota $VERSION" --generate-notes "${flags[@]}"
+          fi
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,assets \
+            --jq '.url, "prerelease: \(.isPrerelease)", (.assets[] | "\(.name)\t\(.size)")'

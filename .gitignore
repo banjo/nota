@@ -9,3 +9,5 @@ bin/
 !.env.example
 .DS_Store
 mygo_windows_*.syso
+# The release workflow builds the CLI into the macOS app here.
+apps/desktop/resources/darwin-*/

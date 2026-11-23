@@ -4,8 +4,8 @@
 //
 // NOTA_LANDING_RELEASE forces a state, for screenshots and tests:
 //   "none"     the app is not out yet (no request is made)
-//   "fixture"  a made-up v1.0.0 with every asset
-// GITHUB_TOKEN or GH_TOKEN is sent when set (the repo is private until launch).
+//   "fixture"  a made-up v0.1.0 with the assets the release workflow uploads
+// GITHUB_TOKEN or GH_TOKEN is sent when set (it lifts the API rate limit).
 
 export interface ReleaseAsset {
   name: string;
@@ -71,27 +71,27 @@ export function formatSize(bytes: number): string {
 }
 
 const FIXTURE: GitHubRelease = {
-  tag_name: "v1.0.0",
-  html_url: "https://github.com/banjo/nota/releases/tag/v1.0.0",
+  tag_name: "v0.1.0",
+  html_url: "https://github.com/banjo/nota/releases/tag/v0.1.0",
   published_at: "2026-12-01T10:00:00Z",
   assets: [
     {
-      name: "Nota-1.0.0-universal.dmg",
+      name: "Nota-0.1.0-arm64.dmg",
       size: 9_412_000,
       browser_download_url:
-        "https://github.com/banjo/nota/releases/download/v1.0.0/Nota-1.0.0-universal.dmg",
+        "https://github.com/banjo/nota/releases/download/v0.1.0/Nota-0.1.0-arm64.dmg",
     },
     {
-      name: "Nota-1.0.0-x86_64.AppImage",
+      name: "Nota-0.1.0-x86_64.AppImage",
       size: 14_830_000,
       browser_download_url:
-        "https://github.com/banjo/nota/releases/download/v1.0.0/Nota-1.0.0-x86_64.AppImage",
+        "https://github.com/banjo/nota/releases/download/v0.1.0/Nota-0.1.0-x86_64.AppImage",
     },
     {
-      name: "nota_1.0.0_amd64.deb",
+      name: "nota_0.1.0_amd64.deb",
       size: 8_120_000,
       browser_download_url:
-        "https://github.com/banjo/nota/releases/download/v1.0.0/nota_1.0.0_amd64.deb",
+        "https://github.com/banjo/nota/releases/download/v0.1.0/nota_0.1.0_amd64.deb",
     },
   ],
 };
