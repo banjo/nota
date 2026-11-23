@@ -216,7 +216,7 @@ function SwitchList({
                 <span className="min-w-0 flex-1 truncate">{v.name}</span>
                 {on ? (
                   <span className="flex items-center gap-1 text-small text-muted-foreground">
-                    <Check className="size-3.5 text-ink" strokeWidth={2.25} /> Open
+                    <Check className="size-3.5 text-ink" strokeWidth={2.25} /> Current
                   </span>
                 ) : null}
               </button>
