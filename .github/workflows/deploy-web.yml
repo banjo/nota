@@ -1,0 +1,43 @@
+# Deploys the landing page and the web app (/app) to Cloudflare Pages when
+# main changes. The API (`nota serve`) deploys separately from build/v1.
+name: Deploy web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.5"
+      - run: bun install --frozen-lockfile
+      - name: Build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf dist
+          bunx vp run site:build
+      # wrangler deploys a dist/ without app/ happily, which would take /app down.
+      - name: Check the build is complete
+        run: test -f dist/app/index.html && test -f dist/index.html && test -f dist/_worker.js
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx -y wrangler@4 pages deploy dist --project-name nota --branch main --commit-hash "$GITHUB_SHA" --commit-message "$GITHUB_SHA"
