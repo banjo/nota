@@ -1,0 +1,25 @@
+---
+import Everywhere from "../components/Everywhere.astro";
+import Footer from "../components/Footer.astro";
+import Hero from "../components/Hero.astro";
+import Light from "../components/Light.astro";
+import Nav from "../components/Nav.astro";
+import Plugins from "../components/Plugins.astro";
+import Sync from "../components/Sync.astro";
+import { fetchRelease } from "../data/release.ts";
+import Layout from "../layouts/Layout.astro";
+
+const release = await fetchRelease();
+---
+
+<Layout>
+  <Nav />
+  <main id="main">
+    <Hero release={release} />
+    <Light />
+    <Plugins />
+    <Everywhere />
+    <Sync />
+  </main>
+  <Footer release={release} />
+</Layout>

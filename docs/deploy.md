@@ -172,6 +172,18 @@ deploy, check `https://nota.banjoanton.com/` (landing),
 `/app/` (app shell) and `/app/assets/*.js` (`application/javascript`, not
 HTML — that was the bug the worker fixed).
 
+The landing page is Astro, prerendered to `dist/index.html` and
+`dist/llms.txt`; it ships no framework, only one small script. The build
+reads the latest GitHub release of `banjo/nota` once
+(`apps/landing/src/data/release.ts`): with app assets it shows download
+buttons and the Homebrew line, without them "Watch releases" and
+`go install`. A new release needs a rebuild and a deploy.
+`NOTA_LANDING_RELEASE=none|fixture` forces either state (screenshots),
+`GITHUB_TOKEN` reads the repo while it is private, and
+`PUBLIC_CF_BEACON_TOKEN` adds Cloudflare Web Analytics. The numbers in
+its "Light on purpose" row are measured, not estimated: the commands
+are in `apps/landing/src/data/site.ts`; re-measure before changing them.
+
 The web app talks to the API at `https://nota.app.banjoanton.com`
 (`VITE_API_URL` overrides it at build time). Passkeys work because the
 API's `NOTA_SERVER_RP_ID` is `nota.banjoanton.com`, the web app's domain,

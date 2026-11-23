@@ -1,0 +1,139 @@
+---
+import { hookExample } from "../data/site.ts";
+import { esc } from "../scripts/frames.ts";
+
+// Three layers (issue #1, Plugins): views and hooks ship today; the UI
+// plugin API (manifest, permissions, sandbox) does not yet.
+const layers = [
+  { name: "Views", text: "Saved searches as folders." },
+  { name: "Hooks", text: "Scripts on note events, also on your server." },
+  { name: "UI plugins", text: "Commands, panels and editor widgets.", soon: true },
+];
+
+// A few colours for TOML, at build time.
+const toml = hookExample
+  .split("\n")
+  .map((line) => {
+    if (line.startsWith("#")) return `<span class="c">${esc(line)}</span>`;
+    if (line.startsWith("[")) return `<span class="t">${esc(line)}</span>`;
+    const m = /^(\w+)( = )(.*)$/.exec(line);
+    return m ? `<span class="k">${m[1]}</span>${m[2]}<span class="s">${esc(m[3])}</span>` : esc(line);
+  })
+  .join("\n");
+---
+
+<section class="wrap section plugins" aria-labelledby="plugins-title">
+  <div>
+    <h2 class="sec-title" id="plugins-title">Plugins live in your vault, and sync with it.</h2>
+    <dl class="layers">
+      {
+        layers.map((l) => (
+          <div>
+            <dt>
+              {l.name}
+              {l.soon && <span class="soon">Soon</span>}
+            </dt>
+            <dd>{l.text}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+  <figure class="code">
+    <figcaption><code>.nota/hooks.toml</code></figcaption>
+    <pre set:html={toml} />
+  </figure>
+</section>
+
+<style>
+  .plugins {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 40px 72px;
+    align-items: end;
+  }
+
+  .sec-title {
+    max-width: 11em;
+  }
+
+  .layers {
+    margin: 36px 0 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .layers div {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 16px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  dt {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .soon {
+    padding: 1px 7px;
+    border-radius: 99px;
+    background: var(--ink-soft);
+    color: var(--ink-strong);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .code {
+    margin: 0;
+    border-radius: 14px;
+    background: var(--background);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+
+  figcaption {
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--divider);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  pre {
+    margin: 0;
+    padding: 18px 20px 20px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: var(--text-soft);
+  }
+
+  pre :global(.c) {
+    color: var(--muted);
+  }
+  pre :global(.t) {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  pre :global(.k) {
+    color: var(--ink-strong);
+  }
+
+  @media (max-width: 900px) {
+    .plugins {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .layers div {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+    }
+  }
+</style>

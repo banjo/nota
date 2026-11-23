@@ -1,0 +1,93 @@
+---
+import { docker, site } from "../data/site.ts";
+import { esc } from "../scripts/frames.ts";
+
+const shell = docker
+  .split("\n")
+  .map((l) => (l.startsWith("docker") ? `<span class="p">$</span> ${esc(l)}` : `  ${esc(l)}`))
+  .join("\n");
+---
+
+<section class="wrap section sync" aria-labelledby="sync-title">
+  <div>
+    <h2 class="sec-title" id="sync-title">Sync through your own server.</h2>
+    <p class="sec-lead">
+      A Go binary and SQLite. Passkeys, not passwords. Nota works offline forever without it.
+    </p>
+    <p class="more"><a class="link" href={site.deployDoc}>Deploy guide</a></p>
+  </div>
+  <div class="term">
+    <div class="term-head">
+      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+      <button class="copy" type="button" data-copy={docker} aria-label="Copy the commands">Copy</button>
+    </div>
+    <pre set:html={shell} />
+  </div>
+</section>
+
+<style>
+  .sync {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 32px 40px;
+    align-items: center;
+  }
+
+  .more {
+    margin: 18px 0 0;
+    font-size: 15px;
+    font-weight: 550;
+  }
+
+  .term {
+    position: relative;
+    border-radius: 14px;
+    background: var(--term-bg);
+    box-shadow: var(--shadow-window);
+  }
+
+  .term-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .term-head .dots i {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  pre {
+    margin: 0;
+    padding: 18px 22px 22px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--term-fg);
+  }
+
+  pre :global(.p) {
+    color: var(--term-key);
+    user-select: none;
+  }
+
+  .copy {
+    height: 30px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--term-fg);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .copy:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .sync {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
