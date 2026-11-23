@@ -3,7 +3,8 @@
  * dark variant and overrides only what it needs: the ink family, and for
  * graphite and paper the surfaces too. The app sets data-palette and
  * data-mode on <html> before the first paint (index.html), so these key
- * on data-mode only; "nota" is tokens.css itself. The list of themes the
+ * on data-mode only; "nota" (Forest green, the brand colour) is
+ * tokens.css itself. The list of themes the
  * UI offers lives in packages/app/src/theme/themes.ts, and its swatch
  * colours mirror the values here. Contrast (WCAG) of every variant is
  * checked in packages/app/tests/themes.test.ts.
@@ -116,19 +117,36 @@
   --ink-foreground: #221e1a;
 }
 
-/* Forest: muted green ink on Nota's neutrals. */
-:root[data-palette="forest"]:not([data-mode="dark"]) {
-  --ink: #2f7a52;
-  --ink-soft: #e6f2eb;
-  --ink-soft-hover: #d8eadf;
-  --ink-strong: #22603f;
+/* Indigo: Nota's original ink, from before the brand went green. */
+:root[data-palette="indigo"]:not([data-mode="dark"]) {
+  --ink: #4256d6;
+  --ink-soft: #eceffd;
+  --ink-soft-hover: #e0e5fc;
+  --ink-strong: #2f40b3;
   --ink-foreground: #ffffff;
 }
-:root[data-palette="forest"][data-mode="dark"] {
-  --ink: #7fc79d;
-  --ink-soft: rgba(127, 199, 157, 0.14);
-  --ink-soft-hover: rgba(127, 199, 157, 0.22);
-  --ink-strong: #a8dcbd;
+:root[data-palette="indigo"][data-mode="dark"] {
+  --ink: #8b9bff;
+  --ink-soft: rgba(139, 155, 255, 0.14);
+  --ink-soft-hover: rgba(139, 155, 255, 0.22);
+  --ink-strong: #b4beff;
+  --ink-foreground: #15161a;
+}
+
+/* Jade: blue-green ink on Nota's neutrals, cooler than the default green.
+   It replaces "forest", which the default palette now is. */
+:root[data-palette="jade"]:not([data-mode="dark"]) {
+  --ink: #1e7363;
+  --ink-soft: #e6f3f0;
+  --ink-soft-hover: #d6ebe6;
+  --ink-strong: #175c4f;
+  --ink-foreground: #ffffff;
+}
+:root[data-palette="jade"][data-mode="dark"] {
+  --ink: #5fd9c4;
+  --ink-soft: rgba(95, 217, 196, 0.14);
+  --ink-soft-hover: rgba(95, 217, 196, 0.22);
+  --ink-strong: #a3eadd;
   --ink-foreground: #15161a;
 }
 

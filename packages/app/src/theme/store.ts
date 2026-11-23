@@ -34,8 +34,18 @@ export function readMode(v: string | null | undefined): ThemeMode {
   return v === "light" || v === "dark" ? v : "system";
 }
 
+/**
+ * Palette ids that were renamed or folded into another one. "forest" was
+ * a green option next to the indigo default; when Forest green became
+ * Nota's brand colour the default palette took it over, so a device that
+ * had picked Forest now simply has the default. The inline pre-paint
+ * scripts in index.html map it the same way.
+ */
+const RENAMED_PALETTES: Record<string, string> = { forest: DEFAULT_PALETTE };
+
 /** The stored palette id, or the default for none or garbage. */
 export function readPalette(v: string | null | undefined): string {
+  if (v && Object.hasOwn(RENAMED_PALETTES, v)) return RENAMED_PALETTES[v]!;
   return v && PALETTE_ID.test(v) ? v : DEFAULT_PALETTE;
 }
 

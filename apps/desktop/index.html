@@ -19,6 +19,8 @@
         if (t === "light" || t === "dark") d.dataset.theme = t;
         else t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         d.dataset.mode = t;
+        // "forest" is the default palette now (store.ts, RENAMED_PALETTES).
+        if (p === "forest") p = "nota";
         d.dataset.palette = p && /^[a-z0-9][a-z0-9.-]*$/.test(p) ? p : "nota";
       })();
     </script>
