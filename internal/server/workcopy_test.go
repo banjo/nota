@@ -292,10 +292,10 @@ func TestDeletedVaultIDReuse(t *testing.T) {
 	uid := e.userID("anton@example.com")
 	e.put(tok, "old.md", 0, "old\n")
 	old := e.ws("main", uid)
-	if err := e.srv.Store().DeleteVault(context.Background(), uid, "main"); err != nil {
+	if _, err := e.srv.Store().DeleteVault(context.Background(), uid, "main"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.srv.Store().DeleteVault(context.Background(), uid, "main"); err == nil {
+	if _, err := e.srv.Store().DeleteVault(context.Background(), uid, "main"); err == nil {
 		t.Fatal("deleted twice")
 	}
 	if res, body := e.do(tok, "POST", protocol.VaultsPath(), nil, `{"name":"main"}`); res.StatusCode != 201 {

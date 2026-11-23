@@ -376,8 +376,10 @@ func (a *app) serveVaultCmd(f *serveFlags) *cobra.Command {
 		Use:   "rm <email> <vault> --yes",
 		Short: "Delete a vault with its whole history from the server",
 		Long: `Delete a user's vault from the server: its files, every version and
-its working copy. Devices keep their local files; their next sync fails
-until they connect to another vault. This cannot be undone.`,
+its working copy, and the blob files no other vault references. Devices
+keep their local files; their next sync fails until they connect to
+another vault. This cannot be undone. The web app does the same from
+Settings › Vaults.`,
 		Args: exactArgs(2, "an email address and a vault name"),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if !yes {
@@ -392,14 +394,13 @@ until they connect to another vault. This cannot be undone.`,
 				if err != nil {
 					return serverErr(err)
 				}
-				id, err := st.VaultID(ctx, u.ID, args[1])
+				rm, err := st.DeleteVault(ctx, u.ID, args[1])
 				if err != nil {
 					return serverErr(err)
 				}
-				if err := st.DeleteVault(ctx, u.ID, args[1]); err != nil {
-					return serverErr(err)
+				if _, _, err := server.RemoveVaultData(ctx, st, dir, rm); err != nil {
+					fmt.Fprintf(a.stderr, "nota: vault %s is deleted, but cleaning up its files failed: %v\n", args[1], err)
 				}
-				_ = os.RemoveAll(filepath.Join(dir, "vaults", strconv.FormatInt(id, 10)))
 				if a.json {
 					return a.printJSON(map[string]any{"deleted": args[1], "user": u.Email})
 				}
