@@ -365,6 +365,17 @@ export interface AuthApi {
   }): Promise<{ code: string; redirect: string; expiresIn: number }>;
   vaults(): Promise<VaultSummary[]>;
   createVault(name: string): Promise<VaultSummary>;
+  /**
+   * Gives a vault a new name (browser session only). The old name keeps
+   * leading to it, so devices that sync with it keep working.
+   */
+  renameVault(name: string, to: string): Promise<VaultSummary>;
+  /**
+   * Deletes a vault with its whole history (browser session only).
+   * `confirm` is the vault's name as the user typed it; the server
+   * refuses anything else.
+   */
+  deleteVault(name: string, confirm: string): Promise<void>;
   /** Where the web app lists this account's devices. */
   devicesUrl(): string;
   /** Fires when the session changes or expires; refetch `session()`. */

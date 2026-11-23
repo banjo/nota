@@ -44,6 +44,17 @@ interface BeginResponse {
   options: unknown;
 }
 
+/** A vault as the server sends it (protocol.VaultInfo). */
+interface ServerVault {
+  name: string;
+  cursor: number;
+  created_at: string;
+}
+
+function vaultSummary(v: ServerVault): VaultSummary {
+  return { name: v.name, cursor: v.cursor, createdAt: v.created_at };
+}
+
 function session(me: Me): AuthSession {
   return {
     user: { id: me.user.id, email: me.user.email, createdAt: me.user.created_at },
@@ -270,24 +281,24 @@ export function createHttpAuth(options: HttpAuthOptions): HttpAuth {
     },
 
     async vaults() {
-      const out = await request<{ vaults: { name: string; cursor: number; created_at: string }[] }>(
-        "GET",
-        "/v1/api/vaults",
-      );
-      return out.vaults.map((v): VaultSummary => ({
-        name: v.name,
-        cursor: v.cursor,
-        createdAt: v.created_at,
-      }));
+      const out = await request<{ vaults: ServerVault[] }>("GET", "/v1/api/vaults");
+      return out.vaults.map(vaultSummary);
     },
 
     async createVault(name: string) {
-      const out = await request<{ name: string; cursor: number; created_at: string }>(
-        "POST",
-        "/v1/api/vaults",
-        { name },
+      return vaultSummary(await request<ServerVault>("POST", "/v1/api/vaults", { name }));
+    },
+
+    async renameVault(name: string, to: string) {
+      return vaultSummary(
+        await request<ServerVault>("PATCH", `/v1/api/vaults/${encodeURIComponent(name)}`, {
+          name: to,
+        }),
       );
-      return { name: out.name, cursor: out.cursor, createdAt: out.created_at };
+    },
+
+    async deleteVault(name: string, confirm: string) {
+      await request<void>("DELETE", `/v1/api/vaults/${encodeURIComponent(name)}`, { confirm });
     },
   };
 }
