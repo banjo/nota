@@ -10,6 +10,7 @@ import type {
   Note,
   NoteInfo,
   PropertyPatch,
+  ServerVaultApi,
   ShellApi,
   SyncStatus,
   TagCount,
@@ -69,8 +70,10 @@ export interface NotesClient {
   };
   /** Sign in to sync (desktop). The web app's session is phase 4b. */
   account?: AccountApi;
-  /** The web app's session: passkeys, devices, approvals. */
+  /** The web app's session: passkeys, devices, approvals, the account's vaults. */
   auth?: AuthApi;
+  /** The server vault the web app has open, and opening another (web). */
+  serverVault?: ServerVaultApi;
   /** Windows, the file manager and menu commands (desktop). */
   shell?: ShellApi;
 }

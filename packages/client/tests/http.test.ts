@@ -234,4 +234,13 @@ describe("createHttpClient", () => {
     off();
     expect(close).toHaveBeenCalled();
   });
+
+  test("exposes the open vault only when the web app can switch", () => {
+    const openVault = vi.fn();
+    const c = createHttpClient({ baseUrl: BASE, vault: "Work", openVault });
+    expect(c.serverVault?.name).toBe("Work");
+    c.serverVault?.open("Notes");
+    expect(openVault).toHaveBeenCalledWith("Notes");
+    expect(createHttpClient({ baseUrl: BASE, vault: "Work" }).serverVault).toBeUndefined();
+  });
 });

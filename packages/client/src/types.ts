@@ -324,6 +324,17 @@ export interface PendingCode {
   expiresAt: string;
 }
 
+/**
+ * The web app's open vault. Listing, creating, renaming and deleting
+ * the account's vaults is on AuthApi; this is which one is open.
+ */
+export interface ServerVaultApi {
+  /** The vault's name as this page opened it. */
+  name: string;
+  /** Opens another vault (the page reloads); null forgets the choice and asks. */
+  open(name: string | null): void;
+}
+
 export interface VaultSummary {
   name: string;
   cursor: number;
