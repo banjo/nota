@@ -2,6 +2,7 @@
 import type { AppRelease } from "../data/release.ts";
 import { diff } from "../scripts/frames.ts";
 import Cta from "./Cta.astro";
+import MacApp from "./MacApp.astro";
 
 interface Props {
   release: AppRelease | null;
@@ -14,9 +15,11 @@ const check = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap intro">
     <h1 id="hero-title">Your notes are files.</h1>
-    <p class="lead">Local Markdown notes in a small Go app for desktop and web, synced through your own server.</p>
+    <p class="lead">A small Mac app for Markdown notes that stay plain files. Also in your terminal, on the web, and for your agents.</p>
     <Cta release={release} />
   </div>
+
+  <MacApp />
 
   <figure class="stage" data-hero>
     <div class="split" aria-hidden="true">

@@ -19,6 +19,7 @@ import GitHubIcon from "./GitHubIcon.astro";
     ></a
   >
   <nav class="top-links" aria-label="Elsewhere">
+    <a class="signin" href={site.signIn}>Sign in</a>
     <a class="icon-btn" href={site.repo} aria-label="Nota on GitHub"><GitHubIcon /></a>
     <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch to dark mode">
       <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"
@@ -55,6 +56,23 @@ import GitHubIcon from "./GitHubIcon.astro";
 
   .mark {
     color: var(--ink);
+  }
+
+  .signin {
+    margin-right: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 14.5px;
+    font-weight: 550;
+    color: var(--text);
+    text-decoration: none;
+    transition: background-color 150ms ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .signin:hover {
+      background: var(--hover);
+    }
   }
 
   .top-links {

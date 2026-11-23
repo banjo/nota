@@ -13,6 +13,7 @@ export const site = {
   description:
     "Local Markdown notes in a small Go app, for desktop and the web, synced through a server you run. A CLI and an MCP server work on the same folder.",
   goInstall: "go install github.com/banjo/nota/cmd/nota@latest",
+  signIn: "/app/",
   brewCask: "brew install --cask banjo/tap/nota",
   claudeMcp: "claude mcp add nota -- nota mcp",
 };
@@ -48,16 +49,25 @@ export const mcpTools: [name: string, what: string][] = [
   ["get_backlinks", "the notes that link to a note"],
 ];
 
-/** The prompt in "Hand this to your agent". */
-export const agentPrompt = `Install Nota, a Markdown notes app that keeps notes as .md files in a folder, and connect it to yourself:
+/**
+ * The prompt in "Hand this to your agent". The cask installs the app and
+ * puts `nota` on PATH, so it replaces go install once a release is out.
+ */
+export function agentPrompt(released: boolean): string {
+  const install = released
+    ? "Run `brew install --cask banjo/tap/nota` (Apple silicon Mac; it installs the app and the `nota` CLI) and check that `nota` is on my PATH."
+    : "Run `go install github.com/banjo/nota/cmd/nota@latest` and check that `nota` is on my PATH.";
+  return `Install Nota, a Markdown notes app that keeps notes as .md files in a folder, and connect it to yourself:
 
-1. Run \`go install github.com/banjo/nota/cmd/nota@latest\` and check that \`nota\` is on my PATH.
+1. ${install}
 2. Use ~/Notes as the vault, or ask me which folder I keep notes in. Run \`nota ls\` to check it.
 3. Add the MCP server: \`claude mcp add nota -- nota mcp\`.
-4. Read https://nota.banjoanton.com/llms.txt for the commands and tools.`;
+4. Read https://nota.banjoanton.com/llms.txt for the commands and tools.`.replace(/\\`/g, "`");
+}
 
-export const agentCommands = `go install github.com/banjo/nota/cmd/nota@latest
-claude mcp add nota -- nota mcp`;
+export function agentCommands(released: boolean): string {
+  return `${released ? site.brewCask : site.goInstall}\n${site.claudeMcp}`;
+}
 
 /** A transform hook (internal/hooks, .nota/hooks.toml). */
 export const hookExample = `# Inbox notes tagged #recipe go to Recipes/
