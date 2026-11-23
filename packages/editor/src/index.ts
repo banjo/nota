@@ -9,7 +9,8 @@ import {
   keymap,
   placeholder as placeholderExt,
 } from "@codemirror/view";
-import { livePreview, type PreviewHandlers } from "./preview.ts";
+import { modeCompartment, modeExtensions, rememberHandlers, type EditorMode } from "./mode.ts";
+import { type PreviewHandlers } from "./preview.ts";
 import { notaSyntax } from "./syntax.ts";
 import { notaTheme } from "./theme.ts";
 
@@ -20,6 +21,14 @@ export {
   type DecoSpec,
   type PreviewOptions,
 } from "./decorations.ts";
+export {
+  EDITOR_MODES,
+  isEditorMode,
+  modeExtensions,
+  setEditorMode,
+  sourceHighlight,
+  type EditorMode,
+} from "./mode.ts";
 export { livePreview, toDecorations, type PreviewHandlers } from "./preview.ts";
 export { findTags, notaSyntax, parseWikilink, tagLength, type Wikilink } from "./syntax.ts";
 export { notaTheme } from "./theme.ts";
@@ -40,14 +49,16 @@ export interface EditorOptions extends PreviewHandlers {
   /** Called with the whole text after every edit made in the editor. */
   onChange?: (doc: string) => void;
   placeholder?: string;
+  /** How the note is shown; "live" when absent. Change it with setEditorMode. */
+  mode?: EditorMode;
   /** More extensions, e.g. from plugins. */
   extensions?: Extension[];
 }
 
 /** Mounts Nota's live-preview markdown editor in parent. */
 export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorView {
-  const { doc, onChange, placeholder, extensions: extra = [], ...handlers } = opts;
-  return new EditorView({
+  const { doc, onChange, placeholder, mode = "live", extensions: extra = [], ...handlers } = opts;
+  const view = new EditorView({
     parent,
     state: EditorState.create({
       doc,
@@ -70,7 +81,7 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
           autocapitalize: "sentences",
         }),
         placeholder ? placeholderExt(placeholder) : [],
-        livePreview(handlers),
+        modeCompartment.of(modeExtensions(mode, handlers)),
         notaTheme,
         EditorView.updateListener.of((u) => {
           if (!u.docChanged || !onChange) return;
@@ -81,6 +92,8 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
       ],
     }),
   });
+  rememberHandlers(view, handlers);
+  return view;
 }
 
 /**

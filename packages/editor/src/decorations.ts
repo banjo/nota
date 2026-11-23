@@ -24,6 +24,8 @@ export type DecoSpec =
 export interface PreviewOptions {
   /** Lines (1-based) where markers show; usually where the cursor is. */
   activeLines: ReadonlySet<number>;
+  /** Reading mode: no cursor, so no marker is ever shown as source. */
+  reading?: boolean;
   /** Only these ranges are decorated (the viewport); whole doc when absent. */
   ranges?: readonly { from: number; to: number }[];
 }
@@ -61,7 +63,7 @@ export function previewSpecs(state: EditorState, opts: PreviewOptions): DecoSpec
   const active = (pos: number) => opts.activeLines.has(lineOf(pos));
   // The selection overlaps [from, to]: show that marker's source.
   const touched = (from: number, to: number) =>
-    state.selection.ranges.some((r) => r.from <= to && r.to >= from);
+    !opts.reading && state.selection.ranges.some((r) => r.from <= to && r.to >= from);
   const lineDone = new Set<string>();
   const line = (pos: number, cls: string, style?: string) => {
     const l = doc.lineAt(pos);
