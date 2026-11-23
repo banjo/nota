@@ -126,6 +126,7 @@ func menu(d *Desktop) *mygo.Menu {
 		{Label: "View", Submenu: []*mygo.MenuItem{
 			{Label: "Command Palette", Accelerator: "CmdOrCtrl+K", Click: send("palette.toggle")},
 			{Label: "Toggle Sidebar", Accelerator: "CmdOrCtrl+\\", Click: send("sidebar.toggle")},
+			{Label: "Toggle Reading Mode", Accelerator: "CmdOrCtrl+E", Click: send("view.mode.toggle")},
 			{Label: "Toggle Dark Mode", Click: send("theme.toggleDark")},
 			mygo.Separator(),
 			{Role: mygo.RoleResetZoom},
