@@ -182,6 +182,10 @@ type VaultInfo struct {
 // live on the server.
 var ErrNoHistory = errors.New("history needs sync: sign in to sync in Settings")
 
+// ErrNoVault is returned while the first-run setup has not chosen a
+// vault: the window is open, but nothing is bound to read from.
+var ErrNoVault = errors.New("no vault is open yet: finish the setup first")
+
 // Vault exposes the notes of one folder to the frontend. Every method
 // goes through internal/vault and the index, as the CLI does.
 type Vault struct {
@@ -302,11 +306,17 @@ func (s *Vault) note(p string) (Note, error) {
 
 // Info describes the open vault.
 func (s *Vault) Info() VaultInfo {
+	if s.v == nil {
+		return VaultInfo{}
+	}
 	return VaultInfo{Name: filepath.Base(s.v.Root()), Dir: s.v.Root(), Inbox: s.v.Inbox()}
 }
 
 // Tree returns every folder (empty ones too) and every note, by path.
 func (s *Vault) Tree() (Tree, error) {
+	if s.v == nil {
+		return Tree{}, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	es, err := s.ix.Query(index.Query{Sort: index.Sort{Field: "path"}})
@@ -387,6 +397,9 @@ func (s *Vault) query(lq ListQuery) (index.Query, error) {
 // List returns the notes matching a query: a folder (with subfolders),
 // a tag, property conditions or a saved view.
 func (s *Vault) List(q ListQuery) ([]NoteInfo, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	iq, err := s.query(q)
@@ -402,6 +415,9 @@ func (s *Vault) List(q ListQuery) ([]NoteInfo, error) {
 
 // Inbox returns the notes in the inbox folder, newest first.
 func (s *Vault) Inbox() ([]NoteInfo, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	es, err := s.ix.Query(index.Query{Folder: s.v.Inbox(), Sort: index.Sort{Field: "created", Desc: true}})
@@ -414,6 +430,9 @@ func (s *Vault) Inbox() ([]NoteInfo, error) {
 // Search runs a full-text query, best match first, with snippets. All
 // words must match, the last one as a prefix.
 func (s *Vault) Search(q string, filter ListQuery) ([]NoteInfo, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	iq, err := s.query(filter)
@@ -435,6 +454,9 @@ func (s *Vault) Search(q string, filter ListQuery) ([]NoteInfo, error) {
 
 // Tags returns every tag with its note count.
 func (s *Vault) Tags() ([]TagCount, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ts, err := s.ix.Tags()
@@ -450,6 +472,9 @@ func (s *Vault) Tags() ([]TagCount, error) {
 
 // Views returns the saved views of .nota/views with their note counts.
 func (s *Vault) Views() ([]ViewInfo, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	vs, err := views.Load(s.v)
@@ -470,6 +495,9 @@ func (s *Vault) Views() ([]ViewInfo, error) {
 
 // Get returns one note with its content, hash, links and backlinks.
 func (s *Vault) Get(path string) (Note, error) {
+	if s.v == nil {
+		return Note{}, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.note(path)
@@ -497,6 +525,9 @@ func (s *Vault) conflict(p, base string) (*Note, bool, error) {
 // file changed since, nothing is written and the result is a conflict
 // with the current note. An empty baseHash overwrites.
 func (s *Vault) Save(path, body, baseHash string) (SaveResult, error) {
+	if s.v == nil {
+		return SaveResult{}, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if cur, c, err := s.conflict(path, baseHash); err != nil || c {
@@ -519,6 +550,9 @@ func (s *Vault) Save(path, body, baseHash string) (SaveResult, error) {
 // Patch edits a note's frontmatter (set and unset keys, add and remove
 // tags); only the touched lines change. baseHash works as in Save.
 func (s *Vault) Patch(path string, req PatchRequest, baseHash string) (SaveResult, error) {
+	if s.v == nil {
+		return SaveResult{}, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if cur, c, err := s.conflict(path, baseHash); err != nil || c {
@@ -552,6 +586,9 @@ func (s *Vault) Patch(path string, req PatchRequest, baseHash string) (SaveResul
 // Create writes a new note, by default into the inbox. Transform hooks
 // may file it elsewhere: the result shows where it ended up.
 func (s *Vault) Create(req CreateRequest) (Note, error) {
+	if s.v == nil {
+		return Note{}, ErrNoVault
+	}
 	title := strings.TrimSpace(req.Title)
 	text := req.Body
 	if title != "" {
@@ -591,6 +628,9 @@ func (s *Vault) Create(req CreateRequest) (Note, error) {
 // letter case, or has a name that is not allowed. Empty folders are
 // local until they hold a note (docs/sync.md).
 func (s *Vault) CreateFolder(path string) (string, error) {
+	if s.v == nil {
+		return "", ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p, err := s.v.Mkdir(path)
@@ -604,6 +644,9 @@ func (s *Vault) CreateFolder(path string) (string, error) {
 // Move moves a note into folder, keeping its file name ("/" or "" is
 // the vault root).
 func (s *Vault) Move(path, folder string) (MoveResult, error) {
+	if s.v == nil {
+		return MoveResult{}, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if folder == "/" {
@@ -620,6 +663,9 @@ func (s *Vault) Move(path, folder string) (MoveResult, error) {
 
 // Rename gives a note a new path (a new name, a new folder, or both).
 func (s *Vault) Rename(path, to string) (MoveResult, error) {
+	if s.v == nil {
+		return MoveResult{}, ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	where, stop := s.bus.Follow()
@@ -633,6 +679,9 @@ func (s *Vault) Rename(path, to string) (MoveResult, error) {
 
 // Delete moves a note to .trash/ and returns where it went.
 func (s *Vault) Delete(path string) (string, error) {
+	if s.v == nil {
+		return "", ErrNoVault
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.v.Delete(path)
@@ -641,6 +690,9 @@ func (s *Vault) Delete(path string) (string, error) {
 // History lists the server versions of a note, newest first. Versions
 // live on the sync server, so it needs sync.
 func (s *Vault) History(ctx context.Context, path string) ([]HistoryEntry, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
 	c := s.syn.Load().client()
 	if c == nil {
 		return nil, ErrNoHistory
@@ -660,6 +712,9 @@ func (s *Vault) History(ctx context.Context, path string) ([]HistoryEntry, error
 // Restore makes an old server version of a note its newest one; the
 // background sync brings it to this vault (the server nudges it).
 func (s *Vault) Restore(ctx context.Context, path string, version int64) error {
+	if s.v == nil {
+		return ErrNoVault
+	}
 	c := s.syn.Load().client()
 	if c == nil {
 		return ErrNoHistory
@@ -671,5 +726,8 @@ func (s *Vault) Restore(ctx context.Context, path string, version int64) error {
 // SyncStatus returns the state of the background sync. Updates also
 // arrive as "syncStatus" events after every pass.
 func (s *Vault) SyncStatus() SyncStatus {
+	if s.v == nil {
+		return SyncStatus{State: "off", Conflicts: []string{}, Time: time.Now()}
+	}
 	return s.syn.Load().get()
 }

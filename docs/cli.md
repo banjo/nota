@@ -31,6 +31,13 @@ exists or differs only in case.
 The vault is `--vault`, else `$NOTA_VAULT`, else `vault = "…"` in
 `~/.config/nota/config.toml`, else `~/Notes`. The config also takes `inbox = "Inbox"`.
 
+The desktop app shares that file: its first-run setup (and Settings › Vault › Switch vault…)
+writes `vault`, `inbox` and `onboarded = true`, so the CLI picks up the chosen vault with no
+environment variable. The app edits only those lines, atomically; comments and other keys stay as
+they are. The setup runs only when no flag, no `$NOTA_VAULT` and no `vault` key chose a vault,
+`onboarded` is not set, and `~/Notes` is missing or empty. With `$NOTA_VAULT` set, the variable
+wins, so the app's vault switch has no effect until it is unset.
+
 - `.notaignore` (gitignore syntax) excludes files; `.git/ .obsidian/ .nota/ .trash/
   .DS_Store` are always ignored.
 - The index lives in `<vault>/.nota/index.db` (SQLite: full-text search, tags, properties,

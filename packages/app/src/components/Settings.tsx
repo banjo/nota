@@ -9,6 +9,7 @@ import {
   Cloud,
   ExternalLink,
   FolderOpen,
+  FolderPlus,
   LoaderCircle,
   type LucideIcon,
   Monitor,
@@ -22,6 +23,7 @@ import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
 import { keys, useVaultInfo } from "../queries.ts";
 import { useContributions } from "../registry.ts";
+import { useUI } from "../state.ts";
 import { type ThemeMode, themeStore } from "../theme/store.ts";
 import { useTheme } from "../theme/useTheme.ts";
 import { TopBar } from "./TopBar.tsx";
@@ -410,6 +412,39 @@ function SyncAccount() {
   );
 }
 
+/** Switch to another folder or make a new vault: the setup wizard, over the app. */
+function VaultActions() {
+  const client = useClient();
+  const setup = client.shell?.setup;
+  const openFlow = useUI((s) => s.openVaultFlow);
+  const source = useQuery({
+    queryKey: ["setup", "vaultSource"],
+    queryFn: () => setup!.vaultSource(),
+    enabled: !!setup,
+    staleTime: Infinity,
+  });
+  if (!setup) return null;
+  // $NOTA_VAULT wins over the config, so a switch would not stick.
+  const pinned = source.data === "env";
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={pinned} onClick={() => openFlow("open")}>
+          <FolderOpen /> Switch vault…
+        </Button>
+        <Button variant="outline" disabled={pinned} onClick={() => openFlow("create")}>
+          <FolderPlus /> New vault…
+        </Button>
+      </div>
+      <p className="mt-2 text-small text-faint">
+        {pinned
+          ? "NOTA_VAULT is set, so it decides which vault opens. Unset it to switch from here."
+          : "Nota restarts to open the other vault. Your notes stay where they are."}
+      </p>
+    </div>
+  );
+}
+
 export function Settings() {
   const client = useClient();
   const info = useVaultInfo();
@@ -435,12 +470,13 @@ export function Settings() {
               </code>
               {client.shell ? (
                 <Button variant="ghost" size="sm" onClick={() => void client.shell!.revealVault()}>
-                  <FolderOpen /> Show
+                  <FolderOpen /> Reveal
                 </Button>
               ) : null}
             </div>
           </Field>
           <Field label="Inbox folder">{info.data?.inbox}</Field>
+          <VaultActions />
         </Section>
         <SyncAccount />
       </div>

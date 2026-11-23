@@ -219,6 +219,59 @@ export interface ShellApi {
   onCommand(listener: (id: string) => void): () => void;
   /** The windows' native appearance and the colours behind the page. */
   setAppearance?(appearance: ShellAppearance): Promise<void>;
+  /** Choosing the vault: first-run setup, switching and creating (desktop). */
+  setup?: SetupApi;
+}
+
+/** What InspectFolder found in a folder. */
+export interface FolderInfo {
+  /** The cleaned absolute path. */
+  path: string;
+  exists: boolean;
+  isDir: boolean;
+  /** Nothing in it at all. */
+  empty: boolean;
+  /** `.md` files in it (subfolders included, hidden folders left out), and other files. */
+  notes: number;
+  files: number;
+  /** The count stopped early: the folder is huge. */
+  truncated: boolean;
+  /** Nota can create its `.nota` folder in it. */
+  writable: boolean;
+}
+
+/** The vault the setup made or chose. The app relaunches to open it. */
+export interface VaultResult {
+  path: string;
+  name: string;
+}
+
+/**
+ * Choosing where the notes live. The desktop app asks on first run and
+ * from Settings (Switch vault…, New vault…); the web app has none of it
+ * (the server is the vault), so its client has no `shell.setup`.
+ */
+export interface SetupApi {
+  /** The app started without a vault: show the setup instead of the notes. */
+  needsOnboarding(): Promise<boolean>;
+  /** Where a new vault goes by default (`~/Documents`, else the home folder). */
+  defaultLocation(): Promise<string>;
+  /** What chose the open vault: "config", "env" (`NOTA_VAULT`) or "default". */
+  vaultSource(): Promise<string>;
+  /** The system's folder chooser; "" when cancelled. Rejects when there is none. */
+  pickFolder(title: string, start?: string): Promise<string>;
+  inspectFolder(path: string): Promise<FolderInfo>;
+  /** Why a folder can't hold a new vault; "" when it can. */
+  checkLocation(location: string): Promise<string>;
+  /** Makes `<location>/<name>` and opens it (the app relaunches). */
+  createVault(
+    location: string,
+    name: string,
+    inbox: string,
+    welcome: boolean,
+  ): Promise<VaultResult>;
+  /** Opens an existing folder as it is (the app relaunches). */
+  useVault(path: string, inbox: string, welcome: boolean): Promise<VaultResult>;
 }
 
 /** What the native windows need of the theme. */

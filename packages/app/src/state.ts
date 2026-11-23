@@ -37,9 +37,16 @@ interface UIState {
   palette: { open: boolean; mode: PaletteMode; path?: string };
   /** Expanded folders, views and sections, by key. */
   expanded: Record<string, boolean>;
+  /**
+   * The vault wizard over the app (Switch vault…, New vault…), or null.
+   * Not kept between runs.
+   */
+  vaultFlow: { mode: "create" | "open" } | null;
   /** How notes are shown, per device (localStorage nota:note-mode), not per note. */
   noteMode: NoteMode;
 
+  openVaultFlow: (mode: "create" | "open") => void;
+  closeVaultFlow: () => void;
   setNoteMode: (mode: NoteMode) => void;
   /** Live ↔ Reading (⌘E). */
   toggleNoteMode: () => void;
@@ -72,7 +79,10 @@ export const useUI = create<UIState>()(
       palette: { open: false, mode: "all" },
       expanded: { "section:folders": true, "section:views": true },
       noteMode: loadNoteMode(deviceStorage()),
+      vaultFlow: null,
 
+      openVaultFlow: (mode) => set({ vaultFlow: { mode } }),
+      closeVaultFlow: () => set({ vaultFlow: null }),
       setNoteMode: (mode) => {
         saveNoteMode(deviceStorage(), mode);
         set({ noteMode: mode });
