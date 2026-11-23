@@ -5,6 +5,11 @@ desktop icon, favicons, the landing page's lockup, the README header) is
 copied or rendered from here by `render.sh`; edit these files, then run
 `sh assets/brand/render.sh` on a machine with `rsvg-convert`.
 
+The social card `apps/landing/public/og.png` is `og.html` (the lockup,
+the landing page's headline and `docs/screenshots/main.png`) rendered at
+1200×630 by `render-og.mjs`; retake `main.png` first when the app's look
+changes.
+
 ## The mark
 
 "Stroke": an N drawn in one line, its last leg flicking up into the tick
