@@ -23,7 +23,11 @@ export type Route =
   | { kind: "list"; list: ListSpec }
   | { kind: "settings" };
 
-export type PaletteMode = "all" | "move";
+/**
+ * "move" files the note at `path` in a folder; "noteIn" picks a folder for a
+ * new note; "newFolder" asks for a folder name, relative to the folder `path`.
+ */
+export type PaletteMode = "all" | "move" | "noteIn" | "newFolder";
 
 interface UIState {
   route: Route;

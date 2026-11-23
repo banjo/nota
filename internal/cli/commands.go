@@ -407,6 +407,72 @@ The file's content is not touched, so its "updated" timestamp stays.`,
 	}
 }
 
+func (a *app) folderCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "folder",
+		Short: "Make and list folders",
+		Long: `Folders are real directories in the vault. "nota folder add" makes empty ones,
+which stay local until a note lands in them (see docs/sync.md); notes are moved
+into folders with "nota mv".`,
+	}
+	add := &cobra.Command{
+		Use:   "add <path>...",
+		Short: "Create empty folders (nested paths like a/b make the parents too)",
+		Example: `  nota folder add Projects/Ideas
+  nota folder add --json Archive/2026`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := a.openVault(false); err != nil {
+				return err
+			}
+			made := []string{}
+			for _, arg := range args {
+				p, err := a.vault.Mkdir(arg)
+				if err != nil {
+					return err
+				}
+				made = append(made, p)
+			}
+			a.attrs = append(a.attrs, "folders", len(made))
+			if a.json {
+				if len(made) == 1 {
+					return a.printJSON(map[string]string{"path": made[0]})
+				}
+				return a.printJSON(map[string][]string{"paths": made})
+			}
+			for _, p := range made {
+				fmt.Fprintln(a.stdout, p)
+			}
+			return nil
+		},
+	}
+	ls := &cobra.Command{
+		Use:   "ls",
+		Short: "List every folder, empty ones too, with its note count",
+		Args:  exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			ix, err := a.index()
+			if err != nil {
+				return err
+			}
+			fs, err := ix.Folders(a.vault)
+			if err != nil {
+				return err
+			}
+			if a.json {
+				return a.printJSON(fs)
+			}
+			rows := make([][]string, len(fs))
+			for i, f := range fs {
+				rows[i] = []string{f.Path, strconv.Itoa(f.Notes)}
+			}
+			return table(a.stdout, rows)
+		},
+	}
+	cmd.AddCommand(add, ls)
+	return cmd
+}
+
 func (a *app) rmCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:               "rm <note>",

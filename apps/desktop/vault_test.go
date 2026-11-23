@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -235,6 +236,46 @@ func TestOutsideEditsReachTheIndex(t *testing.T) {
 	s.applyFileEvents(watchBatch("Hem/Julklappar.md"))
 	if c := changed(); len(c) != 0 {
 		t.Fatalf("changed without a change = %v", c)
+	}
+}
+
+func TestCreateFolderShowsInTree(t *testing.T) {
+	s, dir, changed := testVault(t, map[string]string{"Projekt/Plan.md": "# Plan\n"})
+	got, err := s.CreateFolder("Projekt/Ideer/2027")
+	if err != nil || got != "Projekt/Ideer/2027" {
+		t.Fatalf("CreateFolder = %q, %v", got, err)
+	}
+	if c := changed(); !slices.Equal(c, []string{"Projekt/Ideer/2027"}) {
+		t.Fatalf("changed = %v", c)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Projekt", "Ideer", "2027")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateFolder("projekt"); err == nil {
+		t.Fatal("a case-colliding folder was made")
+	}
+	if _, err := s.CreateFolder("Projekt/Ideer"); err == nil {
+		t.Fatal("an existing folder was made again")
+	}
+	tr, err := s.Tree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, f := range tr.Folders {
+		counts[f.Path] = f.Notes
+	}
+	want := map[string]int{"Projekt": 1, "Projekt/Ideer": 0, "Projekt/Ideer/2027": 0}
+	if !maps.Equal(counts, want) {
+		t.Fatalf("folders = %v, want %v", counts, want)
+	}
+	// Another program makes a folder: the watcher reports it.
+	if err := os.Mkdir(filepath.Join(dir, "Arkiv"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.applyFileEvents([]mygo.FileEvent{{Op: mygo.FileCreate, Path: "Arkiv", IsDir: true}})
+	if c := changed(); !slices.Equal(c, []string{"Arkiv"}) {
+		t.Fatalf("changed after an outside mkdir = %v", c)
 	}
 }
 

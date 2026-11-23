@@ -44,6 +44,12 @@ export interface NotesClient {
   create(input: CreateInput): Promise<Note>;
   /** Moves a note into a folder ("/" is the root), keeping its name. */
   move(path: string, folder: string): Promise<MoveResult>;
+  /**
+   * Makes an empty folder (nested paths like "a/b" make the parents too)
+   * and resolves to its path. Rejects when it exists or the name is not
+   * allowed.
+   */
+  createFolder(path: string): Promise<string>;
   /** Gives a note a new path. */
   rename(path: string, to: string): Promise<MoveResult>;
   /** Moves a note to the trash. */

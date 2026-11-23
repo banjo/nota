@@ -45,6 +45,7 @@ export interface MygoBindings {
     patch(path: string, req: PropertyPatch, baseHash: string): Promise<SaveResult>;
     create(req: CreateInput): Promise<Note>;
     move(path: string, folder: string): Promise<MoveResult>;
+    createFolder(path: string): Promise<string>;
     rename(path: string, to: string): Promise<MoveResult>;
     delete(path: string): Promise<string>;
     search(q: string, filter: ListQuery): Promise<NoteInfo[] | null>;
@@ -112,6 +113,7 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     patch: async (path, patch, base) => result(await v.patch(path, patch, base?.hash ?? "")),
     create: (input) => v.create(input),
     move: (path, folder) => v.move(path, folder),
+    createFolder: (path) => v.createFolder(path),
     rename: (path, to) => v.rename(path, to),
     remove: async (path) => {
       await v.delete(path);

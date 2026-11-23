@@ -122,6 +122,7 @@ func (s *Vault) watch(ctx context.Context) {
 func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 	var paths []string
 	views := false
+	var dirs []string
 	for _, e := range evs {
 		for _, p := range []string{e.Path, e.OldPath} {
 			switch {
@@ -130,9 +131,14 @@ func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 				views = true
 			case vault.IsNote(p):
 				paths = append(paths, vault.NFC(p))
+			case e.IsDir && p != ".":
+				dirs = append(dirs, vault.NFC(p))
 			}
 		}
 	}
+	// Folders made, removed or renamed by other programs change the tree
+	// even though no note (and so nothing in the index) did.
+	s.changes.add(dirs...)
 	if len(paths) == 0 && !views {
 		return
 	}

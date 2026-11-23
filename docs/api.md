@@ -150,7 +150,7 @@ Shapes:
 | --- | --- |
 | `GET /v1/api/vaults` | → `{vaults: [{name, cursor, created_at}]}` |
 | `POST /v1/api/vaults` | `{name}` → `201` vault |
-| `GET …/tree` | → `{inbox, folders: [{path, name, notes}], notes: [NoteInfo], cursor}` (every note, by path; folders that hold notes, with counts including subfolders) |
+| `GET …/tree` | → `{inbox, folders: [{path, name, notes}], notes: [NoteInfo], cursor}` (every note, by path; every folder, empty ones too, with counts including subfolders) |
 | `GET …/notes?folder=&tag=&where=k=v&where=k!=v&view=&sort=&limit=` | → `{notes: [NoteInfo], count}`. `sort` is `path|title|created|updated|modified [asc|desc]`; `view` starts from a saved view and the other filters narrow it. |
 | `GET …/search?q=&folder=&tag=&limit=` | → `{notes, count}` best match first, with `snippet`; empty `q` is `400` |
 | `GET …/inbox` | → `{notes, count}` the inbox folder, newest first |
@@ -162,6 +162,7 @@ Shapes:
 | `PATCH …/notes/{path}` | optional `Base-Version`; `{set?: {k: v}, unset?: [k], tags?: {add?, remove?}}` → `Note`. Only the touched frontmatter lines change. |
 | `DELETE …/notes/{path}` | optional `Base-Version` → the tombstone entry. Devices move the file to `.trash/`; the server keeps every version. |
 | `POST …/move` | `{path, folder}` (keep the name; `"/"` = root) or `{path, to}` (rename), optional `base_version` → `{from, path, version}`; `409 exists` / `case_collision` |
+| `POST …/folders` | `{path}` (nested `a/b` makes the parents) → `201 {path}`; `409 exists` / `case_collision`, `400 invalid_path` (hidden, ignored or reserved names). An empty folder is not a version: it stays on this server, sends no event and does not sync until a note lands in it. |
 | `GET …/history/{path}` | → `{path, versions: [Entry]}` newest first, through renames |
 | `GET …/history/{path}?version=N` | → `Entry` plus `content` (absent for a delete) |
 | `POST …/history/{path}/restore` | `{version}`, optional `Base-Version` → the new `Entry`: the old bytes become the newest version; history is never rewritten |

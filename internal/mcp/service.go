@@ -473,6 +473,47 @@ func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 	return MoveOutput{From: p, Path: to, URI: URI(to)}, nil
 }
 
+// FolderInput are the arguments of create_folder.
+type FolderInput struct {
+	Path string `json:"path" jsonschema:"vault-relative folder path; a/b makes a and b. Fails if it exists"`
+}
+
+// FolderOutput is the result of create_folder.
+type FolderOutput struct {
+	Path string `json:"path" jsonschema:"the folder as created"`
+}
+
+// CreateFolder makes an empty folder. Empty folders stay local until a
+// note lands in them.
+func (s *Service) CreateFolder(in FolderInput) (FolderOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, err := s.v.Mkdir(in.Path)
+	if err != nil {
+		return FolderOutput{}, err
+	}
+	return FolderOutput{Path: p}, nil
+}
+
+// FoldersOutput is the result of list_folders.
+type FoldersOutput struct {
+	Folders []index.FolderInfo `json:"folders" jsonschema:"every folder, empty ones too, with the number of notes in it (subfolders included)"`
+}
+
+// Folders lists every folder with its note count.
+func (s *Service) Folders() (FoldersOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.sync(); err != nil {
+		return FoldersOutput{}, err
+	}
+	fs, err := s.ix.Folders(s.v)
+	if err != nil {
+		return FoldersOutput{}, err
+	}
+	return FoldersOutput{Folders: fs}, nil
+}
+
 // TagsOutput is the result of list_tags.
 type TagsOutput struct {
 	Tags []index.TagCount `json:"tags"`

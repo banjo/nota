@@ -10,11 +10,25 @@ import {
 } from "@nota/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@nota/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, Folder, FolderRoot, Inbox, Plus } from "lucide-react";
+import { FileText, Folder, FolderPlus, FolderRoot, Inbox, Plus } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { createNote, moveNote } from "../actions.ts";
+import {
+  addFolder,
+  addFolderThenNote,
+  createFolderAndMove,
+  createNote,
+  createNoteIn,
+  fileNote,
+} from "../actions.ts";
 import { useClient } from "../context.ts";
-import { compareNames, folderLabel, folderOf } from "../lib/notes.ts";
+import {
+  choiceLabel,
+  fold,
+  folderChoices,
+  readRecentFolders,
+  resolveNewFolder,
+} from "../lib/folders.ts";
+import { folderLabel, folderOf } from "../lib/notes.ts";
 import { label } from "../lib/shortcuts.ts";
 import { useList, useSearch, useTree } from "../queries.ts";
 import { type CommandContext, useContributions } from "../registry.ts";
@@ -22,8 +36,6 @@ import { currentPath, useUI } from "../state.ts";
 
 // ⌘K (the "Fokus" prototype): search notes, run commands, move notes.
 // It opens instantly: keyboard-driven, used all day, so no animation.
-
-const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 /** Debounced search text, so typing never waits on the index. */
 function useDebounced(value: string, ms: number) {
@@ -144,60 +156,105 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
   );
 }
 
-function MoveMode({ query, path, close }: { query: string; path: string; close: () => void }) {
+/** Lists folders to file a note in (mode "move") or to make a note in ("noteIn"). */
+function FolderMode({ query, path, close }: { query: string; path?: string; close: () => void }) {
   const client = useClient();
   const qc = useQueryClient();
   const tree = useTree();
-  const q = fold(query.trim());
-  const from = folderOf(path);
+  const suggesters = useContributions("inboxSuggester");
   const inbox = tree.data?.inbox ?? "Inbox";
-  const folders = useMemo(() => {
-    const all = new Set((tree.data?.folders ?? []).map((f) => f.path));
-    all.add(inbox);
-    return [...all].sort(compareNames);
-  }, [tree.data, inbox]);
-  const shown = ["/", ...folders].filter(
-    (f) => f !== (from || "/") && (!q || fold(f === "/" ? "vault root" : f).includes(q)),
+  const note = path ? tree.data?.notes.find((n) => n.path === path) : undefined;
+  const suggestion =
+    tree.data && note && note.folder === inbox
+      ? suggesters
+          .flatMap((s) => s.suggest(note, { tree: tree.data! }))
+          .sort((a, b) => b.score - a.score)[0]
+      : undefined;
+  const choices = folderChoices({
+    tree: tree.data ?? { inbox, folders: [] },
+    query,
+    from: path ? folderOf(path) : undefined,
+    recent: readRecentFolders(),
+    suggestion,
+  });
+  const pick = (folder: string) => {
+    close();
+    if (path) void fileNote(client, qc, path, folder);
+    else void createNoteIn(client, qc, folder);
+  };
+  const row = (f: string, hint?: string) => (
+    <CommandItem key={f} value={`folder:${f}`} onSelect={() => pick(f)}>
+      {f === "/" ? (
+        <FolderRoot className="size-[15px]" strokeWidth={1.75} />
+      ) : f === inbox ? (
+        <Inbox className="size-[15px]" strokeWidth={1.75} />
+      ) : (
+        <Folder className="size-[15px]" strokeWidth={1.75} />
+      )}
+      <span className="flex-1 truncate">{choiceLabel(f)}</span>
+      {hint ? <span className="ml-3 shrink-0 text-small text-faint">{hint}</span> : null}
+    </CommandItem>
   );
-  const newFolder = query.trim().replace(/^\/+|\/+$/g, "");
   return (
     <>
-      <CommandGroup heading="Move to">
-        {shown.map((f) => (
-          <CommandItem
-            key={f}
-            value={`folder:${f}`}
-            onSelect={() => {
-              close();
-              void moveNote(client, qc, path, f);
-            }}
-          >
-            {f === "/" ? (
-              <FolderRoot className="size-[15px]" strokeWidth={1.75} />
-            ) : f === inbox ? (
-              <Inbox className="size-[15px]" strokeWidth={1.75} />
-            ) : (
-              <Folder className="size-[15px]" strokeWidth={1.75} />
-            )}
-            <span className="flex-1 truncate">{f === "/" ? "Vault root" : folderLabel(f)}</span>
-          </CommandItem>
-        ))}
+      {choices.suggested ? (
+        <CommandGroup heading="Suggested">
+          {row(choices.suggested.folder, choices.suggested.reason)}
+        </CommandGroup>
+      ) : null}
+      {choices.recent.length ? (
+        <CommandGroup heading="Recent">{choices.recent.map((f) => row(f))}</CommandGroup>
+      ) : null}
+      <CommandGroup heading={path ? "Add to folder" : "New note in"}>
+        {choices.rest.map((f) => row(f))}
       </CommandGroup>
-      {newFolder && !folders.some((f) => fold(f) === fold(newFolder)) ? (
+      {choices.create ? (
         <CommandGroup>
           <CommandItem
-            value="new-folder"
+            value="create-folder"
             onSelect={() => {
               close();
-              void moveNote(client, qc, path, newFolder);
+              if (path) void createFolderAndMove(client, qc, path, choices.create!);
+              else void addFolderThenNote(client, qc, choices.create!);
             }}
           >
             <Plus className="size-[15px]" strokeWidth={1.75} />
-            <span className="flex-1 truncate">New folder “{newFolder}”</span>
+            <span className="flex-1 truncate">
+              Create “{choices.create}” and {path ? "move here" : "add a note"}
+            </span>
           </CommandItem>
         </CommandGroup>
       ) : null}
     </>
+  );
+}
+
+/** "Add folder…": the typed name, relative to the selected folder, is the one choice. */
+function NewFolderMode({ query, base, close }: { query: string; base: string; close: () => void }) {
+  const client = useClient();
+  const qc = useQueryClient();
+  const target = resolveNewFolder(query, base);
+  return target ? (
+    <CommandGroup
+      heading={base && !query.trim().startsWith("/") ? `In ${folderLabel(base)}` : "In the vault"}
+    >
+      <CommandItem
+        value="add-folder"
+        onSelect={() => {
+          close();
+          void addFolder(client, qc, target);
+        }}
+      >
+        <FolderPlus className="size-[15px]" strokeWidth={1.75} />
+        <span className="flex-1 truncate">Create “{folderLabel(target)}”</span>
+        <CommandShortcut>↵</CommandShortcut>
+      </CommandItem>
+    </CommandGroup>
+  ) : (
+    <div className="px-3.5 py-6 text-center text-small text-faint">
+      {base ? `New folder in ${folderLabel(base)}. ` : ""}Use / for subfolders
+      {base ? ", or start with / for the vault root" : ""}.
+    </div>
   );
 }
 
@@ -211,6 +268,20 @@ export function Palette() {
   const movingTitle = moving
     ? (tree.data?.notes.find((n) => n.path === moving)?.title ?? moving)
     : "";
+  // A "move" palette without a note has nothing to move: fall back to search.
+  const mode = palette.mode === "move" && !moving ? "all" : palette.mode;
+  const title = {
+    all: "Search and commands",
+    move: "Add note to folder",
+    noteIn: "New note in folder",
+    newFolder: "Add folder",
+  }[mode];
+  const placeholder = {
+    all: "Search notes or type a command",
+    move: `Add “${movingTitle}” to folder…`,
+    noteIn: "New note in folder…",
+    newFolder: "Folder name, e.g. Projects/Ideas",
+  }[mode];
 
   useEffect(() => {
     if (palette.open) setQuery("");
@@ -223,22 +294,20 @@ export function Palette() {
         className="top-[14vh] max-w-[580px] translate-y-0 overflow-hidden p-0 max-[720px]:top-3"
         aria-describedby="palette-help"
       >
-        <DialogTitle className="sr-only">
-          {moving ? "Move note" : "Search and commands"}
-        </DialogTitle>
+        <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription id="palette-help" className="sr-only">
           Type to search; arrow keys select, Enter opens, Escape closes.
         </DialogDescription>
         <Command shouldFilter={false} loop>
-          <CommandInput
-            value={query}
-            onValueChange={setQuery}
-            placeholder={moving ? `Move “${movingTitle}” to…` : "Search notes or type a command"}
-          />
+          <CommandInput value={query} onValueChange={setQuery} placeholder={placeholder} />
           <CommandList>
-            <CommandEmpty>Nothing found</CommandEmpty>
-            {moving ? (
-              <MoveMode query={deferred} path={moving} close={closePalette} />
+            {mode === "newFolder" ? null : <CommandEmpty>Nothing found</CommandEmpty>}
+            {mode === "move" ? (
+              <FolderMode query={deferred} path={moving} close={closePalette} />
+            ) : mode === "noteIn" ? (
+              <FolderMode query={deferred} close={closePalette} />
+            ) : mode === "newFolder" ? (
+              <NewFolderMode query={deferred} base={palette.path ?? ""} close={closePalette} />
             ) : (
               <SearchMode query={deferred} close={closePalette} />
             )}

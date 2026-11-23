@@ -34,6 +34,14 @@ Sync state lives in `.nota/` (`sync.toml`, `state.db`, merge bases); only one sy
 vault at a time. The desktop app signs in through the browser (`/app/connect`, handing a device
 token back over the `nota://` scheme) and syncs in the background when the vault has a remote.
 
+## Empty folders
+
+Sync works on files, so a folder you made with `nota folder add` (or ⌘K → "Add folder…") stays
+on that machine until it holds a note; then the note carries the folder to every device. A folder
+that empties out on another machine is not removed here. Empty folders are not part of the sync
+protocol (`Nota-Protocol: 1`) and nothing about them is sent to the server, which lists its own
+only when made through the web API.
+
 ## History
 
 The server keeps every version: `nota history <note>` lists them (through renames,
