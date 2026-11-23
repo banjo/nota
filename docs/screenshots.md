@@ -12,6 +12,19 @@ The desktop app (MyGo + React) over the demo vault from `scripts/demo-vault.sh`:
 Narrow windows switch to a navigation stack ([narrow.png](screenshots/narrow.png)), and ⌃⌥N
 opens quick capture ([light](screenshots/capture.png), [dark](screenshots/capture-dark.png)).
 
+## Reading and source
+
+Each note has three views, switched from the top bar or ⌘K ("View: Source mode"); ⌘E swaps Live and
+Reading. The choice is kept per device and applies to every note you open next. Reading hides every
+marker and blocks typing, but links, tags and checkboxes still work.
+
+| | | |
+| --- | --- | --- |
+| ![Live](screenshots/mode-live.png) | ![Reading](screenshots/mode-reading.png) | ![Source](screenshots/mode-source.png) |
+| Live: markers show on the line you edit | Reading: the finished page, read-only | Source: the raw markdown |
+
+On a narrow window the switch shows icons only ([narrow](screenshots/mode-narrow.png)).
+
 ## Themes
 
 Settings › Appearance picks System, Light or Dark and one of six colour themes (Nota, Indigo,

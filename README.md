@@ -30,6 +30,7 @@
 - 🤖 Built for agents: `nota mcp` serves 11 MCP tools over stdio, and the sync server offers the same tools over HTTP.
 - ⚡️ Light: one 20 MB binary for the CLI, MCP and server; a search over 10,000 notes takes about 18 ms.
 - 🔄 Sync you host: three-way merge per file, conflict copies instead of lost edits, a version history for every note.
+- 📖 Three views per note: Live preview while you write, a read-only Reading mode (⌘E) and the raw Source, all from the top bar or ⌘K.
 - 🔑 No passwords: accounts are an e-mail address and a passkey, only needed for sync.
 - 🧩 Extensible: saved views without code, and hooks that run your scripts when notes change.
 
