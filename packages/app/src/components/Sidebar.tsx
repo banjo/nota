@@ -1,4 +1,5 @@
 import { Kbd } from "@nota/ui/kbd";
+import { MarkTile } from "@nota/ui/logo";
 import { ScrollArea } from "@nota/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Settings } from "lucide-react";
@@ -30,9 +31,7 @@ export function Sidebar() {
       aria-label="Sidebar"
     >
       <div className="flex items-center gap-[9px] px-4 pt-1.5 pb-2.5 pointer-coarse:pt-3">
-        <span className="grid size-[22px] shrink-0 place-items-center rounded-sm bg-ink text-[12px] font-semibold text-ink-foreground">
-          {name.charAt(0).toUpperCase()}
-        </span>
+        <MarkTile size={22} />
         <span className="truncate text-[13.5px] font-semibold text-foreground">{name}</span>
       </div>
       <div className="px-3 pb-3">
