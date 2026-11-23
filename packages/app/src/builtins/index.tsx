@@ -23,6 +23,7 @@ import { suggestFolders } from "../lib/suggest.ts";
 import { themeStore } from "../theme/store.ts";
 import { BUILTIN_THEMES } from "../theme/themes.ts";
 import { useUI } from "../state.ts";
+import { onlineVaults, useVaultDialog } from "../vaults/online.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
 import { FoldersSection, NavSection, ViewsSection } from "./sections.tsx";
 
@@ -191,24 +192,55 @@ export function registerBuiltins(r: Registry): () => void {
         run: () => themeStore().setPalette(t.id),
       }),
     ),
-    // Choosing the vault is the desktop's: the web app's vault is the server's.
+    // On the desktop a vault is a folder (the setup wizard, then a
+    // relaunch); on the web it is one of the account's server vaults.
     r.register("command", {
       id: "vault.switch",
       title: "Switch vault…",
       group: "Vault",
       keywords: ["open", "folder", "change", "vault", "notes folder"],
       icon: FolderOpen,
-      when: (ctx) => !!ctx.client.shell?.setup,
-      run: (ctx) => openVaultFlow(ctx.client, "open"),
+      when: (ctx) => !!ctx.client.shell?.setup || !!onlineVaults(ctx.client),
+      run: (ctx) =>
+        onlineVaults(ctx.client)
+          ? useVaultDialog.getState().open({ kind: "switch" })
+          : openVaultFlow(ctx.client, "open"),
     }),
     r.register("command", {
       id: "vault.new",
       title: "New vault…",
       group: "Vault",
-      keywords: ["create", "folder", "vault", "notes folder"],
+      keywords: ["create", "add", "folder", "vault", "notes folder"],
       icon: FolderPlus,
-      when: (ctx) => !!ctx.client.shell?.setup,
-      run: (ctx) => openVaultFlow(ctx.client, "create"),
+      when: (ctx) => !!ctx.client.shell?.setup || !!onlineVaults(ctx.client),
+      run: (ctx) =>
+        onlineVaults(ctx.client)
+          ? useVaultDialog.getState().open({ kind: "create" })
+          : openVaultFlow(ctx.client, "create"),
+    }),
+    r.register("command", {
+      id: "vault.rename",
+      title: "Rename vault…",
+      group: "Vault",
+      keywords: ["name", "vault", "title"],
+      icon: PenLine,
+      when: (ctx) => !!onlineVaults(ctx.client),
+      run: (ctx) =>
+        useVaultDialog
+          .getState()
+          .open({ kind: "rename", name: onlineVaults(ctx.client)!.current.name }),
+    }),
+    r.register("command", {
+      id: "vault.delete",
+      title: "Delete vault…",
+      group: "Vault",
+      keywords: ["remove", "vault", "trash"],
+      icon: Trash2,
+      when: (ctx) => !!onlineVaults(ctx.client),
+      run: (ctx) =>
+        useVaultDialog
+          .getState()
+          .open({ kind: "delete", name: onlineVaults(ctx.client)!.current.name }),
     }),
     r.register("command", {
       id: "settings.open",

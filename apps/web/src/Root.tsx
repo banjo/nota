@@ -98,6 +98,17 @@ function ConnectionBanner() {
   );
 }
 
+/**
+ * Switches this browser to another vault (null: forget the choice and
+ * ask) by reloading the page: the notes UI, its caches and its event
+ * stream all belong to one vault.
+ */
+function openVault(key: string, vault: string | null) {
+  if (vault) localStorage.setItem(key, vault);
+  else localStorage.removeItem(key);
+  window.location.reload();
+}
+
 /** Picks (or creates) the server vault this browser opens. */
 function VaultGate() {
   const session = useSession();
@@ -118,6 +129,7 @@ function VaultGate() {
     },
     [key, qc],
   );
+  const reopen = useCallback((v: string | null) => openVault(key, v), [key]);
   const create = useMutation({
     mutationFn: (n: string) => auth.createVault(n),
     onSuccess: (v) => {
@@ -141,7 +153,7 @@ function VaultGate() {
     setVault(null);
   }, [vault, vaults.data, key]);
 
-  if (vault) return <Notes vault={vault} />;
+  if (vault) return <Notes vault={vault} onOpenVault={reopen} />;
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-background px-5 py-12">
@@ -237,17 +249,24 @@ function VaultGate() {
 }
 
 /** The notes UI over the HTTP client, for one vault. */
-function Notes({ vault }: { vault: string }) {
+function Notes({
+  vault,
+  onOpenVault,
+}: {
+  vault: string;
+  onOpenVault: (vault: string | null) => void;
+}) {
   const client: NotesClient = useMemo(
     () =>
       createHttpClient({
         baseUrl: API,
         vault,
         auth,
+        openVault: onOpenVault,
         onUnauthorized: () => auth.invalidate(),
         onStatus: (up) => connection.set(up),
       }),
-    [vault],
+    [vault, onOpenVault],
   );
   return (
     <>

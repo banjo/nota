@@ -34,6 +34,11 @@ export interface HttpClientOptions {
   eventSource?: (url: string) => EventSourceLike;
   /** The web app's account API, exposed as `client.auth`. */
   auth?: AuthApi;
+  /**
+   * Opens another of the account's vaults (the web app reloads into it);
+   * null forgets the choice and asks. Exposed as `client.serverVault`.
+   */
+  openVault?: (name: string | null) => void;
   /** Called on a 401, so the web app can show sign-in again. */
   onUnauthorized?: () => void;
   /** Called when the server answers, or when it cannot be reached. */
@@ -161,6 +166,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
   return {
     kind: "web",
     ...(options.auth ? { auth: options.auth } : {}),
+    ...(options.openVault ? { serverVault: { name: options.vault, open: options.openVault } } : {}),
     async info(): Promise<VaultInfo> {
       const tree = await request<Tree>("GET", "/tree");
       return { name: options.vault, dir: `${root}/${options.vault}`, inbox: tree.inbox };

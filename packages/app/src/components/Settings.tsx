@@ -26,6 +26,8 @@ import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { type ThemeMode, themeStore } from "../theme/store.ts";
 import { useTheme } from "../theme/useTheme.ts";
+import { onlineVaults } from "../vaults/online.ts";
+import { OnlineVaults } from "../vaults/OnlineVaults.tsx";
 import { TopBar } from "./TopBar.tsx";
 
 function Section({
@@ -454,30 +456,38 @@ export function Settings() {
       <div className="mx-auto w-full max-w-[640px] px-14 pt-10 pb-24 max-[720px]:px-5 max-[720px]:pt-5">
         <h1 className="mb-5 text-[26px] font-bold tracking-[-0.015em] text-foreground">Settings</h1>
         <Appearance />
-        <Section
-          title="Vault"
-          description="A folder of Markdown files. Any editor can open it; Nota keeps its index and settings in .nota."
-        >
-          <Field label="Name">{info.data?.name}</Field>
-          <Field label={client.kind === "desktop" ? "Folder" : "Server vault"}>
-            <div className="flex items-center gap-2">
-              <code
-                className={cn(
-                  "min-w-0 truncate rounded-xs bg-code px-1.5 py-0.5 font-mono text-[12px] text-text-soft",
-                )}
-              >
-                {info.data?.dir}
-              </code>
-              {client.shell ? (
-                <Button variant="ghost" size="sm" onClick={() => void client.shell!.revealVault()}>
-                  <FolderOpen /> Reveal
-                </Button>
-              ) : null}
-            </div>
-          </Field>
-          <Field label="Inbox folder">{info.data?.inbox}</Field>
-          <VaultActions />
-        </Section>
+        {onlineVaults(client) ? (
+          <OnlineVaults />
+        ) : (
+          <Section
+            title="Vault"
+            description="A folder of Markdown files. Any editor can open it; Nota keeps its index and settings in .nota."
+          >
+            <Field label="Name">{info.data?.name}</Field>
+            <Field label={client.kind === "desktop" ? "Folder" : "Server vault"}>
+              <div className="flex items-center gap-2">
+                <code
+                  className={cn(
+                    "min-w-0 truncate rounded-xs bg-code px-1.5 py-0.5 font-mono text-[12px] text-text-soft",
+                  )}
+                >
+                  {info.data?.dir}
+                </code>
+                {client.shell ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void client.shell!.revealVault()}
+                  >
+                    <FolderOpen /> Reveal
+                  </Button>
+                ) : null}
+              </div>
+            </Field>
+            <Field label="Inbox folder">{info.data?.inbox}</Field>
+            <VaultActions />
+          </Section>
+        )}
         <SyncAccount />
       </div>
     </div>

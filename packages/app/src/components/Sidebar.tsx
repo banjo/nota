@@ -11,6 +11,7 @@ import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { SidebarScroll } from "./FolderTree.tsx";
 import { SyncStatusRow } from "./SyncStatus.tsx";
+import { VaultSwitcher } from "../vaults/VaultSwitcher.tsx";
 
 /** The Träd sidebar: workspace, search, the registered sections, new note, sync. */
 export function Sidebar() {
@@ -34,6 +35,7 @@ export function Sidebar() {
           {name.charAt(0).toUpperCase()}
         </span>
         <span className="truncate text-[13.5px] font-semibold text-foreground">{name}</span>
+        <VaultSwitcher />
       </div>
       <div className="px-3 pb-3">
         <button
