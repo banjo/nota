@@ -38,7 +38,12 @@ function parsed(doc: string, cursor: number) {
   return s;
 }
 
-const reading = (s: EditorState) => previewSpecs(s, { activeLines: new Set(), reading: true });
+// Spec order inside a code fence depends on the parse, so compare sorted.
+const reading = (s: EditorState) =>
+  previewSpecs(s, { activeLines: new Set(), reading: true })
+    .map((x) => JSON.stringify(x))
+    .sort()
+    .map((x) => JSON.parse(x) as DecoSpec);
 const classes = (all: DecoSpec[]) =>
   all.flatMap((x) => (x.type === "mark" || x.type === "line" ? [x.class] : []));
 
