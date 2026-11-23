@@ -24,7 +24,6 @@ function initTheme() {
       const label = mode === "dark" ? "Switch to light mode" : "Switch to dark mode";
       b.setAttribute("aria-label", label);
       b.title = label;
-      b.hidden = false;
     }
   };
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]")) {

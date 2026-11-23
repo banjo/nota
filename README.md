@@ -265,4 +265,4 @@ More: [Graphite dark](docs/screenshots/theme-graphite-dark.png), [Paper dark](do
 
 In the browser: [sign in with a passkey](docs/screenshots/web-signin.png), the same app over HTTP (`web-app.png`), [approving a desktop sign-in](docs/screenshots/connect.png), the [device list](docs/screenshots/web-devices.png), and the [recovery codes](docs/screenshots/web-recovery-codes.png) shown once at sign-up.
 
-![Landing](docs/screenshots/landing.png)
+![Landing](docs/screenshots/landing-v3-1440-hero-light.png)
