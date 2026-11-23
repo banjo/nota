@@ -63,6 +63,14 @@ describe("colour themes", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21);
     expect(contrast("#ffffff", "#ffffff")).toBe(1);
     expect(contrast("#4256d6", "#ffffff")).toBeCloseTo(5.94, 1);
+    expect(contrast("#256b4d", "#ffffff")).toBeCloseTo(6.39, 1);
+  });
+
+  test("the default palette is the brand's Forest green", () => {
+    expect(BUILTIN_THEMES[0]!.id).toBe("nota");
+    expect(BUILTIN_THEMES[0]!.light.ink).toBe("#256b4d");
+    expect(BUILTIN_THEMES[0]!.dark.ink).toBe("#5fd3a0");
+    expect(BUILTIN_THEMES.find((t) => t.id === "forest")).toBeUndefined();
   });
 
   test("ids are valid data-palette values and unique", () => {
@@ -76,9 +84,10 @@ describe("colour themes", () => {
     const off = registerBuiltins(r);
     expect(r.get("theme").map((t) => t.id)).toEqual([
       "nota",
+      "indigo",
       "graphite",
       "paper",
-      "forest",
+      "jade",
       "rose",
     ]);
     const mine: ColorTheme = {
@@ -92,14 +101,15 @@ describe("colour themes", () => {
     const offMine = r.register("theme", mine);
     expect(r.get("theme").map((t) => t.id)).toEqual([
       "nota",
+      "indigo",
       "graphite",
       "paper",
       "plugin.sea",
-      "forest",
+      "jade",
       "rose",
     ]);
     offMine();
-    expect(r.get("theme")).toHaveLength(5);
+    expect(r.get("theme")).toHaveLength(6);
     // ⌘K: one toggle and a command per built-in theme.
     expect(r.command("theme.toggleDark")?.title).toBe("Toggle dark mode");
     expect(r.command("theme.toggleDark")?.shortcut).toBeUndefined();

@@ -61,6 +61,9 @@ describe("theme store", () => {
     expect(readPalette("paper")).toBe("paper");
     expect(readPalette('x"]{}')).toBe("nota");
     expect(readPalette(null)).toBe("nota");
+    // Forest became the default palette's colour; its old id maps there.
+    expect(readPalette("forest")).toBe("nota");
+    expect(readPalette("indigo")).toBe("indigo");
   });
 
   test("defaults to System and the nota palette, applied to <html>", () => {
@@ -86,9 +89,9 @@ describe("theme store", () => {
     expect(f.root.dataset.mode).toBe("light");
     expect(seen).toHaveBeenCalledTimes(2);
 
-    s.setPalette("forest");
-    expect(f.data.get(PALETTE_KEY)).toBe("forest");
-    expect(f.root.dataset.palette).toBe("forest");
+    s.setPalette("jade");
+    expect(f.data.get(PALETTE_KEY)).toBe("jade");
+    expect(f.root.dataset.palette).toBe("jade");
     s.setPalette("nota");
     expect(f.data.has(PALETTE_KEY)).toBe(false);
 
@@ -97,6 +100,11 @@ describe("theme store", () => {
     s.setPalette("rose");
     const again = createThemeStore(fakeEnv(Object.fromEntries(f.data), true).env);
     expect(again.get()).toEqual({ mode: "light", palette: "rose", resolved: "light" });
+  });
+
+  test("a device that had picked Forest gets the default, now Forest green", () => {
+    const s = createThemeStore(fakeEnv({ [PALETTE_KEY]: "forest" }, false).env);
+    expect(s.get().palette).toBe("nota");
   });
 
   test("System follows the OS live", () => {
