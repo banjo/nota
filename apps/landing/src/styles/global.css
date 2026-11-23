@@ -1,5 +1,5 @@
 /* The landing page on the app's own tokens (packages/ui/src/tokens.css):
-   warm neutral greys, hairline borders, one Forest-green ink. Light by default,
+   warm neutral greys, hairline borders, one Jade ink. Light by default,
    dark from the system or the toggle (localStorage "nota:theme"). */
 @import "@nota/ui/tokens.css";
 
@@ -30,7 +30,7 @@
   --term-bg: #1b1c20;
   --term-fg: #d8d7d2;
   --term-dim: #8a8d96;
-  --term-key: #8fdcb8; /* brand mint, a step lighter than the dark ink */
+  --term-key: #8fe3d2; /* brand mint, a step lighter than the dark ink */
   --term-head: #f1efe9;
   --term-add: #7fd19b;
   --term-del: #f08a8a;

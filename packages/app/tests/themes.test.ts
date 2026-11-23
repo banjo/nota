@@ -63,14 +63,15 @@ describe("colour themes", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21);
     expect(contrast("#ffffff", "#ffffff")).toBe(1);
     expect(contrast("#4256d6", "#ffffff")).toBeCloseTo(5.94, 1);
-    expect(contrast("#256b4d", "#ffffff")).toBeCloseTo(6.39, 1);
+    expect(contrast("#1e7363", "#ffffff")).toBeCloseTo(5.69, 1);
   });
 
-  test("the default palette is the brand's Forest green", () => {
+  test("the default palette is the brand's Jade", () => {
     expect(BUILTIN_THEMES[0]!.id).toBe("nota");
-    expect(BUILTIN_THEMES[0]!.light.ink).toBe("#256b4d");
-    expect(BUILTIN_THEMES[0]!.dark.ink).toBe("#5fd3a0");
-    expect(BUILTIN_THEMES.find((t) => t.id === "forest")).toBeUndefined();
+    expect(BUILTIN_THEMES[0]!.light.ink).toBe("#1e7363");
+    expect(BUILTIN_THEMES[0]!.dark.ink).toBe("#5fd9c4");
+    expect(BUILTIN_THEMES.find((t) => t.id === "jade")).toBeUndefined();
+    expect(BUILTIN_THEMES.find((t) => t.id === "forest")?.light.ink).toBe("#256b4d");
   });
 
   test("ids are valid data-palette values and unique", () => {
@@ -87,7 +88,7 @@ describe("colour themes", () => {
       "indigo",
       "graphite",
       "paper",
-      "jade",
+      "forest",
       "rose",
     ]);
     const mine: ColorTheme = {
@@ -105,7 +106,7 @@ describe("colour themes", () => {
       "graphite",
       "paper",
       "plugin.sea",
-      "jade",
+      "forest",
       "rose",
     ]);
     offMine();

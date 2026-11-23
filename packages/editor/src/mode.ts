@@ -26,7 +26,7 @@ export const sourceHighlight = HighlightStyle.define([
   { tag: t.strong, fontWeight: "650" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: [t.link, t.url], color: v("ink", "#256b4d") },
+  { tag: [t.link, t.url], color: v("ink", "#1e7363") },
   { tag: t.monospace, color: v("ink-strong", "#2f40b3") },
   { tag: t.labelName, color: v("ink-strong", "#2f40b3") },
   { tag: t.quote, color: v("muted-foreground", "#6b6f78") },

@@ -3,7 +3,7 @@
  * dark variant and overrides only what it needs: the ink family, and for
  * graphite and paper the surfaces too. The app sets data-palette and
  * data-mode on <html> before the first paint (index.html), so these key
- * on data-mode only; "nota" (Forest green, the brand colour) is
+ * on data-mode only; "nota" (Jade, the brand colour) is
  * tokens.css itself. The list of themes the
  * UI offers lives in packages/app/src/theme/themes.ts, and its swatch
  * colours mirror the values here. Contrast (WCAG) of every variant is
@@ -117,7 +117,7 @@
   --ink-foreground: #221e1a;
 }
 
-/* Indigo: Nota's original ink, from before the brand went green. */
+/* Indigo: Nota's original ink, from before the brand went Jade. */
 :root[data-palette="indigo"]:not([data-mode="dark"]) {
   --ink: #4256d6;
   --ink-soft: #eceffd;
@@ -133,20 +133,19 @@
   --ink-foreground: #15161a;
 }
 
-/* Jade: blue-green ink on Nota's neutrals, cooler than the default green.
-   It replaces "forest", which the default palette now is. */
-:root[data-palette="jade"]:not([data-mode="dark"]) {
-  --ink: #1e7363;
-  --ink-soft: #e6f3f0;
-  --ink-soft-hover: #d6ebe6;
-  --ink-strong: #175c4f;
+/* Forest: the deeper, yellower green Nota's icon used before Jade. */
+:root[data-palette="forest"]:not([data-mode="dark"]) {
+  --ink: #256b4d;
+  --ink-soft: #e8f3ee;
+  --ink-soft-hover: #dbede4;
+  --ink-strong: #1d5a40;
   --ink-foreground: #ffffff;
 }
-:root[data-palette="jade"][data-mode="dark"] {
-  --ink: #5fd9c4;
-  --ink-soft: rgba(95, 217, 196, 0.14);
-  --ink-soft-hover: rgba(95, 217, 196, 0.22);
-  --ink-strong: #a3eadd;
+:root[data-palette="forest"][data-mode="dark"] {
+  --ink: #5fd3a0;
+  --ink-soft: rgba(95, 211, 160, 0.14);
+  --ink-soft-hover: rgba(95, 211, 160, 0.22);
+  --ink-strong: #9fe6c4;
   --ink-foreground: #15161a;
 }
 

@@ -1,6 +1,6 @@
 /*
  * Nota's tokens, from the first layout prototype ("Träd"): warm neutral
- * grays, hairline borders, one Forest-green ink (the brand colour,
+ * grays, hairline borders, one Jade ink (the brand colour,
  * assets/brand/README.md) used sparingly. Light and dark
  * follow the system, or an explicit data-theme ("light" | "dark", the
  * landing page's toggle and the app's Appearance setting). The app also
@@ -36,10 +36,10 @@
   --surface: #ffffff; /* popovers, palette, capture card */
   --overlay: rgba(20, 21, 24, 0.28);
 
-  --ink: #256b4d;
-  --ink-soft: #e8f3ee;
-  --ink-soft-hover: #dbede4;
-  --ink-strong: #1d5a40;
+  --ink: #1e7363;
+  --ink-soft: #e6f3f0;
+  --ink-soft-hover: #d6ebe6;
+  --ink-strong: #175c4f;
   --ink-foreground: #ffffff;
 
   --success: #37b26c;
@@ -84,10 +84,10 @@
   --surface: #26262a;
   --overlay: rgba(0, 0, 0, 0.5);
 
-  --ink: #5fd3a0;
-  --ink-soft: rgba(95, 211, 160, 0.14);
-  --ink-soft-hover: rgba(95, 211, 160, 0.22);
-  --ink-strong: #9fe6c4;
+  --ink: #5fd9c4;
+  --ink-soft: rgba(95, 217, 196, 0.14);
+  --ink-soft-hover: rgba(95, 217, 196, 0.22);
+  --ink-strong: #a3eadd;
   --ink-foreground: #15161a;
 
   --shadow-pop:
@@ -118,10 +118,10 @@
     --surface: #26262a;
     --overlay: rgba(0, 0, 0, 0.5);
 
-    --ink: #5fd3a0;
-    --ink-soft: rgba(95, 211, 160, 0.14);
-    --ink-soft-hover: rgba(95, 211, 160, 0.22);
-    --ink-strong: #9fe6c4;
+    --ink: #5fd9c4;
+    --ink-soft: rgba(95, 217, 196, 0.14);
+    --ink-soft-hover: rgba(95, 217, 196, 0.22);
+    --ink-strong: #a3eadd;
     --ink-foreground: #15161a;
 
     --shadow-pop:
