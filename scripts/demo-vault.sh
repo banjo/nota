@@ -1,212 +1,174 @@
 #!/bin/sh
-# Writes a realistic demo vault (Swedish notes) for screenshots and
+# Writes a small demo vault (English, neutral content) for screenshots and
 # manual testing: scripts/demo-vault.sh /tmp/nota-demo
 set -eu
 dir=${1:?usage: demo-vault.sh DIR}
 rm -rf "$dir"
-mkdir -p "$dir/Inbox" "$dir/Projekt/Nota" "$dir/Projekt/Schackklubb" "$dir/Fotboll" "$dir/Hem" "$dir/Recept" "$dir/.nota/views"
+mkdir -p "$dir/Inbox" "$dir/Projects/Nota" "$dir/Projects/Chess club" "$dir/Meetings" "$dir/.nota/views"
 
 note() { # note PATH (content on stdin)
   cat >"$dir/$1"
 }
 
-note "Projekt/Nota/Sync-protokoll.md" <<'EOF'
+note "Welcome.md" <<'EOF'
+---
+tags: [welcome]
+status: done
+created: 2026-11-18T09:00:00+01:00
+updated: 2026-11-22T08:40:00+01:00
+---
+# Welcome to Nota
+
+This is a demo vault: plain Markdown files with YAML at the top, written by scripts/demo-vault.sh.
+
+A few things to try:
+
+- Click **Standup, Friday** in the tree. Its tags and status are frontmatter, edited in the panel above the note.
+- Press ⌘K (⌃K elsewhere) and search for *sync*. There is a note about [[Sync protocol]].
+- Open the **Inbox**. Three notes are waiting; Nota suggests where each one belongs.
+- Type here. The editor is CodeMirror, with live preview.
+EOF
+
+note "Getting around.md" <<'EOF'
+---
+tags: [help]
+status: done
+created: 2026-11-18T09:10:00+01:00
+updated: 2026-11-21T17:02:00+01:00
+---
+# Getting around
+
+The keys worth knowing, all of them the app's:
+
+- ⌘K opens the command palette: search every note, or run a command.
+- ⌘N makes a note in the folder you are looking at.
+- ⌘⇧M moves the note on screen to another folder.
+- ⌘⇧I goes to the inbox.
+- ⌘, opens Settings, where the appearance lives.
+
+Links are wikilinks: [[Standup, Friday]] is a note, and Nota lists the notes that link back at the bottom of the page.
+
+Tags can also be written inline, like #welcome, and show up in the sidebar with the rest.
+EOF
+
+note "Inbox/Plumber, kitchen tap.md" <<'EOF'
+The kitchen tap drips at night. Ask about the washer size before booking a visit, and whether the landlord pays.
+EOF
+
+note "Inbox/Gift ideas.md" <<'EOF'
+Mum: a good chef's knife, or the bread book she keeps borrowing.
+
+Leo: the climbing guide to Font. The new edition.
+EOF
+
+note "Inbox/Read later, WAL mode.md" <<'EOF'
+SQLite in WAL mode: what changes for readers and writers, and why checkpoints matter. Add to the [[Search ranking]] note when read.
+EOF
+
+note "Projects/Standup, Friday.md" <<'EOF'
+---
+tags: [standup, nota]
+status: draft
+created: 2026-11-20T09:12:00+01:00
+updated: 2026-11-22T09:31:00+01:00
+---
+# Standup, Friday
+
+Shipped the [[Sync protocol]] page. Next: the ranking pass in [[Search ranking]].
+
+## Notes
+
+- 10k notes reindex in about a second on the laptop.
+- A search answers in under 20 ms, snippets included.
+- The index is disposable: delete .nota/index.db and it comes back.
+
+## To do
+
+- [x] Frontmatter keeps unknown keys
+- [ ] Rank titles above body text
+- [ ] A keyboard shortcut for backlinks
+EOF
+
+note "Projects/Nota/Sync protocol.md" <<'EOF'
 ---
 tags: [nota, sync]
+status: done
+created: 2026-11-17T14:20:00+01:00
+updated: 2026-11-20T18:05:00+01:00
+---
+# Sync protocol
+
+File-level, with a three-way merge. The server keeps an optimistic version per note and answers 409 when the base is stale, so a client merges instead of overwriting.
+
+The rules, briefly:
+
+1. A pull goes by cursor; a server nudge is only a hint to pull.
+2. Edits to different lines merge. The same lines become a conflict copy next to the original.
+3. Deletes are tombstones, and an edit beats a delete.
+
+Plan for the week in [[Standup, Friday]].
+EOF
+
+note "Projects/Nota/Search ranking.md" <<'EOF'
+---
+tags: [nota, search]
 status: draft
-created: 2026-11-18T10:12:00+01:00
-updated: 2026-11-22T10:42:00+01:00
+created: 2026-11-19T11:45:00+01:00
+updated: 2026-11-22T07:50:00+01:00
 ---
-# Sync-protokoll
+# Search ranking
 
-Filnivå-sync med 3-way merge. [[CLI-kommandon]] ska kunna trigga en sync manuellt, och allt annat sker i bakgrunden.
+FTS5 with bm25, plus a nudge for notes whose title matches: a title hit is worth more than a body hit. Snippets come from the same query, so a result always shows why it matched.
 
-## Flöde
+Open questions:
 
-1. Watchern märker en ändring och jämför `local_hash` mot `base_hash`
-2. `PUT /files/{path}` med `base_version`
-3. Vid 409: hämta servern, merga mot base, pusha igen
-4. Krock på samma rader blir en **konfliktkopia**
+- Do tags belong in the rank, or only in the filter?
+- How much should a recent edit count?
 
-> Filen på disk är alltid sanningen. Servern vet inte vad markdown är.
-
-## Att göra
-
-- [x] Välj diff-lib (sergi/go-diff)
-- [ ] Namnformat för konfliktkopior
-- [ ] SSE-kanal som säger till att pulla
-- [ ] Tombstones för borttagna filer
+Links to [[Sync protocol]] because both need a stable hash per note.
 EOF
 
-note "Projekt/Nota/CLI-kommandon.md" <<'EOF'
+note "Projects/Chess club/Ratings — Glicko-2.md" <<'EOF'
 ---
-tags: [nota, cli]
-status: in progress
-created: 2026-11-19T08:30:00+01:00
-prio: 1
+tags: [chess]
+status: done
+created: 2026-11-12T10:00:00+01:00
+updated: 2026-11-16T22:15:00+01:00
 ---
-# CLI-kommandon
+# Ratings
 
-`nota add "text"` skapar i inkorgen. `nota search` söker i FTS-indexet. `nota ls --folder Fotboll` listar.
-
-## Flaggor
-
-- `--json` på allt, för agenter
-- `--tag` sätts i frontmatter
-
-Se också [[Sync-protokoll]] för hur `nota sync` fungerar.
+Glicko-2 per pool, stored next to the games, recomputed nightly. The bench numbers live in the repo, not here.
 EOF
 
-note "Projekt/Nota/Namnidéer.md" <<'EOF'
+note "Meetings/Planning, November.md" <<'EOF'
 ---
-tags: [nota]
-created: 2026-11-21T21:05:00+01:00
+tags: [planning]
+status: draft
+created: 2026-11-21T10:00:00+01:00
+updated: 2026-11-21T10:42:00+01:00
 ---
-# Namnidéer
+# Planning, November
 
-Nota vann. *Notula* var tvåa, ~~Anteckna~~ föll bort direkt.
+Decisions from the meeting:
+
+- Nota ships the desktop app with v1; the CLI is out first.
+- Sync stays self-hosted.
+- The landing page shows the app itself, not a video.
+
+Follow-ups in [[Standup, Friday]].
 EOF
 
-note "Projekt/Schackklubb/Bänkar i Göteborg.md" <<'EOF'
----
-tags: [schackklubb]
-created: 2026-11-02T14:00:00+01:00
----
-# Bänkar i Göteborg
-
-Slottsskogen vid Plikta har två bord. Kungsparken saknar tak, funkar inte i regn.
-
-- [x] Lägg in Plikta
-- [ ] Fota Kungsparken
-EOF
-
-note "Fotboll/Junior träning tisdag.md" <<'EOF'
----
-tags: [fotboll, junior]
-created: 2026-11-20T18:00:00+01:00
----
-# Junior: träning tisdag
-
-19:00 på Valhalla. Ta med västar och koner.
-
-## Upplägg
-
-- Rondo 5 mot 2
-- Omställning från hörna
-- Spel 8 mot 8
-EOF
-
-note "Fotboll/Futsal december.md" <<'EOF'
----
-tags: [fotboll, futsal]
-created: 2026-11-15T09:00:00+01:00
----
-# Futsal: december
-
-Borta mot Örebro 7 dec, hemma 14 dec i Lisebergshallen. #futsal
-EOF
-
-note "Hem/Ella 1-årskontroll.md" <<'EOF'
----
-tags: [ella]
-status: in progress
-created: 2026-11-10T07:45:00+01:00
----
-# Ella: 1-årskontroll
-
-BVC torsdag 09:30. Frågor: sömn, smakportioner, vaccin.
-
-- [x] Boka tid
-- [ ] Skriv ner frågor
-EOF
-
-note "Hem/Julklappar 2026.md" <<'EOF'
----
-tags: [jul]
-created: 2026-11-01T20:10:00+01:00
-budget: 3000
-klart: false
----
-# Julklappar 2026
-
-- [ ] Sara: The Will of the Many
-- [x] Ella: stapelleksak
-- [ ] Pappa: kaffekvarn
-EOF
-
-note "Recept/Pasta alla vodka.md" <<'EOF'
----
-tags: [recept, pasta]
-created: 2026-11-08T17:30:00+01:00
-portioner: 4
----
-# Pasta alla vodka
-
-Schalottenlök, tomatpuré stekt hårt, en skvätt vodka, grädde, parmesan. Rigatoni.
-EOF
-
-note "Recept/Kimchi-stekt ris.md" <<'EOF'
----
-tags: [recept, snabbt]
-created: 2026-11-02T12:00:00+01:00
----
-# Kimchi-stekt ris
-
-Dagsgammalt ris, kimchi, smör, gochujang. Stekt ägg ovanpå.
-EOF
-
-note "Inbox/Dela en anteckning via länk.md" <<'EOF'
----
-tags: [idé, nota]
-created: 2026-11-22T10:58:00+01:00
----
-Dela en anteckning via länk
-
-Läs-länk som går ut efter 7 dagar. Servern har redan blobben, så det är bara en signerad URL.
-
-Kolla hur Bear gör.
-EOF
-
-note "Inbox/Ringa Elbolaget om fakturan.md" <<'EOF'
----
-tags: [hem]
-created: 2026-11-22T09:12:00+01:00
----
-Ringa Elbolaget om fakturan
-
-Dubbeldebiterade i oktober, 349 kr. Ärendenummer finns i mejlet.
-EOF
-
-note "Inbox/Futsal testa 2-2 i powerplay.md" <<'EOF'
----
-tags: [taktik]
-created: 2026-11-21T22:15:00+01:00
----
-Futsal: testa 2-2 i powerplay
-
-Målvakt ut, fyra ute plus en. Bredd på kanterna, pivot håller boll.
-EOF
-
-note "Inbox/Smash burgers med kimchi-mayo.md" <<'EOF'
----
-created: 2026-11-21T19:40:00+01:00
----
-Smash burgers med kimchi-mayo
-
-Sågs på TikTok. Gochujang + majonnäs + lite lime.
-EOF
-
-note ".nota/views/utkast.yaml" <<'EOF'
-name: Utkast
+note ".nota/views/drafts.yaml" <<'EOF'
+name: Drafts
 icon: pen
 where: { status: draft }
 sort: updated desc
 EOF
 
-note ".nota/views/pagar.yaml" <<'EOF'
-name: Pågår
+note ".nota/views/sync.yaml" <<'EOF'
+name: Sync
 icon: flag
-where: { status: in progress }
+tag: sync
 sort: updated desc
 EOF
 

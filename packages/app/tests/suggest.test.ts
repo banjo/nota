@@ -21,7 +21,7 @@ const n = (
 const notes = [
   n("Projekt/Nota/Sync-protokoll.md", "Sync-protokoll", ["nota", "sync"]),
   n("Projekt/Nota/CLI-kommandon.md", "CLI-kommandon", ["nota", "cli"]),
-  n("Projekt/Schackklubb/Bänkar i Göteborg.md", "Bänkar i Göteborg", ["schackklubb"]),
+  n("Projekt/Schackklubb/Bänkar i Göteborg.md", "Bänkar i Göteborg", ["schack"]),
   n("Fotboll/Junior träning tisdag.md", "Junior: träning tisdag", ["fotboll", "junior"]),
   n("Fotboll/Futsal december.md", "Futsal: december", ["fotboll", "futsal"]),
   n("Hem/Julklappar 2026.md", "Julklappar 2026", ["jul"]),
@@ -30,7 +30,7 @@ const notes = [
 ];
 const inbox = [
   n("Inbox/Dela en anteckning via länk.md", "Dela en anteckning via länk", ["idé", "nota"]),
-  n("Inbox/Ringa Elbolaget om fakturan.md", "Ringa Elbolaget om fakturan", ["hem"]),
+  n("Inbox/Ringa elbolaget om fakturan.md", "Ringa elbolaget om fakturan", ["hem"]),
   n("Inbox/Futsal testa 2-2 i powerplay.md", "Futsal: testa 2-2 i powerplay", ["taktik"]),
   n("Inbox/Smash burgers med kimchi-mayo.md", "Smash burgers med kimchi-mayo"),
   n("Inbox/Köpa mjölk.md", "Köpa mjölk"),
@@ -64,7 +64,7 @@ describe("inbox suggestions", () => {
     expect(suggestFolders(inbox[4]!, tree)).toEqual([]);
   });
   test("other notes with the same tag", () => {
-    const note = n("Inbox/Bänk i Slottsskogen.md", "Bänk vid dammen", ["schackklubb-bänk", "fika"]);
+    const note = n("Inbox/Bänk i Slottsskogen.md", "Bänk vid dammen", ["schack-bänk", "fika"]);
     const tagged = n("Hem/Fika.md", "Fika", ["fika"]);
     expect(suggestFolders(note, { ...tree, notes: [...tree.notes, tagged] })[0]).toMatchObject({
       folder: "Hem",

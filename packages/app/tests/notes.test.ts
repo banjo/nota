@@ -25,8 +25,8 @@ const info = (path: string, title = path.split("/").pop()!.replace(/\.md$/, ""))
 describe("title split", () => {
   test.each([
     "# Sync-protokoll\n\nFilnivå-sync med 3-way merge.\n",
-    "Ringa Elbolaget om fakturan",
-    "Ringa Elbolaget om fakturan\n",
+    "Ringa elbolaget om fakturan",
+    "Ringa elbolaget om fakturan\n",
     "## Rubrik två\nDirekt text",
     "",
     "\n\nText utan titel",
@@ -44,8 +44,8 @@ describe("title split", () => {
     });
   });
   test("a first line of text under a bare title gets a blank line", () => {
-    expect(joinTitle({ ...splitTitle("Ringa Elbolaget"), rest: "349 kr" })).toBe(
-      "Ringa Elbolaget\n\n349 kr",
+    expect(joinTitle({ ...splitTitle("Ringa elbolaget"), rest: "349 kr" })).toBe(
+      "Ringa elbolaget\n\n349 kr",
     );
   });
   test("file names follow vault.Filename", () => {

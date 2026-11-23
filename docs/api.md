@@ -1,7 +1,7 @@
 # Nota server API: accounts, devices and the web API
 
 This is the HTTP API of `nota serve` next to the sync protocol
-(`docs/sync-protocol.md`). The web app (`nota.banjoanton.com/app`), the
+(`docs/sync-protocol.md`). The web app (`<web origin>/app`), the
 desktop app and the CLI use it. Go types live in `internal/protocol`
 (wire types shared with clients) and `internal/server`.
 
@@ -98,7 +98,7 @@ NAME` (or `--id N`).
 
 1. The app makes a random `code_verifier` (43–128 chars of
    `[A-Za-z0-9-._~]`) and opens
-   `https://nota.banjoanton.com/app/connect?challenge=<base64url(sha256(verifier))>&device=<name>&redirect=nota://auth&state=<random>`.
+   `<web origin>/app/connect?challenge=<base64url(sha256(verifier))>&device=<name>&redirect=nota://auth&state=<random>`.
 2. After passkey sign-in the page calls `POST /v1/auth/connect`
    `{code_challenge, code_challenge_method: "S256", device, redirect_uri,
    state}` (session only) → `{code, redirect, expires_in: 120}` and sends

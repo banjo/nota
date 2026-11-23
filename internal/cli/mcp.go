@@ -17,7 +17,7 @@ func (a *app) mcpCmd() *cobra.Command {
 		Use:   "mcp",
 		Short: "Serve the vault to AI agents over MCP (stdio)",
 		Long: `Run a Model Context Protocol server on stdin/stdout, for agents such as
-Claude Code or Hermes. Configure it as {"command": "nota", "args": ["mcp"]};
+Claude Code or any other MCP client. Configure it as {"command": "nota", "args": ["mcp"]};
 add "--vault", "DIR" to the args to pick a vault. Logs go to stderr.
 
 Tools: search_notes, read_note, list_notes, create_note, append_to_note,

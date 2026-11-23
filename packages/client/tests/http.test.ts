@@ -153,21 +153,21 @@ describe("createHttpClient", () => {
 
   test("creates, moves, renames and deletes", async () => {
     const f = mockFetch(
-      json(note({ path: "Inbox/Ringa Elbolaget.md" }), 201),
-      json({ from: "Inbox/Ringa Elbolaget.md", path: "Hem/Ringa Elbolaget.md", version: 12 }),
-      json({ from: "Hem/Ringa Elbolaget.md", path: "Hem/Elbolaget.md", version: 13 }),
+      json(note({ path: "Inbox/Ringa elbolaget.md" }), 201),
+      json({ from: "Inbox/Ringa elbolaget.md", path: "Hem/Ringa elbolaget.md", version: 12 }),
+      json({ from: "Hem/Ringa elbolaget.md", path: "Hem/Elbolaget.md", version: 13 }),
       json({}, 204),
     );
     const c = client(f);
-    await c.create({ body: "Ringa Elbolaget om fakturan", tags: ["hem"] });
-    expect(f.call(0).body).toEqual({ body: "Ringa Elbolaget om fakturan", tags: ["hem"] });
-    expect(await c.move("Inbox/Ringa Elbolaget.md", "Hem")).toEqual({
-      from: "Inbox/Ringa Elbolaget.md",
-      path: "Hem/Ringa Elbolaget.md",
+    await c.create({ body: "Ringa elbolaget om fakturan", tags: ["hem"] });
+    expect(f.call(0).body).toEqual({ body: "Ringa elbolaget om fakturan", tags: ["hem"] });
+    expect(await c.move("Inbox/Ringa elbolaget.md", "Hem")).toEqual({
+      from: "Inbox/Ringa elbolaget.md",
+      path: "Hem/Ringa elbolaget.md",
     });
-    expect(f.call(1).body).toEqual({ path: "Inbox/Ringa Elbolaget.md", folder: "Hem" });
-    await c.rename("Hem/Ringa Elbolaget.md", "Hem/Elbolaget.md");
-    expect(f.call(2).body).toEqual({ path: "Hem/Ringa Elbolaget.md", to: "Hem/Elbolaget.md" });
+    expect(f.call(1).body).toEqual({ path: "Inbox/Ringa elbolaget.md", folder: "Hem" });
+    await c.rename("Hem/Ringa elbolaget.md", "Hem/Elbolaget.md");
+    expect(f.call(2).body).toEqual({ path: "Hem/Ringa elbolaget.md", to: "Hem/Elbolaget.md" });
     await c.remove("Hem/Elbolaget.md");
     expect(f.call(3).method).toBe("DELETE");
   });

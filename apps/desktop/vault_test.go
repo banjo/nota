@@ -68,7 +68,7 @@ func TestTreeListAndGet(t *testing.T) {
 	s, _, _ := testVault(t, map[string]string{
 		"Projekt/Nota/Sync-protokoll.md": plan,
 		"Projekt/Nota/CLI-kommandon.md":  "# CLI-kommandon\n\nLänkar till [[Sync-protokoll]].\n",
-		"Inbox/Ringa Elbolaget.md":           "Ringa Elbolaget om fakturan\n",
+		"Inbox/Ringa elbolaget.md":       "Ringa elbolaget om fakturan\n",
 		".nota/views/utkast.yaml":        "name: Utkast\nwhere: { status: draft }\n",
 	})
 	tr, err := s.Tree()
@@ -111,7 +111,7 @@ func TestTreeListAndGet(t *testing.T) {
 		t.Fatalf("tag list = %+v, %v", ls, err)
 	}
 	hits, err := s.Search("fakturan", ListQuery{})
-	if err != nil || len(hits) != 1 || hits[0].Path != "Inbox/Ringa Elbolaget.md" {
+	if err != nil || len(hits) != 1 || hits[0].Path != "Inbox/Ringa elbolaget.md" {
 		t.Fatalf("search = %+v, %v", hits, err)
 	}
 	if hits, err := s.Search("  ", ListQuery{}); err != nil || len(hits) != 0 {
