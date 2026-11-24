@@ -61,6 +61,8 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
   const mode = useNoteMode();
   const modeRef = useRef(mode);
   const loadedTitle = useRef(splitTitle(note.body).title);
+  // Where a click in Reading mode asked to start editing.
+  const editAt = useRef<number | null>(null);
 
   const body = () => joinTitle(parts.current);
 
@@ -251,6 +253,30 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
       setEditorMode(v, mode);
       if (mode === "reading") v.contentDOM.blur();
     }
+    const at = editAt.current;
+    editAt.current = null;
+    if (at !== null && mode === "live") {
+      v.focus();
+      v.dispatch({ selection: { anchor: Math.min(at, v.state.doc.length) }, scrollIntoView: true });
+    }
+  }, [mode]);
+
+  // A click in Reading mode starts editing there, unless it opened a
+  // link, ticked a task or selected text.
+  useEffect(() => {
+    const v = view.current;
+    const el = host.current;
+    if (mode !== "reading" || !v || !el) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], a")) return;
+      if (!(window.getSelection()?.isCollapsed ?? true)) return;
+      editAt.current = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+      useUI.getState().setNoteMode("live");
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
   }, [mode]);
 
   // Reading mode ignores typing; say why once.
@@ -296,6 +322,11 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
         data-text-size="own"
         spellCheck={false}
         readOnly={mode === "reading"}
+        onClick={(e) => {
+          if (mode !== "reading") return;
+          if (e.currentTarget.selectionStart !== e.currentTarget.selectionEnd) return;
+          useUI.getState().setNoteMode("live");
+        }}
         onChange={(e) => {
           parts.current = { ...parts.current, title: e.target.value.replace(/\n/g, " ") };
           if (
