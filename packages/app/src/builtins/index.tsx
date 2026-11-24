@@ -6,6 +6,7 @@ import {
   FolderOpen,
   FolderPlus,
   Inbox,
+  ListTree,
   PanelLeft,
   Palette,
   PenLine,
@@ -202,6 +203,14 @@ export function registerBuiltins(r: Registry): () => void {
       icon: Code2,
       when: (ctx) => !!ctx.notePath,
       run: () => useUI.getState().setNoteMode("source"),
+    }),
+    r.register("command", {
+      id: "view.properties.toggle",
+      title: "Toggle properties",
+      group: "View",
+      keywords: ["frontmatter", "metadata", "tags", "status", "hide", "show"],
+      icon: ListTree,
+      run: () => useUI.getState().toggleProperties(),
     }),
     // No shortcut: ⌘⇧L is CodeMirror's select-matches and Safari's
     // sidebar, ⌘⇧D bookmarks every tab in browsers.

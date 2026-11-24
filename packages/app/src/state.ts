@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
+  loadPropertiesPref,
+  type PropertiesPref,
+  savePropertiesPref,
+  toggledPropertiesPref,
+  watchPropertiesPref,
+} from "./lib/propertiesPref.ts";
+import {
   loadNoteMode,
   type NoteMode,
   saveNoteMode,
@@ -44,12 +51,16 @@ interface UIState {
   vaultFlow: { mode: "create" | "open" } | null;
   /** How notes are shown, per device (localStorage nota:note-mode), not per note. */
   noteMode: NoteMode;
+  /** Whether properties show above a note, per device (localStorage nota:properties). */
+  properties: PropertiesPref;
 
   openVaultFlow: (mode: "create" | "open") => void;
   closeVaultFlow: () => void;
   setNoteMode: (mode: NoteMode) => void;
   /** Live ↔ Reading (⌘E). */
   toggleNoteMode: () => void;
+  setProperties: (pref: PropertiesPref) => void;
+  toggleProperties: () => void;
   navigate: (route: Route) => void;
   back: () => void;
   toggleSidebar: () => void;
@@ -79,6 +90,7 @@ export const useUI = create<UIState>()(
       palette: { open: false, mode: "all" },
       expanded: { "section:folders": true, "section:views": true },
       noteMode: loadNoteMode(deviceStorage()),
+      properties: loadPropertiesPref(deviceStorage()),
       vaultFlow: null,
 
       openVaultFlow: (mode) => set({ vaultFlow: { mode } }),
@@ -88,6 +100,11 @@ export const useUI = create<UIState>()(
         set({ noteMode: mode });
       },
       toggleNoteMode: () => get().setNoteMode(toggledNoteMode(get().noteMode)),
+      setProperties: (pref) => {
+        savePropertiesPref(deviceStorage(), pref);
+        set({ properties: pref });
+      },
+      toggleProperties: () => get().setProperties(toggledPropertiesPref(get().properties)),
 
       navigate: (route) => {
         set({ route, pane: "main" });
@@ -132,4 +149,7 @@ export const currentPath = (r: Route) => (r.kind === "note" ? r.path : undefined
 // Another window changed the mode: follow it.
 watchNoteMode(typeof window === "undefined" ? null : window, deviceStorage(), (noteMode) =>
   useUI.setState({ noteMode }),
+);
+watchPropertiesPref(typeof window === "undefined" ? null : window, deviceStorage(), (properties) =>
+  useUI.setState({ properties }),
 );
