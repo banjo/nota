@@ -1,4 +1,11 @@
-import type { Extension, Range } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
+import {
+  type EditorState,
+  type Extension,
+  type Range,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -7,7 +14,16 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { activeLines, type DecoSpec, previewSpecs, toggleTaskAt } from "./decorations.ts";
+import {
+  activeLines,
+  type DecoSpec,
+  type InlineSpec,
+  previewSpecs,
+  type TableCell,
+  type TableSpec,
+  tableSpecs,
+  toggleTaskAt,
+} from "./decorations.ts";
 
 class CheckboxWidget extends WidgetType {
   constructor(readonly checked: boolean) {
@@ -40,6 +56,109 @@ class BulletWidget extends WidgetType {
     return b;
   }
 }
+
+/** Text with its inline specs as spans: hidden ranges dropped, marks nested. */
+function renderInline(parent: HTMLElement, text: string, specs: InlineSpec[]) {
+  const cuts = new Set([0, text.length]);
+  for (const s of specs) {
+    cuts.add(s.from);
+    cuts.add(s.to);
+  }
+  const points = [...cuts].sort((a, b) => a - b);
+  const marks = specs
+    .filter((s): s is Extract<InlineSpec, { type: "mark" }> => s.type === "mark")
+    .sort((a, b) => a.from - b.from || b.to - a.to);
+  for (let i = 0; i < points.length - 1; i++) {
+    const from = points[i]!;
+    const to = points[i + 1]!;
+    if (specs.some((s) => s.type === "hide" && s.from <= from && s.to >= to)) continue;
+    let node: Node = document.createTextNode(text.slice(from, to));
+    for (const m of marks.filter((m) => m.from <= from && m.to >= to).reverse()) {
+      const span = document.createElement("span");
+      span.className = m.class;
+      for (const [k, v] of Object.entries(m.attrs ?? {})) span.setAttribute(k, v);
+      span.append(node);
+      node = span;
+    }
+    parent.append(node);
+  }
+}
+
+class TableWidget extends WidgetType {
+  constructor(readonly table: TableSpec) {
+    super();
+  }
+  eq(other: TableWidget) {
+    return other.table.source === this.table.source;
+  }
+  toDOM() {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-table-widget";
+    const table = document.createElement("table");
+    const row = (cells: TableCell[], tag: "th" | "td") => {
+      const tr = document.createElement("tr");
+      cells.forEach((cell, i) => {
+        const el = document.createElement(tag);
+        const align = this.table.align[i];
+        if (align) el.style.textAlign = align;
+        el.dataset.offset = String(cell.offset + cell.text.length);
+        renderInline(el, cell.text, cell.specs);
+        tr.append(el);
+      });
+      return tr;
+    };
+    const head = document.createElement("thead");
+    head.append(row(this.table.header, "th"));
+    const body = document.createElement("tbody");
+    for (const r of this.table.rows) body.append(row(r, "td"));
+    table.append(head);
+    if (this.table.rows.length) table.append(body);
+    wrap.append(table);
+    return wrap;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+const setFocused = StateEffect.define<boolean>();
+
+/** Whether the editor has focus, as state, for the table field. */
+const focused = StateField.define<boolean>({
+  create: () => false,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setFocused)) return e.value;
+    return value;
+  },
+});
+
+const tableDecorations = (state: EditorState, reading: boolean): DecorationSet =>
+  Decoration.set(
+    tableSpecs(state, {
+      activeLines: reading ? new Set<number>() : activeLines(state, state.field(focused)),
+      reading,
+    }).map((t) =>
+      Decoration.replace({ widget: new TableWidget(t), block: true }).range(t.from, t.to),
+    ),
+  );
+
+/**
+ * Rendered tables replace whole lines, which only a state field may do
+ * (block decorations can't come from a view plugin).
+ */
+const tablesField = (reading: boolean) =>
+  StateField.define<DecorationSet>({
+    create: (state) => tableDecorations(state, reading),
+    update(deco, tr) {
+      const changed =
+        tr.docChanged ||
+        tr.selection ||
+        tr.effects.some((e) => e.is(setFocused)) ||
+        syntaxTree(tr.state) !== syntaxTree(tr.startState);
+      return changed ? tableDecorations(tr.state, reading) : deco;
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
 
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
@@ -152,5 +271,30 @@ export function livePreview(
     },
   });
 
-  return [plugin, clicks];
+  // A click on a rendered table puts the cursor at the end of that cell,
+  // which shows the table's source (Live only).
+  const tableClicks = EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (reading || event.button !== 0) return false;
+      const target = event.target as HTMLElement;
+      const wrap = target.closest<HTMLElement>(".cm-table-widget");
+      if (!wrap) return false;
+      const cell = target.closest<HTMLElement>("[data-offset]");
+      const start = view.posAtDOM(wrap);
+      const anchor = cell ? start + Number(cell.dataset.offset) : view.state.doc.lineAt(start).to;
+      view.dispatch({ selection: { anchor }, scrollIntoView: true, userEvent: "select.pointer" });
+      view.focus();
+      event.preventDefault();
+      return true;
+    },
+  });
+
+  return [
+    focused,
+    EditorView.focusChangeEffect.of((_, focusing) => setFocused.of(focusing)),
+    tablesField(reading),
+    plugin,
+    clicks,
+    tableClicks,
+  ];
 }

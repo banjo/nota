@@ -35,6 +35,27 @@ function cssColors(id: string, mode: "light" | "dark") {
   return { ...base, ...(id === "nota" ? {} : block(palettesCss, sel)) };
 }
 
+/** The colours code is drawn in, with the fallbacks the editor uses. */
+function syntaxColors(v: Record<string, string>): Record<string, string | undefined> {
+  return {
+    keyword: v["--md-syntax-keyword"] ?? v["--ink-strong"],
+    string: v["--md-syntax-string"],
+    number: v["--md-syntax-number"],
+    comment: v["--md-syntax-comment"] ?? v["--muted-foreground"],
+    function: v["--md-syntax-function"] ?? v["--ink"],
+    type: v["--md-syntax-type"] ?? v["--md-tag"] ?? v["--ink-strong"],
+  };
+}
+
+/** Strings and numbers ≥ 4.5:1 on code; the accents, like ink, ≥ 3:1. */
+function expectReadableCode(v: Record<string, string>) {
+  for (const [k, c] of Object.entries(syntaxColors(v))) {
+    expect(c, k).toBeDefined();
+    const min = k === "string" || k === "number" ? 4.5 : 3;
+    expect(contrast(c!, v["--code"]!), k).toBeGreaterThanOrEqual(min);
+  }
+}
+
 describe("colour themes", () => {
   const cases: [string, "light" | "dark"][] = BUILTIN_THEMES.flatMap((t) => [
     [t.id, "light"],
@@ -59,6 +80,7 @@ describe("colour themes", () => {
     // Muted labels too, where the theme sets them.
     if (vars["--muted-foreground"]?.startsWith("#"))
       expect(contrast(vars["--muted-foreground"], c.background)).toBeGreaterThanOrEqual(4.5);
+    expectReadableCode(vars);
   });
 
   test.each(CLASSIC_THEMES.flatMap((t) => [[t.id, "light"] as const, [t.id, "dark"] as const]))(
@@ -80,6 +102,11 @@ describe("colour themes", () => {
       }
       if (tk["--md-code"])
         expect(contrast(tk["--md-code"], tk["--code"]!)).toBeGreaterThanOrEqual(3);
+      // Table headers are body text on their own background.
+      const header = tk["--md-table-header"] ?? tk["--code"]!;
+      const headerText = tk["--foreground"]!;
+      expect(contrast(headerText, header), "table header").toBeGreaterThanOrEqual(4.5);
+      expectReadableCode(tk);
     },
   );
 

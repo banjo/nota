@@ -215,6 +215,8 @@ function PreviewEditor({ doc, draft }: { doc: ExternalDoc; draft: string | undef
   const view = useRef<EditorView | null>(null);
   const editing = draft !== undefined;
   const shown = useRef(draft ?? doc.body);
+  // Where a click in the preview asked to start editing.
+  const editAt = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     const id = doc.id;
@@ -271,7 +273,31 @@ function PreviewEditor({ doc, draft }: { doc: ExternalDoc; draft: string | undef
     }
     setEditorMode(v, editing ? "live" : "reading");
     if (editing && !v.hasFocus) v.focus();
+    const at = editAt.current;
+    editAt.current = null;
+    if (editing && at !== null)
+      v.dispatch({ selection: { anchor: Math.min(at, v.state.doc.length) }, scrollIntoView: true });
   }, [draft, doc.body, editing]);
+
+  // A click in the preview starts a draft there, unless it opened a
+  // link, ticked a task or selected text.
+  useEffect(() => {
+    const v = view.current;
+    const el = host.current;
+    if (editing || !v || !el) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], a")) return;
+      if (!(window.getSelection()?.isCollapsed ?? true)) return;
+      editAt.current = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+      editPreview(qc, doc.id);
+      // Not editable (not UTF-8): don't carry the position to a later Edit.
+      if (useOpened.getState().drafts[doc.id] === undefined) editAt.current = null;
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+  }, [editing, doc.id]);
 
   return <div ref={host} className="nota-editor min-h-[40vh] text-editor" />;
 }

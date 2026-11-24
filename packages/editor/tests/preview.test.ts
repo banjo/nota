@@ -7,6 +7,7 @@ import {
   findTags,
   parseWikilink,
   previewSpecs,
+  tableSpecs,
   toggleTaskAt,
   type DecoSpec,
 } from "../src/index.ts";
@@ -197,5 +198,76 @@ describe("lists and tasks", () => {
     expect(toggleTaskAt(s, doc.indexOf("slut"))).toBeNull();
     const after = s.update({ changes: toggleTaskAt(s, second)! }).state;
     expect(after.doc.line(2).text).toBe("- [x] Namnformat");
+  });
+});
+
+describe("tables", () => {
+  const doc = [
+    "Intro",
+    "",
+    "| Name | **Age** | Länk |",
+    "|:--|:-:|--:|",
+    "| Ann |  | [[Plan\\|planen]] |",
+    "| Bo |",
+    "",
+    "slut",
+  ].join("\n");
+  const tables = (cursor: number, focused = true) => {
+    const s = state(doc, cursor);
+    return tableSpecs(s, { activeLines: activeLines(s, focused) });
+  };
+
+  test("render in place of their lines while the cursor is elsewhere", () => {
+    const [t, ...rest] = tables(doc.length);
+    expect(rest).toEqual([]);
+    expect(text(doc, t!)).toBe(doc.split("\n").slice(2, 6).join("\n"));
+    expect(t!.align).toEqual(["left", "center", "right"]);
+    expect(t!.header.map((c) => c.text)).toEqual(["Name", "**Age**", "Länk"]);
+    expect(t!.rows.map((r) => r.map((c) => c.text))).toEqual([
+      ["Ann", "", "[[Plan\\|planen]]"],
+      ["Bo", "", ""],
+    ]);
+  });
+
+  test("cells carry their inline formatting", () => {
+    const [t] = tables(doc.length);
+    const age = t!.header[1]!;
+    expect(age.specs.filter((s) => s.type === "hide").map((s) => text(age.text, s))).toEqual([
+      "**",
+      "**",
+    ]);
+    const link = t!.rows[0]![2]!;
+    const wl = link.specs.find((s) => s.type === "mark" && s.class === "cm-wikilink");
+    expect(wl && text(link.text, wl)).toBe("planen");
+    expect(wl?.type === "mark" && wl.attrs).toEqual({ "data-wikilink": "Plan" });
+  });
+
+  test("cell offsets point at the cell's text in the source", () => {
+    const [t] = tables(doc.length);
+    for (const cell of [...t!.header, ...t!.rows.flat()].filter((c) => c.text))
+      expect(doc.slice(t!.from + cell.offset).startsWith(cell.text)).toBe(true);
+  });
+
+  test("show their source, in monospace, while the cursor is in them", () => {
+    const cursor = doc.indexOf("Ann");
+    expect(tables(cursor)).toEqual([]);
+    const { specs: sp } = specs(doc, { cursor });
+    expect(lines(sp, "cm-table-source").length).toBe(4);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toContain("|:--|:-:|--:|");
+    expect(hidden(doc, sp)).toEqual([]);
+  });
+
+  test("render when the editor is not focused, and are not decorated as source", () => {
+    expect(tables(doc.indexOf("Ann"), false).length).toBe(1);
+    const { specs: sp } = specs(doc, { cursor: doc.indexOf("Ann"), focused: false });
+    expect(lines(sp, "cm-table-source")).toEqual([]);
+  });
+
+  test("in a quote keep their source", () => {
+    const quoted = "> | a | b |\n> |---|---|\n> | 1 | 2 |\n\nslut";
+    const s = state(quoted);
+    expect(tableSpecs(s, { activeLines: new Set() })).toEqual([]);
+    const sp = previewSpecs(s, { activeLines: new Set() });
+    expect(hidden(quoted, sp)).toEqual(["> ", "> ", "> "]);
   });
 });
