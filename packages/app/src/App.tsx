@@ -10,6 +10,8 @@ import { Onboarding } from "./onboarding/Onboarding.tsx";
 import { ClientContext } from "./context.ts";
 import { isMac } from "./lib/shortcuts.ts";
 import { useChangeSubscription } from "./queries.ts";
+import { useNarrow, useViewport } from "./lib/viewport.ts";
+import { useUI } from "./state.ts";
 import { createRegistry, type Registry, RegistryContext, useContributions } from "./registry.ts";
 import { useTheme, useThemeChrome, useThemeTokens } from "./theme/useTheme.ts";
 
@@ -34,9 +36,23 @@ function Changes({ client }: { client: NotesClient }) {
 /** Toasts in the mode in effect, and the chrome around the page with it. */
 function Themed({ client }: { client: NotesClient }) {
   const theme = useTheme();
+  const narrow = useNarrow();
+  const navPane = useUI((s) => s.pane === "nav");
+  useViewport();
   useThemeTokens(theme, useContributions("theme"));
-  useThemeChrome(theme, client.shell);
-  return <Toaster theme={theme.resolved} />;
+  // A phone's status bar sits over whichever pane is on screen.
+  useThemeChrome(theme, client.shell, narrow && navPane ? "--sidebar" : "--background");
+  // On a phone toasts drop in from the top, clear of the notch, where
+  // the home indicator and the keyboard can't cover them.
+  return narrow ? (
+    <Toaster
+      theme={theme.resolved}
+      position="top-center"
+      mobileOffset={{ top: "calc(var(--safe-top) + 8px)" }}
+    />
+  ) : (
+    <Toaster theme={theme.resolved} />
+  );
 }
 
 /** Providers shared by the main window and the quick-capture window. */

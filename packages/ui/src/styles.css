@@ -83,7 +83,23 @@
   --animate-pop-in: pop-in 160ms var(--ease-out);
   --animate-fade-in: fade-in 140ms var(--ease-out);
   --animate-slide-in: slide-in 220ms var(--ease-drawer);
+  --animate-slide-back: slide-back 220ms var(--ease-drawer);
   --animate-rise: rise 220ms var(--ease-out) backwards;
+  /* Sheets: in on the iOS drawer curve, out faster than in. */
+  --animate-sheet-in: sheet-in 300ms var(--ease-drawer);
+  --animate-sheet-out: sheet-out 200ms var(--ease-out) forwards;
+  --animate-fade-out: fade-out 200ms var(--ease-out) forwards;
+}
+
+/* Plain variables too: inline styles (sheet drag) and env() use them. */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* The notch, the home indicator and landscape's sides (viewport-fit=cover). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 
 @keyframes pop-in {
@@ -109,6 +125,27 @@
     opacity: 0;
   }
 }
+@keyframes slide-back {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
 
 @layer base {
   *,
@@ -117,9 +154,19 @@
     border-color: var(--hairline);
   }
   html,
-  body,
-  #root {
+  body {
     height: 100%;
+    /* An app, not a document: no pull-to-refresh, no page rubber band.
+       Scrolling panes use overscroll-contain. */
+    overscroll-behavior: none;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  /* The visible height, URL bar or not; the keyboard shrinks it where the
+     browser doesn't (useViewport sets --app-height while it is open). */
+  #root {
+    height: var(--app-height, 100dvh);
   }
   body {
     margin: 0;
@@ -147,6 +194,16 @@
   button {
     cursor: default;
   }
+  /* Controls: no double-tap-zoom wait, no long-press callout. Their text
+     is already unselectable (body). */
+  button,
+  a,
+  [role="button"],
+  [role="menuitem"],
+  [role="treeitem"] {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+  }
   :focus-visible {
     outline: 2px solid var(--ink);
     outline-offset: 2px;
@@ -156,11 +213,54 @@
   }
 }
 
+/* iOS zooms into any field under 16px and stays zoomed: under a finger
+   every field is at least 16px. Unlayered, so it beats the utilities;
+   bigger fields (the note title) opt out with data-text-size="own". */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [data-text-size="own"]),
+  textarea:not([data-text-size="own"]),
+  select,
+  .nota-editor .cm-editor {
+    font-size: 16px;
+  }
+}
+
+/* Reduced motion: things still fade, nothing slides or scales. The same
+   names, later in the sheet, win while the media query matches. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
   ::after {
-    animation-duration: 1ms !important;
     transition-duration: 1ms !important;
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-back {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      opacity: 0;
+    }
   }
 }

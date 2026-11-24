@@ -293,6 +293,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
         rows={1}
         aria-label="Title"
         placeholder="Untitled"
+        data-text-size="own"
         spellCheck={false}
         readOnly={mode === "reading"}
         onChange={(e) => {
