@@ -9,14 +9,13 @@ import { label, matches } from "../lib/shortcuts.ts";
 import { type CommandContext, useRegistry } from "../registry.ts";
 import { currentPath, type Route, useUI } from "../state.ts";
 import { useList } from "../queries.ts";
-import { Onboarding } from "../onboarding/Onboarding.tsx";
 import { EmptyState } from "./EmptyState.tsx";
 import { ConfirmDialog, ExternalPage } from "./ExternalPage.tsx";
 import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
 import { NotePage } from "./NotePage.tsx";
 import { OpenedFiles } from "./OpenedFiles.tsx";
-import { Settings } from "./Settings.tsx";
+import { Onboarding, preloadScreens, Settings } from "./lazy.tsx";
 import { Palette } from "./Palette.tsx";
 import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
 import { RowSheet } from "./RowSheet.tsx";
@@ -151,6 +150,7 @@ function OpenRecent() {
 }
 
 export function Shell({ children }: { children?: ReactNode }) {
+  useEffect(preloadScreens, []);
   const route = useUI((s) => s.route);
   const sidebarOpen = useUI((s) => s.sidebarOpen);
   const pane = useUI((s) => s.pane);

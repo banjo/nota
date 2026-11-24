@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { registerBuiltins } from "./builtins/index.tsx";
 import { Shell } from "./components/Shell.tsx";
-import { Onboarding } from "./onboarding/Onboarding.tsx";
+import { Onboarding } from "./components/lazy.tsx";
 import { ClientContext } from "./context.ts";
 import { isMac } from "./lib/shortcuts.ts";
 import { useChangeSubscription } from "./queries.ts";

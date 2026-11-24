@@ -257,6 +257,28 @@ const CHECKS = {
     await shot(page, "folder-context-menu");
     await page.keyboard.press("Escape");
   },
+  // Settings (its own chunk now) opens from the sidebar and from ⌘K, and
+  // a theme picked there applies.
+  async "settings page"(page) {
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByText("Appearance", { exact: true }).first().waitFor();
+    await shot(page, "settings");
+    await page
+      .getByRole("radio", { name: /Graphite/ })
+      .first()
+      .click();
+    await page.waitForFunction(() => document.documentElement.dataset.palette === "graphite");
+    await page.keyboard.press("Control+k");
+    await page.locator("[cmdk-input]").waitFor();
+    await page.keyboard.type("Open inbox", { delay: 20 });
+    await page
+      .getByRole("option", { name: /^Open inbox/ })
+      .first()
+      .click();
+    await page.waitForTimeout(350);
+    await page.keyboard.press("Control+Comma");
+    await page.getByText("Appearance", { exact: true }).first().waitFor();
+  },
 };
 
 let failed = 0;
