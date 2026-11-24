@@ -158,6 +158,7 @@ Shapes:
 | `GET …/inbox` | → `{notes, count}` the inbox folder, newest first |
 | `GET …/tags` | → `{tags: [{tag, count}]}` |
 | `GET …/views` | → `{views: [{id, name, icon, where, tag, folder, sort, file, count}]}` from `.nota/views/*.yaml` |
+| `GET …/plugins` | → `{plugins: [{id, name, version?, description?, author?, contributes: {themes: [{id, name, light?, dark?}]}, dir, error?}]}` from `.nota/plugins/*/manifest.json`; a broken plugin has only `id`, `dir` and `error` ([themes](themes.md)) |
 | `GET …/notes/{path}` | → `Note`; `404 not_found` |
 | `POST …/notes` | `{title?, body?, folder?, tags?, properties?}` → `201 Note`. Default folder is the inbox (`"/"` is the root); the file name comes from the title; `created` is stamped. Hooks may move it: the response shows where it ended up. |
 | `PUT …/notes/{path}` | header `Base-Version: <version>` (required; `0` creates the note at that path), body `{content}` (whole file) or `{body}` (keeps the frontmatter) → `Note`. A stale base is `409 version_mismatch` with `current`, like sync. `updated` is set when the note has frontmatter. |

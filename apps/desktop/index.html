@@ -25,6 +25,12 @@
         // "jade" is the default palette now (store.ts, RENAMED_PALETTES).
         if (p === "jade") p = "nota";
         d.dataset.palette = p && /^[a-z0-9][a-z0-9.-]*$/.test(p) ? p : "nota";
+        // A theme made of tokens (theme/useTheme.ts keeps this cache).
+        try {
+          var c = JSON.parse(localStorage.getItem("nota:palette-tokens") || "null");
+          var m = c && c.id === d.dataset.palette && c.tokens && c.tokens[t];
+          for (var k in m || {}) if (/^--[a-z-]+$/.test(k)) d.style.setProperty(k, m[k]);
+        } catch (e) {}
       })();
     </script>
   </head>

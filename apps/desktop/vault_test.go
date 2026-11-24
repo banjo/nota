@@ -279,6 +279,33 @@ func TestCreateFolderShowsInTree(t *testing.T) {
 	}
 }
 
+func TestPluginsAndTheirChanges(t *testing.T) {
+	s, dir, changed := testVault(t, map[string]string{"A.md": "# A\n"})
+	if ps, err := s.Plugins(); err != nil || ps == nil || len(ps) != 0 {
+		t.Fatalf("no plugins = %v, %v", ps, err)
+	}
+	p := filepath.Join(dir, ".nota", "plugins", "night")
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"contributes":{"themes":[{"id":"ink","dark":{"background":"#000000","text":"#ffffff","ink":"#8be9fd"}}]}}`
+	if err := os.WriteFile(filepath.Join(p, "manifest.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ps, err := s.Plugins()
+	if err != nil || len(ps) != 1 || ps[0].ID != "night" || ps[0].Contributes.Themes[0].ID != "ink" {
+		t.Fatalf("plugins = %+v, %v", ps, err)
+	}
+	// An edit to a manifest tells the frontend, though no note changed.
+	s.applyFileEvents([]mygo.FileEvent{
+		{Op: mygo.FileCreate, Path: ".nota/plugins/night", IsDir: true},
+		{Op: mygo.FileWrite, Path: ".nota/plugins/night/manifest.json"},
+	})
+	if c := changed(); !slices.Equal(c, []string{".nota/plugins"}) {
+		t.Fatalf("changed = %v", c)
+	}
+}
+
 func watchBatch(paths ...string) []mygo.FileEvent {
 	out := make([]mygo.FileEvent, len(paths))
 	for i, p := range paths {
@@ -296,6 +323,7 @@ func TestWatchIgnored(t *testing.T) {
 		{".git", true, true}, {".trash", true, true}, {"Projekt/node_modules", true, true},
 		{".nota", true, false}, {".nota/base", true, true}, {".nota/index.db", false, true}, {".nota/index.db-wal", false, true},
 		{".nota/views", true, false}, {".nota/views/utkast.yaml", false, false},
+		{".nota/plugins", true, false}, {".nota/plugins/night/manifest.json", false, false},
 		{"Projekt", true, false}, {"Projekt/Plan.md", false, false},
 	} {
 		if got := watchIgnored(c.path, c.dir); got != c.want {

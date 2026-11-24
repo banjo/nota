@@ -10,6 +10,7 @@ import type {
   Note,
   NoteInfo,
   OpenerApi,
+  PluginInfo,
   PropertyPatch,
   ServerVaultApi,
   ShellApi,
@@ -66,6 +67,8 @@ export interface NotesClient {
   search(query: string, filter?: ListQuery): Promise<NoteInfo[]>;
   tags(): Promise<TagCount[]>;
   views(): Promise<ViewInfo[]>;
+  /** The vault's plugins (.nota/plugins), broken ones with their error. */
+  plugins(): Promise<PluginInfo[]>;
   history(path: string): Promise<HistoryEntry[]>;
   restore(path: string, version: number): Promise<void>;
   /** Calls listener whenever notes change, from anywhere. */

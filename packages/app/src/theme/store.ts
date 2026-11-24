@@ -25,6 +25,11 @@ export interface ThemeState {
 
 export const THEME_KEY = "nota:theme";
 export const PALETTE_KEY = "nota:palette";
+/**
+ * The tokens of the chosen theme when they are not in CSS ({id, light,
+ * dark}), so the pre-paint script in index.html can set them too.
+ */
+export const TOKENS_KEY = "nota:palette-tokens";
 export const DEFAULT_PALETTE = "nota";
 
 const PALETTE_ID = /^[a-z0-9][a-z0-9.-]*$/;

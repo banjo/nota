@@ -13,6 +13,7 @@ import type {
   NoteInfo,
   Opened,
   OpenerApi,
+  PluginInfo,
   PropertyPatch,
   SyncStatus,
   TagCount,
@@ -63,6 +64,7 @@ export interface MygoBindings {
     search(q: string, filter: ListQuery): Promise<NoteInfo[] | null>;
     tags(): Promise<TagCount[] | null>;
     views(): Promise<ViewInfo[] | null>;
+    plugins(): Promise<PluginInfo[] | null>;
     history(path: string): Promise<HistoryEntry[] | null>;
     restore(path: string, version: number): Promise<void>;
     syncStatus(): Promise<SyncStatus>;
@@ -205,6 +207,7 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     search: async (q, filter = {}) => (q.trim() ? list(await v.search(q, filter)) : []),
     tags: async () => list(await v.tags()),
     views: async () => list(await v.views()),
+    plugins: async () => list(await v.plugins()),
     history: async (path) => list(await v.history(path)),
     restore: (path, version) => v.restore(path, version),
     subscribe: (listener: (e: ChangeEvent) => void) =>

@@ -2,3 +2,6 @@
 declare module "node:fs" {
   export function readFileSync(path: URL | string, encoding: "utf8"): string;
 }
+declare module "node:vm" {
+  export function runInNewContext(code: string, context: Record<string, unknown>): unknown;
+}

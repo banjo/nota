@@ -17,6 +17,7 @@ export const keys = {
   inbox: ["inbox"] as const,
   tags: ["tags"] as const,
   views: ["views"] as const,
+  plugins: ["plugins"] as const,
   note: (path: string) => ["note", path] as const,
   list: (q: ListQuery) => ["list", q] as const,
   search: (q: string) => ["search", q] as const,
@@ -43,6 +44,10 @@ export const useTags = () => {
 export const useViews = () => {
   const c = useClient();
   return useQuery({ queryKey: keys.views, queryFn: () => c.views() });
+};
+export const usePlugins = () => {
+  const c = useClient();
+  return useQuery({ queryKey: keys.plugins, queryFn: () => c.plugins(), retry: false });
 };
 export const useList = (q: ListQuery, enabled = true) => {
   const c = useClient();
@@ -87,6 +92,8 @@ export function useChangeSubscription(client: NotesClient) {
       client.subscribe(({ paths }) => {
         for (const k of [keys.tree, keys.inbox, keys.tags, keys.views, ["list"], ["search"]])
           void qc.invalidateQueries({ queryKey: k });
+        if (paths.length === 0 || paths.some((p) => p.startsWith(".nota/plugins")))
+          void qc.invalidateQueries({ queryKey: keys.plugins });
         if (paths.length === 0) void qc.invalidateQueries({ queryKey: ["note"] });
         else for (const p of paths) void qc.invalidateQueries({ queryKey: keys.note(p) });
         // Backlinks of other notes may have changed too.

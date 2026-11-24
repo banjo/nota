@@ -2,6 +2,8 @@ import { describe, expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 import { registerBuiltins } from "../src/builtins/index.tsx";
 import { createRegistry } from "../src/registry.ts";
+import { CLASSIC_THEMES } from "../src/theme/classics.ts";
+import { contrastIssues } from "../src/theme/custom.ts";
 import { BUILTIN_THEMES, type ColorTheme, contrast } from "../src/theme/themes.ts";
 
 // Read from disk: the test runner turns CSS imports into empty modules.
@@ -59,6 +61,42 @@ describe("colour themes", () => {
       expect(contrast(vars["--muted-foreground"], c.background)).toBeGreaterThanOrEqual(4.5);
   });
 
+  test.each(CLASSIC_THEMES.flatMap((t) => [[t.id, "light"] as const, [t.id, "dark"] as const]))(
+    "classic %s %s is readable",
+    (id, mode) => {
+      const theme = CLASSIC_THEMES.find((t) => t.id === id)!;
+      expect(contrastIssues(theme)).toEqual([]);
+      const tk = theme.tokens![mode]!;
+      const c = theme[mode];
+      // The swatch draws what the tokens paint.
+      expect(tk["--background"]).toBe(c.background);
+      expect(tk["--sidebar"]).toBe(c.sidebar);
+      expect(tk["--ink"]).toBe(c.ink);
+      expect(contrast(tk["--muted-foreground"]!, c.background)).toBeGreaterThanOrEqual(4.5);
+      // Markdown colours are accents, like ink: ≥ 3:1 where they are drawn.
+      for (const k of ["heading", "bold", "italic", "link", "tag", "quote"]) {
+        const v = tk[`--md-${k}`];
+        if (v) expect(contrast(v, c.background), k).toBeGreaterThanOrEqual(3);
+      }
+      if (tk["--md-code"])
+        expect(contrast(tk["--md-code"], tk["--code"]!)).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  test("classics have both modes, unique ids and a group", () => {
+    const ids = [...BUILTIN_THEMES, ...CLASSIC_THEMES].map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(CLASSIC_THEMES.length).toBeGreaterThanOrEqual(5);
+    expect(CLASSIC_THEMES.length).toBeLessThanOrEqual(10);
+    for (const t of CLASSIC_THEMES) {
+      expect(t.only).toBeUndefined();
+      expect(t.group).toBe("Classics");
+    }
+    const dracula = CLASSIC_THEMES.find((t) => t.id === "dracula")!;
+    expect(dracula.dark.background).toBe("#282a36");
+    expect(dracula.tokens?.dark?.["--md-tag"]).toBe("#ff79c6");
+  });
+
   test("contrast is WCAG's", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21);
     expect(contrast("#ffffff", "#ffffff")).toBe(1);
@@ -83,14 +121,9 @@ describe("colour themes", () => {
   test("themes are registry contributions, sorted, and a plugin can add one", () => {
     const r = createRegistry();
     const off = registerBuiltins(r);
-    expect(r.get("theme").map((t) => t.id)).toEqual([
-      "nota",
-      "indigo",
-      "graphite",
-      "paper",
-      "forest",
-      "rose",
-    ]);
+    const ids = () => r.get("theme").map((t) => t.id);
+    const classics = CLASSIC_THEMES.map((t) => t.id);
+    expect(ids()).toEqual(["nota", "indigo", "graphite", "paper", "forest", "rose", ...classics]);
     const mine: ColorTheme = {
       id: "plugin.sea",
       name: "Sea",
@@ -100,7 +133,7 @@ describe("colour themes", () => {
       tokens: { light: { "--ink": "#1d6f8a" }, dark: { "--ink": "#7cc4dc" } },
     };
     const offMine = r.register("theme", mine);
-    expect(r.get("theme").map((t) => t.id)).toEqual([
+    expect(ids()).toEqual([
       "nota",
       "indigo",
       "graphite",
@@ -108,13 +141,15 @@ describe("colour themes", () => {
       "plugin.sea",
       "forest",
       "rose",
+      ...classics,
     ]);
     offMine();
-    expect(r.get("theme")).toHaveLength(6);
-    // ⌘K: one toggle and a command per built-in theme.
+    expect(r.get("theme")).toHaveLength(6 + classics.length);
+    // ⌘K: one toggle and a command per theme.
     expect(r.command("theme.toggleDark")?.title).toBe("Toggle dark mode");
     expect(r.command("theme.toggleDark")?.shortcut).toBeUndefined();
     expect(r.command("theme.palette.paper")?.title).toBe("Theme: Paper");
+    expect(r.command("theme.palette.dracula")?.title).toBe("Theme: Dracula");
     off();
     expect(r.get("theme")).toHaveLength(0);
   });

@@ -22,6 +22,7 @@ nota folder ls                                 # Every folder with its note coun
 nota folder rename Projects Work                # Moves every note in it; links name notes, so none change.
 nota inbox
 nota ls --view drafts                          # .nota/views/drafts.yaml
+nota plugins                                   # .nota/plugins: themes, or why one is broken
 nota backlinks Plan
 nota index --rebuild
 nota completion zsh > "${fpath[1]}/_nota"

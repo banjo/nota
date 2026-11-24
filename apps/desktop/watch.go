@@ -11,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo"
 
+	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/vault"
 )
 
@@ -18,7 +19,8 @@ import (
 // the sync engine, a hook, or another program editing the files.
 type Changes struct {
 	// Paths are the vault paths that changed (old and new paths of a
-	// move). ".nota/views" stands for the saved views.
+	// move). ".nota/views" stands for the saved views, ".nota/plugins"
+	// for the plugins.
 	Paths []string `json:"paths"`
 	// Seq counts the change batches since the app started.
 	Seq int64 `json:"seq"`
@@ -77,12 +79,19 @@ func (c *notifier) seq() int64 {
 	return c.n
 }
 
-// viewsDir holds the saved views, the one part of .nota/ the UI shows.
-const viewsDir = vault.MetaDirName + "/views"
+// viewsDir holds the saved views and pluginsDir the plugins, the parts
+// of .nota/ the UI shows.
+const (
+	viewsDir   = vault.MetaDirName + "/views"
+	pluginsDir = plugins.Dir
+)
+
+// under reports whether p is dir or inside it.
+func under(p, dir string) bool { return p == dir || strings.HasPrefix(p, dir+"/") }
 
 // watchIgnored leaves out what never shows in the UI: .git, the trash,
-// and .nota/ apart from the views (the index and sync state change on
-// every write).
+// and .nota/ apart from the views and plugins (the index and sync state
+// change on every write).
 func watchIgnored(p string, isDir bool) bool {
 	switch base := path.Base(p); {
 	case isDir && (base == ".git" || base == ".trash" || base == ".obsidian" || base == "node_modules"):
@@ -90,7 +99,7 @@ func watchIgnored(p string, isDir bool) bool {
 	case p == vault.MetaDirName:
 		return false
 	case strings.HasPrefix(p, vault.MetaDirName+"/"):
-		return !(p == viewsDir || strings.HasPrefix(p, viewsDir+"/"))
+		return !under(p, viewsDir) && !under(p, pluginsDir)
 	}
 	return false
 }
@@ -121,14 +130,16 @@ func (s *Vault) watch(ctx context.Context) {
 // updated the index already, so they find nothing new here.
 func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 	var paths []string
-	views := false
+	views, plugs := false, false
 	var dirs []string
 	for _, e := range evs {
 		for _, p := range []string{e.Path, e.OldPath} {
 			switch {
 			case p == "":
-			case strings.HasPrefix(p, viewsDir):
+			case under(p, viewsDir):
 				views = true
+			case under(p, pluginsDir):
+				plugs = true
 			case vault.IsNote(p):
 				paths = append(paths, vault.NFC(p))
 			case e.IsDir && p != ".":
@@ -139,6 +150,10 @@ func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 	// Folders made, removed or renamed by other programs change the tree
 	// even though no note (and so nothing in the index) did.
 	s.changes.add(dirs...)
+	// Plugins don't touch the index: the frontend reads them again.
+	if plugs {
+		s.changes.add(pluginsDir)
+	}
 	if len(paths) == 0 && !views {
 		return
 	}

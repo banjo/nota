@@ -106,6 +106,31 @@ export interface ViewInfo {
   count: number;
 }
 
+/** The colour tokens of one mode of a theme, without the leading "--". */
+export type ThemeTokens = Record<string, string>;
+
+/** A colour theme a plugin contributes (docs/themes.md). */
+export interface PluginTheme {
+  id: string;
+  name: string;
+  light?: ThemeTokens;
+  dark?: ThemeTokens;
+}
+
+/** A plugin from .nota/plugins/<folder>/manifest.json. */
+export interface PluginInfo {
+  id: string;
+  name: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  contributes: { themes: PluginTheme[] };
+  /** The plugin's folder in the vault. */
+  dir: string;
+  /** Why the plugin did not load; nothing else is set then. */
+  error?: string;
+}
+
 export interface CreateInput {
   title?: string;
   body?: string;

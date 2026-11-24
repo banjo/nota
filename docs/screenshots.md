@@ -52,8 +52,9 @@ On a narrow window the switch shows icons only ([narrow](screenshots/mode-narrow
 
 ## Themes
 
-Settings › Appearance picks System, Light or Dark and one of six colour themes (Nota, Indigo,
-Graphite, Paper, Forest, Rose; Nota is the default, in Jade); ⌘K has "Toggle dark mode" and "Theme: …". The choice is kept per
+Settings › Appearance picks System, Light or Dark and a colour theme: Nota's six (Nota, Indigo,
+Graphite, Paper, Forest, Rose; Nota is the default, in Jade), nine classics such as Dracula and
+Nord, and the vault's own ([docs/themes.md](themes.md)); ⌘K has "Toggle dark mode" and "Theme: …". The choice is kept per
 device, applied before the first paint, and followed by the quick-capture window and the desktop
 window chrome. Every theme keeps body text at ≥ 4.5:1 and its ink at ≥ 3:1 in both modes
 (`packages/app/tests/themes.test.ts`).

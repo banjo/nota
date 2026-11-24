@@ -14,7 +14,6 @@ import {
   Inbox,
   ListTree,
   PanelLeft,
-  Palette,
   PenLine,
   Search,
   Settings,
@@ -42,6 +41,8 @@ import type { Registry } from "../registry.ts";
 
 import { suggestFolders } from "../lib/suggest.ts";
 import { themeStore } from "../theme/store.ts";
+import { CLASSIC_THEMES } from "../theme/classics.ts";
+import { registerTheme } from "../theme/register.ts";
 import { BUILTIN_THEMES } from "../theme/themes.ts";
 import { type Route, useUI } from "../state.ts";
 import type { Tree } from "@nota/client";
@@ -75,8 +76,6 @@ export function registerBuiltins(r: Registry): () => void {
       id: "nota.rules",
       suggest: (note, { tree }) => suggestFolders(note, tree),
     }),
-
-    ...BUILTIN_THEMES.map((t) => r.register("theme", t)),
 
     // No default tree decoration: a status is read in the page, and the
     // tree stays quiet. Plugins get the same hook through the registry.
@@ -337,16 +336,8 @@ export function registerBuiltins(r: Registry): () => void {
       icon: SunMoon,
       run: () => themeStore().toggleDark(),
     }),
-    ...BUILTIN_THEMES.map((t) =>
-      r.register("command", {
-        id: `theme.palette.${t.id}`,
-        title: `Theme: ${t.name}`,
-        group: "View",
-        keywords: ["colour", "color", "palette", "appearance"],
-        icon: Palette,
-        run: () => themeStore().setPalette(t.id),
-      }),
-    ),
+    // Each theme, with its "Theme: …" command.
+    ...[...BUILTIN_THEMES, ...CLASSIC_THEMES].map((t) => registerTheme(r, t)),
     // On the desktop a vault is a folder (the setup wizard, then a
     // relaunch); on the web it is one of the account's server vaults.
     r.register("command", {

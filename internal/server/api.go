@@ -13,6 +13,7 @@ import (
 
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/index"
+	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
 	nvault "github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
@@ -42,6 +43,7 @@ func (s *Server) apiRoutes() {
 	s.route("GET /v1/api/vaults/{vault}/search", ro, s.apiSearch)
 	s.route("GET /v1/api/vaults/{vault}/tags", ro, s.apiTags)
 	s.route("GET /v1/api/vaults/{vault}/views", ro, s.apiViews)
+	s.route("GET /v1/api/vaults/{vault}/plugins", ro, s.apiPlugins)
 	s.route("GET /v1/api/vaults/{vault}/inbox", ro, s.apiInbox)
 	s.route("GET /v1/api/vaults/{vault}/history/{path...}", ro, s.apiHistory)
 	s.route("POST /v1/api/vaults/{vault}/history/{path...}", ro, s.apiRestore)
@@ -391,6 +393,23 @@ func (s *Server) apiTags(w http.ResponseWriter, r *http.Request, p Principal) er
 		ts = []index.TagCount{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"tags": ts})
+	return nil
+}
+
+// apiPlugins lists the vault's plugins (.nota/plugins), broken ones
+// with their error.
+func (s *Server) apiPlugins(w http.ResponseWriter, r *http.Request, p Principal) error {
+	ws, err := s.openWS(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	ps, err := plugins.Load(ws.client)
+	ws.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plugins": ps})
 	return nil
 }
 

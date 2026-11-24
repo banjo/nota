@@ -19,17 +19,19 @@ export const isEditorMode = (v: unknown): v is EditorMode =>
   v === "live" || v === "reading" || v === "source";
 
 const v = (name: string, fallback: string) => `var(--${name}, ${fallback})`;
+const md = (name: string, token: string, fallback: string) =>
+  `var(--md-${name}, ${v(token, fallback)})`;
 
 /** Syntax colours for Source mode, from the app's CSS variables. */
 export const sourceHighlight = HighlightStyle.define([
-  { tag: t.heading, fontWeight: "650", color: v("foreground", "#1d1f24") },
-  { tag: t.strong, fontWeight: "650" },
-  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: t.heading, fontWeight: "650", color: md("heading", "foreground", "#1d1f24") },
+  { tag: t.strong, fontWeight: "650", color: "var(--md-bold, inherit)" },
+  { tag: t.emphasis, fontStyle: "italic", color: "var(--md-italic, inherit)" },
   { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: [t.link, t.url], color: v("ink", "#1e7363") },
-  { tag: t.monospace, color: v("ink-strong", "#2f40b3") },
-  { tag: t.labelName, color: v("ink-strong", "#2f40b3") },
-  { tag: t.quote, color: v("muted-foreground", "#6b6f78") },
+  { tag: [t.link, t.url], color: md("link", "ink", "#1e7363") },
+  { tag: t.monospace, color: md("code", "ink-strong", "#2f40b3") },
+  { tag: t.labelName, color: md("tag", "ink-strong", "#2f40b3") },
+  { tag: t.quote, color: md("quote", "muted-foreground", "#6b6f78") },
   { tag: [t.processingInstruction, t.meta, t.contentSeparator], color: v("faint", "#9ca0a8") },
 ]);
 

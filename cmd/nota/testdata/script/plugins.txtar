@@ -1,0 +1,31 @@
+# plugins lists .nota/plugins with their themes.
+nota plugins
+cmp stdout plugins.txt
+nota plugins --json
+stdout '"id": "night"'
+stdout '"dir": ".nota/plugins/night"'
+stdout '"background": "#011627"'
+
+# A broken manifest is listed with its error, and the command fails.
+mkdir vault/.nota/plugins/zz
+cp broken.json vault/.nota/plugins/zz/manifest.json
+exitcode 1 nota plugins
+stdout '^zz\s+\.nota/plugins/zz\s+error: theme owl: dark: unknown token "backgrond"'
+stderr '1 of 2 plugins did not load'
+
+-- plugins.txt --
+night  .nota/plugins/night  themes: Owl, Dim
+-- vault/A.md --
+# A
+-- vault/.nota/plugins/night/manifest.json --
+{
+  "name": "Night",
+  "contributes": {
+    "themes": [
+      { "id": "owl", "name": "Owl", "dark": { "background": "#011627", "text": "#d6deeb", "ink": "#82aaff" } },
+      { "id": "dim", "name": "Dim", "light": { "background": "#f0f0f0", "text": "#333333", "ink": "#1e66f5" } }
+    ]
+  }
+}
+-- broken.json --
+{ "contributes": { "themes": [ { "id": "owl", "dark": { "backgrond": "#000", "background": "#000", "text": "#fff", "ink": "#fff" } } ] } }

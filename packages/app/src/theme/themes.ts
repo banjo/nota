@@ -2,8 +2,9 @@
 // (packages/ui/src/palettes.css) so the pre-paint script in index.html
 // can apply them before React runs; this list is what the UI offers,
 // with the colours its swatches draw. registerBuiltins registers each as
-// a "theme" contribution, the same way a plugin would add its own (a
-// plugin theme carries its tokens instead of CSS).
+// a "theme" contribution, the same way a plugin adds its own. The
+// classics (classics.ts) and plugin themes carry their tokens instead
+// of CSS (custom.ts).
 
 /** The colours a swatch shows, and what the contrast test checks. */
 export interface ThemeColors {
@@ -22,6 +23,10 @@ export interface ColorTheme {
   name: string;
   /** Lower first. */
   order?: number;
+  /** The heading it is listed under in Settings; Nota's own have none. */
+  group?: string;
+  /** A theme with one mode; choosing it switches the app to that mode. */
+  only?: "light" | "dark";
   light: ThemeColors;
   dark: ThemeColors;
   /**

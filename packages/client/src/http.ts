@@ -9,6 +9,7 @@ import type {
   MoveResult,
   Note,
   NoteInfo,
+  PluginInfo,
   PropertyPatch,
   TagCount,
   Tree,
@@ -229,6 +230,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     },
     tags: async () => (await request<{ tags: TagCount[] }>("GET", "/tags")).tags,
     views: async () => (await request<{ views: ViewInfo[] }>("GET", "/views")).views,
+    plugins: async () => (await request<{ plugins: PluginInfo[] }>("GET", "/plugins")).plugins,
     async history(path: string): Promise<HistoryEntry[]> {
       const h = await request<{ versions: ServerEntry[] }>("GET", `/history/${escapePath(path)}`);
       return h.versions.map((e) => ({

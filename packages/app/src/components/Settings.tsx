@@ -15,16 +15,20 @@ import {
   Monitor,
   Moon,
   Sun,
+  TriangleAlert,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { fail } from "../actions.ts";
 import { DeviceList } from "../auth/Devices.tsx";
 import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
-import { keys, useVaultInfo } from "../queries.ts";
+import { keys, usePlugins, useVaultInfo } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
+import { contrastIssues, VAULT_GROUP } from "../theme/custom.ts";
+import { chooseTheme } from "../theme/register.ts";
 import { type ThemeMode, themeStore } from "../theme/store.ts";
+import type { ColorTheme } from "../theme/themes.ts";
 import { useTheme } from "../theme/useTheme.ts";
 import { onlineVaults } from "../vaults/online.ts";
 import { OnlineVaults } from "../vaults/OnlineVaults.tsx";
@@ -138,55 +142,119 @@ function Appearance() {
       </Field>
       <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-ui max-[520px]:grid-cols-1 max-[520px]:gap-1">
         <span className="pt-1 text-muted-foreground">Theme</span>
-        <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-x-2.5 gap-y-3">
-          {themes.map((t) => {
-            const c = t[theme.resolved];
-            const on = theme.palette === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={t.name}
-                onClick={() => store.setPalette(t.id)}
-                className="flex w-[68px] flex-col items-center gap-1.5 rounded-lg focus-visible:outline-offset-4"
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "flex h-11 w-full overflow-hidden rounded-[9px] shadow-card transition-shadow duration-150",
-                    on && "ring-2 ring-ink ring-offset-2 ring-offset-background",
-                  )}
-                  style={{ background: c.background }}
-                >
-                  <span className="w-[30%]" style={{ background: c.sidebar }} />
-                  <span className="flex flex-1 flex-col justify-center gap-[5px] px-2">
-                    <span className="h-[3px] w-3/4 rounded-full" style={{ background: c.ink }} />
-                    <span
-                      className="h-[3px] w-full rounded-full opacity-30"
-                      style={{ background: c.text }}
+        <div className="min-w-0">
+          <div role="radiogroup" aria-label="Theme" className="flex flex-col gap-4">
+            {groupThemes(themes).map(([group, list]) => (
+              <div key={group || "nota"} className="flex flex-col gap-2">
+                {group ? <span className="text-small text-muted-foreground">{group}</span> : null}
+                <div className="flex flex-wrap gap-x-2.5 gap-y-3">
+                  {list.map((t) => (
+                    <ThemeSwatch
+                      key={t.id}
+                      theme={t}
+                      mode={theme.resolved}
+                      on={theme.palette === t.id}
                     />
-                    <span
-                      className="h-[3px] w-2/3 rounded-full opacity-30"
-                      style={{ background: c.text }}
-                    />
-                  </span>
-                </span>
-                <span
-                  className={cn(
-                    "text-small",
-                    on ? "font-medium text-foreground" : "text-muted-foreground",
-                  )}
-                >
-                  {t.name}
-                </span>
-              </button>
-            );
-          })}
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <PluginProblems themes={themes} />
+          <p className="mt-3 text-small text-muted-foreground">
+            Your own themes go in the vault's <code className="font-mono">.nota/plugins/</code>{" "}
+            folder; the Themes page of the docs has the format.
+          </p>
         </div>
       </div>
     </Section>
+  );
+}
+
+/** Themes by their Settings heading, Nota's own (no heading) first. */
+function groupThemes(themes: ColorTheme[]): [string, ColorTheme[]][] {
+  const groups = new Map<string, ColorTheme[]>();
+  for (const t of themes) {
+    const g = t.group ?? "";
+    groups.set(g, [...(groups.get(g) ?? []), t]);
+  }
+  return [...groups];
+}
+
+function ThemeSwatch({
+  theme: t,
+  mode,
+  on,
+}: {
+  theme: ColorTheme;
+  mode: "light" | "dark";
+  on: boolean;
+}) {
+  const c = t[mode];
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={on}
+      aria-label={t.only ? `${t.name} (${t.only} only)` : t.name}
+      title={t.only ? `${t.name} has a ${t.only} mode only` : undefined}
+      onClick={() => chooseTheme(t)}
+      className="flex w-[68px] flex-col items-center gap-1.5 rounded-lg focus-visible:outline-offset-4"
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "flex h-11 w-full overflow-hidden rounded-[9px] shadow-card transition-shadow duration-150",
+          on && "ring-2 ring-ink ring-offset-2 ring-offset-background",
+        )}
+        style={{ background: c.background }}
+      >
+        <span className="w-[30%]" style={{ background: c.sidebar }} />
+        <span className="flex flex-1 flex-col justify-center gap-[5px] px-2">
+          <span className="h-[3px] w-3/4 rounded-full" style={{ background: c.ink }} />
+          <span className="h-[3px] w-full rounded-full opacity-30" style={{ background: c.text }} />
+          <span className="h-[3px] w-2/3 rounded-full opacity-30" style={{ background: c.text }} />
+        </span>
+      </span>
+      <span
+        className={cn(
+          "max-w-full truncate text-small",
+          on ? "font-medium text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {t.name}
+      </span>
+    </button>
+  );
+}
+
+/** Plugins that did not load, and vault themes that are hard to read, for their authors. */
+function PluginProblems({ themes }: { themes: ColorTheme[] }) {
+  const plugins = usePlugins();
+  const broken = (plugins.data ?? []).filter((p) => p.error);
+  const faint = themes
+    .filter((t) => t.group === VAULT_GROUP)
+    .flatMap((t) => contrastIssues(t).map((issue) => ({ id: t.id, text: `${t.name}: ${issue}` })));
+  if (broken.length === 0 && faint.length === 0) {
+    return null;
+  }
+  return (
+    <ul className="mt-3 flex flex-col gap-1 text-small text-muted-foreground">
+      {broken.map((p) => (
+        <li key={p.dir} className="flex gap-1.5">
+          <TriangleAlert className="mt-px size-3.5 shrink-0 text-danger" aria-hidden />
+          <span className="min-w-0 break-words">
+            <code className="font-mono">{p.dir}</code> did not load: {p.error}
+          </span>
+        </li>
+      ))}
+      {faint.map((f) => (
+        <li key={f.text} className="flex gap-1.5">
+          <TriangleAlert className="mt-px size-3.5 shrink-0 text-warning" aria-hidden />
+          <span className="min-w-0 break-words">{f.text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

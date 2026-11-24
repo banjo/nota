@@ -17,6 +17,7 @@ import (
 	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/hooks"
 	"github.com/banjo/nota/internal/index"
+	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
@@ -491,6 +492,17 @@ func (s *Vault) Views() ([]ViewInfo, error) {
 			Folder: vw.Folder, Sort: vw.Sort, File: vw.File, Count: len(es)})
 	}
 	return out, nil
+}
+
+// Plugins returns the plugins of .nota/plugins, broken ones with their
+// error.
+func (s *Vault) Plugins() ([]plugins.Plugin, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return plugins.Load(s.v)
 }
 
 // Get returns one note with its content, hash, links and backlinks.
