@@ -23,6 +23,8 @@ nota folder rename Projects Work                # Moves every note in it; links 
 nota inbox
 nota ls --view drafts                          # .nota/views/drafts.yaml
 nota plugins                                   # .nota/plugins: themes, or why one is broken
+nota settings                                  # Theme, palette, note mode, properties, and where each comes from.
+nota settings edit                             # ~/.config/nota/settings.toml, for your dotfiles.
 nota backlinks Plan
 nota index --rebuild
 nota completion zsh > "${fpath[1]}/_nota"
@@ -42,6 +44,9 @@ environment variable. The app edits only those lines, atomically; comments and o
 they are. The setup runs only when no flag, no `$NOTA_VAULT` and no `vault` key chose a vault,
 `onboarded` is not set, and `~/Notes` is missing or empty. With `$NOTA_VAULT` set, the variable
 wins, so the app's vault switch has no effect until it is unset.
+
+`config.toml` is per machine. The settings that follow you (theme, palette, note mode,
+properties) are in `settings.toml` next to it and in your account: see [settings.md](settings.md).
 
 - `.notaignore` (gitignore syntax) excludes files; `.git/ .obsidian/ .nota/ .trash/
   .DS_Store` are always ignored.

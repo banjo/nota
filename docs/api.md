@@ -121,6 +121,20 @@ NAME` (or `--id N`).
 CLI: `nota devices [--server URL]`, `nota devices revoke <id>`,
 `nota logout [url]`.
 
+## Settings
+
+The account keeps the user's settings (`docs/settings.md`) so they
+follow them to every device. The server stores any key that matches
+`^[a-z][a-z0-9_]{0,63}$` with a string value of at most 256 bytes, at
+most 64 keys, so an older server keeps what a newer app writes; the
+apps check the values.
+
+| Route | Auth | Body → response |
+| --- | --- | --- |
+| `GET /v1/account/settings` | any | → `{rev, settings: {key: value}}`; a new account is `{rev: 0, settings: {}}` |
+| `PATCH /v1/account/settings` | any | `{set?: {key: value}, unset?: [key]}` → `{rev, settings}`; `400 bad_request` for a bad key or value. Keys change one by one and the last write of a key wins, so two devices changing different keys don't collide. A patch that changes nothing keeps `rev`. |
+| `GET /v1/account/events` | any | Server-sent events: `event: settings` with `data: {"rev": N}`, once at the start and after every change from any device. Fetch the settings when `rev` is new. Keep-alive comments as on the vault stream. |
+
 ## Web API
 
 The web app's `NotesClient` talks to `/v1/api/vaults/{vault}/…` with the

@@ -1,6 +1,8 @@
 # Plan: one settings file, synced with the account
 
-Status: **approved by Anton 2026-11-24.** The decisions below override anything older in this document.
+Status: **approved by Anton 2026-11-24, implemented** (issue #20). The decisions below override
+anything older in this document; the user-facing docs are `docs/settings.md` and the Settings
+section of `docs/api.md`.
 
 ## Decisions (Anton, 2026-11-24)
 
@@ -10,6 +12,10 @@ Status: **approved by Anton 2026-11-24.** The decisions below override anything 
 | 2 | Per-device override on top of the file? | No. The file is the top layer. |
 | 3 | A "Copy as TOML" button in Settings? | Yes. It copies the resolved settings as `settings.toml` content. |
 | 4 | Should the web show keys locked by the file? | Not in this round. The web shows only the account layer. |
+| 5 | What does a shortcut do to a locked key (⌘E, the dark-mode toggle)? | It changes the window until it reloads; nothing is stored. |
+| 6 | Conflicts between devices? | Last write wins per key; no `base_rev`. |
+| 7 | Live updates? | A user stream `GET /v1/account/events` (`event: settings`, `data: {"rev": N}`), not the vault stream: settings belong to the account, not a vault. |
+| 8 | Which account does the desktop use? | The open vault's (its `.nota/sync.toml`). |
 
 ## TL;DR
 
@@ -64,20 +70,21 @@ The schema is published as JSON Schema (`settings.schema.json`) anyway. Taplo/Ev
 uses it for completion in the editor via `#:schema` on the first line.
 
 ```toml
-#:schema https://nota.example/settings.schema.json
+#:schema https://nota.banjoanton.com/settings.schema.json
 theme = "dark"
 palette = "paper"
 note_mode = "live"
-properties = "shown"
+properties = "show"
 ```
 
 ## 3. The schema in one place
 
-* Go: `internal/settings` with `type Settings struct` (pointer fields: `nil` = not set in this
-  layer), `Defaults()`, `Validate()` and `Merge(layers ...Settings) Resolved`. `Resolved` holds the
-  value **and the source** of each key (`"default" | "device" | "account" | "file"`).
-* TS: the types are generated or hand-mirrored in `packages/client/src/types.ts`, with a test
-  that compares the key lists so they can't drift.
+* Go: `internal/settings` has the keys (`Keys`, each with its values or pattern and default),
+  `Parse`/`Load` for the file, and `Merge(layers...)`, which gives the value **and the source** of
+  each key (`"default" | "device" | "account" | "file"`). `Schema()` generates
+  `apps/landing/public/settings.schema.json` (`NOTA_UPDATE_SCHEMA=1 go test ./internal/settings`).
+* TS: `packages/app/src/settings/keys.ts` mirrors the keys, with a test that compares them with
+  the generated schema so they can't drift.
 * **Unknown keys produce a warning, not an error** (unlike `hooks.toml`), so an older client
   doesn't break on a file written for a newer version. Invalid values are ignored with a warning,
   and that key falls back to the layer below.
@@ -100,12 +107,13 @@ properties = "shown"
   `data` is a JSON object holding only the keys set at this layer.
 * API (`internal/server`, session or device token):
   * `GET /v1/account/settings` → `{rev, settings}`
-  * `PATCH /v1/account/settings` with `{base_rev, set: {...}, unset: [...]}` → `{rev, settings}`.
-    Changes are per key, so two devices that change different keys don't collide. If `base_rev`
-    is stale, the server still applies them: last writer wins per key, which is enough for
-    preferences.
-* Live updates: a `settings.changed` event on the existing SSE stream, so other devices update
-  without polling.
+  * `PATCH /v1/account/settings` with `{set: {...}, unset: [...]}` → `{rev, settings}`.
+    Changes are per key, so two devices that change different keys don't collide; last writer
+    wins per key, which is enough for preferences.
+  * The server keeps any well-formed key (`^[a-z][a-z0-9_]{0,63}$`, values up to 256 bytes, 64
+    keys), so an older server keeps what a newer app writes.
+* Live updates: `GET /v1/account/events`, an SSE stream per user with `event: settings` and the
+  revision, so other devices update without polling.
 * The desktop app reaches the server through the same token as sync. When not signed in, layer 3
   is skipped and changes go to layer 2.
 
@@ -133,7 +141,7 @@ properties = "shown"
 2. The file: path, reading, watching, `nota settings` in the CLI.
 3. Server: migration, `GET/PATCH /v1/account/settings`, SSE event, tests.
 4. `packages/client`: types and API calls.
-5. Desktop: Go binding (`Settings()`, `SetSetting()`) and `settings.changed`.
+5. Desktop: the `Settings` service (`state()`, `update()`) and the `settings` event.
 6. Frontend: the settings store, migrating theme, note mode and properties, locked state and
    "Copy as TOML" in Settings.
 7. Web: layer 3 only (no file), with the same cache.

@@ -19,6 +19,7 @@ ${app}
 - Free and open source, MIT: ${site.repo}
 - A vault is a folder: \`--vault\`, \`$NOTA_VAULT\`, else ~/Notes. New notes land in \`Inbox/\`.
 - Frontmatter is the metadata (tags, status, created/updated, custom keys). Edits are line-based, unknown keys survive.
+- Settings: \`~/.config/nota/settings.toml\` (\`theme\`, \`palette\`, \`note_mode\`, \`properties\`; schema at https://nota.banjoanton.com/settings.schema.json) wins over the account's synced settings and locks those keys in the app. \`nota settings\` shows each value and its source; \`nota settings edit\` creates the file.
 
 ## CLI
 
