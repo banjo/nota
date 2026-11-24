@@ -58,3 +58,17 @@ export function watchNoteMode(
   win.addEventListener("storage", fn);
   return () => win.removeEventListener("storage", fn);
 }
+
+/** What decides the mode on screen besides the stored preference. */
+export interface ModeRoute {
+  kind: string;
+  via?: "open";
+}
+
+/**
+ * The mode a note shows in: a note opened from the file manager reads
+ * first (a one-time override for that open, the stored preference stays
+ * as it is); everything else uses the preference.
+ */
+export const noteModeFor = (route: ModeRoute, mode: NoteMode): NoteMode =>
+  route.kind === "note" && route.via === "open" ? "reading" : mode;

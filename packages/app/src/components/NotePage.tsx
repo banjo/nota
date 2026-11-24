@@ -4,11 +4,12 @@ import { FileQuestion } from "lucide-react";
 import { relativeTime } from "../lib/format.ts";
 import { useNote } from "../queries.ts";
 import { useContributions } from "../registry.ts";
-import { useUI } from "../state.ts";
+import { useNoteMode, useUI } from "../state.ts";
 import { EmptyState } from "./EmptyState.tsx";
 import { NoteEditor } from "./NoteEditor.tsx";
 import { ModeSwitch } from "./ModeSwitch.tsx";
 import { NoteMenu } from "./NoteRow.tsx";
+import { OpenedNoteStrip } from "./OpenBanner.tsx";
 import { PropertiesPanel } from "./PropertiesPanel.tsx";
 import { TopBar } from "./TopBar.tsx";
 
@@ -18,7 +19,8 @@ export function NotePage({ path }: { path: string }) {
   const panels = useContributions("panel");
   const navigate = useUI((s) => s.navigate);
   const toggle = useUI((s) => s.toggle);
-  const mode = useUI((s) => s.noteMode);
+  const mode = useNoteMode();
+  const opened = useUI((s) => s.route.kind === "note" && s.route.via === "open");
 
   if (note.isError) {
     const missing =
@@ -78,6 +80,7 @@ export function NotePage({ path }: { path: string }) {
           </>
         }
       />
+      {opened ? <OpenedNoteStrip /> : null}
       <article className="mx-auto w-full max-w-[740px] px-14 pt-10 pb-[140px] max-[720px]:px-5 max-[720px]:pt-5">
         <NoteEditor key={n.path} note={n} between={<PropertiesPanel note={n} />} />
         {panels

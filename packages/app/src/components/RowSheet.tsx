@@ -6,7 +6,7 @@ import { useRef } from "react";
 import { create } from "zustand";
 import { createNoteIn, deleteNote } from "../actions.ts";
 import { useClient } from "../context.ts";
-import { useUI } from "../state.ts";
+import { useNoteMode, useUI } from "../state.ts";
 import { MODES } from "./ModeSwitch.tsx";
 import { startNewFolder } from "./NewFolder.tsx";
 
@@ -26,7 +26,7 @@ const close = () => useRowSheet.setState({ target: null });
 
 /** Live / Reading / Source as one segmented control, sized for a thumb. */
 function ModeSegments() {
-  const mode = useUI((s) => s.noteMode);
+  const mode = useNoteMode();
   const setMode = useUI((s) => s.setNoteMode);
   return (
     <div role="group" aria-label="View mode" className="mx-1 mb-2 flex rounded-lg bg-hover p-1">

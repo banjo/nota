@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import {
   loadNoteMode,
   type NoteMode,
+  noteModeFor,
   saveNoteMode,
   toggledNoteMode,
   watchNoteMode,
@@ -18,7 +19,8 @@ export type ListSpec =
 
 export type Route =
   | { kind: "home" }
-  | { kind: "note"; path: string }
+  /** `via: "open"`: opened from the file manager, shown in Reading for this open. */
+  | { kind: "note"; path: string; via?: "open" }
   | { kind: "inbox" }
   | { kind: "list"; list: ListSpec }
   | { kind: "settings" };
@@ -44,11 +46,18 @@ interface UIState {
   vaultFlow: { mode: "create" | "open" } | null;
   /** How notes are shown, per device (localStorage nota:note-mode), not per note. */
   noteMode: NoteMode;
+  /**
+   * The files the OS opened with the app have been looked at once (or
+   * there is no such thing here), so a fresh window may open the most
+   * recent note instead. Not kept.
+   */
+  openChecked: boolean;
 
   openVaultFlow: (mode: "create" | "open") => void;
   closeVaultFlow: () => void;
+  /** Sets the stored mode; it also ends a note's open-in-Reading override. */
   setNoteMode: (mode: NoteMode) => void;
-  /** Live ↔ Reading (⌘E). */
+  /** Live ↔ Reading (⌘E), from the mode on screen. */
   toggleNoteMode: () => void;
   navigate: (route: Route) => void;
   back: () => void;
@@ -79,15 +88,22 @@ export const useUI = create<UIState>()(
       palette: { open: false, mode: "all" },
       expanded: { "section:folders": true, "section:views": true },
       noteMode: loadNoteMode(deviceStorage()),
+      openChecked: false,
       vaultFlow: null,
 
       openVaultFlow: (mode) => set({ vaultFlow: { mode } }),
       closeVaultFlow: () => set({ vaultFlow: null }),
       setNoteMode: (mode) => {
         saveNoteMode(deviceStorage(), mode);
-        set({ noteMode: mode });
+        const r = get().route;
+        set(
+          r.kind === "note" && r.via
+            ? { noteMode: mode, route: { kind: "note", path: r.path } }
+            : { noteMode: mode },
+        );
       },
-      toggleNoteMode: () => get().setNoteMode(toggledNoteMode(get().noteMode)),
+      toggleNoteMode: () =>
+        get().setNoteMode(toggledNoteMode(noteModeFor(get().route, get().noteMode))),
 
       navigate: (route) => {
         set({ route, pane: "main" });
@@ -121,10 +137,26 @@ export const useUI = create<UIState>()(
     {
       name: "nota:ui",
       version: 1,
-      partialize: (s) => ({ route: s.route, sidebarOpen: s.sidebarOpen, expanded: s.expanded }),
+      partialize: (s) => ({
+        route: persistedRoute(s.route),
+        sidebarOpen: s.sidebarOpen,
+        expanded: s.expanded,
+      }),
     },
   ),
 );
+
+/**
+ * The route as kept between runs: an open-in-Reading override is for
+ * that one open.
+ */
+export function persistedRoute(r: Route): Route {
+  if (r.kind === "note" && r.via) return { kind: "note", path: r.path };
+  return r;
+}
+
+/** The mode the note on screen shows in (see noteModeFor). */
+export const useNoteMode = () => useUI((s) => noteModeFor(s.route, s.noteMode));
 
 /** The path of the note on screen, if any. */
 export const currentPath = (r: Route) => (r.kind === "note" ? r.path : undefined);
