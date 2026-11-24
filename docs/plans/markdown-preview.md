@@ -80,14 +80,19 @@ it only looks at `Table` nodes, so it stays cheap.
   | Token | Fallback |
   |---|---|
   | `md-syntax-keyword` | `ink-strong` |
-  | `md-syntax-string` | `success` |
-  | `md-syntax-number` | `warning` |
-  | `md-syntax-comment` | `faint` |
+  | `md-syntax-string` | set in `tokens.css` |
+  | `md-syntax-number` | set in `tokens.css` |
+  | `md-syntax-comment` | `muted-foreground` |
   | `md-syntax-function` | `ink` |
   | `md-syntax-type` | `md-tag` → `ink-strong` |
 
-* The language name shows small and faint on the first line of the block. A copy button is
-  optional, after the rest.
+  `success` and `warning` are too light for text on `code` (about 2:1), so they can't be used
+  directly for strings and numbers. Token themes (classics, plugins) derive all six instead: each
+  is moved toward black or white until it reaches 4.5:1 (strings, numbers) or 3:1 (the others)
+  on `code`.
+
+* The fence line already shows the language (` ```ts `) faintly, so there is no extra label. A
+  copy button is optional, after the rest.
 
 ### 3. Callouts
 
