@@ -1,6 +1,15 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder, FolderOpen } from "lucide-react";
-import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useLongPress } from "../lib/longPress.ts";
 import { withDraft } from "../lib/newFolder.ts";
 import { buildTree, flattenTree } from "../lib/notes.ts";
 import { useTree } from "../queries.ts";
@@ -9,6 +18,42 @@ import { useUI } from "../state.ts";
 import { FolderActions, NewFolderRow, useFolderDraft } from "./NewFolder.tsx";
 import { NoteRow } from "./NoteRow.tsx";
 import { Row } from "./Row.tsx";
+import { openRowSheet } from "./RowSheet.tsx";
+
+/** A folder row, its hover buttons, and a long press for its sheet under a finger. */
+function FolderRow({
+  path,
+  name,
+  open,
+  depth,
+  count,
+  onToggle,
+}: {
+  path: string;
+  name: string;
+  open: boolean;
+  depth: number;
+  count?: ReactNode;
+  onToggle: () => void;
+}) {
+  const longPress = useLongPress(() => openRowSheet({ kind: "folder", path, name }));
+  return (
+    <>
+      <Row
+        chevron={open}
+        icon={open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />}
+        label={name}
+        // Room for the row's "…", which is always shown under a finger.
+        className="pointer-coarse:pr-12"
+        depth={depth}
+        onClick={onToggle}
+        count={count}
+        {...longPress}
+      />
+      <FolderActions path={path} name={name} />
+    </>
+  );
+}
 
 /** The sidebar's scrolling element, which the tree virtualizes against. */
 export const SidebarScroll = createContext<HTMLElement | null>(null);
@@ -94,32 +139,25 @@ export function FolderTree() {
             {row.kind === "draft" ? (
               <NewFolderRow parent={row.parent} depth={row.depth} />
             ) : row.kind === "folder" ? (
-              <>
-                <Row
-                  chevron={row.open}
-                  icon={
-                    row.open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />
-                  }
-                  label={row.node.name}
-                  // Room for the row's buttons, which are always shown under a finger.
-                  className="pointer-coarse:pr-[88px]"
-                  depth={row.depth}
-                  onClick={() => toggle(`folder:${row.node.path}`)}
-                  count={
-                    decorators
-                      .map((d) =>
-                        d.decorate({
-                          kind: "folder",
-                          path: row.node.path,
-                          name: row.node.name,
-                          notes: row.node.count,
-                        }),
-                      )
-                      .find((d) => d?.badge !== undefined)?.badge
-                  }
-                />
-                <FolderActions path={row.node.path} name={row.node.name} />
-              </>
+              <FolderRow
+                path={row.node.path}
+                name={row.node.name}
+                open={row.open}
+                depth={row.depth}
+                onToggle={() => toggle(`folder:${row.node.path}`)}
+                count={
+                  decorators
+                    .map((d) =>
+                      d.decorate({
+                        kind: "folder",
+                        path: row.node.path,
+                        name: row.node.name,
+                        notes: row.node.count,
+                      }),
+                    )
+                    .find((d) => d?.badge !== undefined)?.badge
+                }
+              />
             ) : (
               // Notes line up under their folder's name, past the chevron.
               <NoteRow

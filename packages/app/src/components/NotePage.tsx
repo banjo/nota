@@ -73,7 +73,7 @@ export function NotePage({ path }: { path: string }) {
             </span>
             <ModeSwitch />
             <div className="relative size-7 pointer-coarse:size-11">
-              <NoteMenu path={n.path} active />
+              <NoteMenu path={n.path} active title={n.title || "Untitled"} />
             </div>
           </>
         }

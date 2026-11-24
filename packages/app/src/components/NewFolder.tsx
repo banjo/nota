@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@nota/ui/tooltip";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, Folder, FolderPlus } from "lucide-react";
+import { FilePlus2, Folder, FolderPlus, MoreHorizontal } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent,
@@ -17,6 +17,7 @@ import { useClient } from "../context.ts";
 import { checkNewFolder, type FolderDraft } from "../lib/newFolder.ts";
 import { useTree } from "../queries.ts";
 import { useUI } from "../state.ts";
+import { openRowSheet } from "./RowSheet.tsx";
 
 // Folders made straight in the sidebar: the "New folder" button, the
 // per-folder buttons on tree rows, and the inline name row they open.
@@ -62,35 +63,42 @@ export function IconButton({
 }
 
 /**
- * "New note in …" and "New folder in …" on a folder row: shown on hover
- * and keyboard focus, always under a finger (phones have no hover).
+ * "New note in …" and "New folder in …" on a folder row, shown on hover
+ * and keyboard focus. Under a finger, which has no hover, the row gets
+ * one quiet "…" instead, which opens the same actions as a sheet.
  */
 export function FolderRowActions({
   name,
   onNewNote,
   onNewFolder,
+  onMore,
 }: {
   name: string;
   onNewNote: () => void;
   onNewFolder: () => void;
+  onMore?: () => void;
 }) {
   return (
-    <div className="absolute inset-y-0 right-1 flex items-center gap-px rounded-sm bg-hover opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 pointer-coarse:bg-transparent pointer-coarse:opacity-100">
-      <IconButton
-        label={`New note in ${name}`}
-        onClick={onNewNote}
-        className="size-6 pointer-coarse:size-10"
-      >
-        <FilePlus2 strokeWidth={1.75} />
-      </IconButton>
-      <IconButton
-        label={`New folder in ${name}`}
-        onClick={onNewFolder}
-        className="size-6 pointer-coarse:size-10"
-      >
-        <FolderPlus strokeWidth={1.75} />
-      </IconButton>
-    </div>
+    <>
+      <div className="absolute inset-y-0 right-1 flex items-center gap-px rounded-sm bg-hover opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 pointer-coarse:hidden">
+        <IconButton label={`New note in ${name}`} onClick={onNewNote} className="size-6">
+          <FilePlus2 strokeWidth={1.75} />
+        </IconButton>
+        <IconButton label={`New folder in ${name}`} onClick={onNewFolder} className="size-6">
+          <FolderPlus strokeWidth={1.75} />
+        </IconButton>
+      </div>
+      {onMore ? (
+        <button
+          type="button"
+          aria-label={`Actions for ${name}`}
+          onClick={onMore}
+          className="absolute inset-y-0 right-0 hidden w-11 place-items-center rounded-sm text-faint outline-none active:bg-hover pointer-coarse:grid"
+        >
+          <MoreHorizontal className="size-[18px]" strokeWidth={1.75} />
+        </button>
+      ) : null}
+    </>
   );
 }
 
@@ -103,6 +111,7 @@ export function FolderActions({ path, name }: { path: string; name: string }) {
       name={name}
       onNewNote={() => void createNoteIn(client, qc, path)}
       onNewFolder={() => startNewFolder(path)}
+      onMore={() => openRowSheet({ kind: "folder", path, name })}
     />
   );
 }

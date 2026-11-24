@@ -38,6 +38,8 @@ export function Row({
       className={cn(
         "group/row flex h-7 w-full min-w-0 items-center gap-[7px] rounded-sm pr-2 text-left text-ui text-text-soft outline-none select-none",
         "hover:bg-hover focus-visible:bg-hover focus-visible:outline-none pointer-coarse:h-11 pointer-coarse:text-[15px]",
+        // A finger gets its feedback on touch-down; there is no hover.
+        "active:bg-hover",
         active && "bg-selected font-medium text-foreground hover:bg-selected",
         muted && !active && "text-file",
         className,

@@ -9,6 +9,7 @@ import {
   CommandShortcut,
 } from "@nota/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@nota/ui/dialog";
+import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Folder, FolderPlus, FolderRoot, Inbox, Plus } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -291,16 +292,35 @@ export function Palette() {
     <Dialog open={palette.open} onOpenChange={(o) => !o && closePalette()}>
       <DialogContent
         instant
-        className="top-[14vh] max-w-[580px] translate-y-0 overflow-hidden p-0 max-[720px]:top-3"
+        className={cn(
+          "top-[14vh] max-w-[580px] translate-y-0 overflow-hidden p-0",
+          // A phone: a sheet from the bottom edge, as tall as the space
+          // above the keyboard, the field on top where the eye is.
+          "max-[720px]:top-auto max-[720px]:bottom-(--keyboard-inset,0px) max-[720px]:left-0 max-[720px]:flex max-[720px]:h-[calc(var(--visual-height,100dvh)-var(--safe-top)-8px)] max-[720px]:w-full max-[720px]:max-w-none max-[720px]:translate-x-0 max-[720px]:flex-col max-[720px]:rounded-b-none max-[720px]:pr-(--safe-right) max-[720px]:pb-(--safe-bottom) max-[720px]:pl-(--safe-left) max-[720px]:in-data-keyboard:pb-0",
+        )}
         aria-describedby="palette-help"
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription id="palette-help" className="sr-only">
           Type to search; arrow keys select, Enter opens, Escape closes.
         </DialogDescription>
-        <Command shouldFilter={false} loop>
-          <CommandInput value={query} onValueChange={setQuery} placeholder={placeholder} />
-          <CommandList>
+        <Command shouldFilter={false} loop className="max-[720px]:min-h-0 max-[720px]:flex-1">
+          <CommandInput
+            value={query}
+            onValueChange={setQuery}
+            placeholder={placeholder}
+            enterKeyHint="go"
+            trailing={
+              <button
+                type="button"
+                onClick={closePalette}
+                className="-mr-2 hidden h-11 shrink-0 px-2 text-[16px] text-ink outline-none active:opacity-60 max-[720px]:block"
+              >
+                Cancel
+              </button>
+            }
+          />
+          <CommandList className="max-[720px]:max-h-none max-[720px]:min-h-0 max-[720px]:flex-1">
             {mode === "newFolder" ? null : <CommandEmpty>Nothing found</CommandEmpty>}
             {mode === "move" ? (
               <FolderMode query={deferred} path={moving} close={closePalette} />

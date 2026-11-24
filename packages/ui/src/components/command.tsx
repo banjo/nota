@@ -18,8 +18,9 @@ export function Command({ className, ...props }: React.ComponentProps<typeof Com
 
 export function CommandInput({
   className,
+  trailing,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & { trailing?: React.ReactNode }) {
   return (
     <div
       data-slot="command-input-wrapper"
@@ -34,6 +35,7 @@ export function CommandInput({
         )}
         {...props}
       />
+      {trailing}
     </div>
   );
 }
@@ -101,7 +103,7 @@ export function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-ui text-text-soft outline-none select-none",
+        "relative flex h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-ui text-text-soft outline-none select-none pointer-coarse:h-11 pointer-coarse:text-[15px]",
         "data-[selected=true]:bg-hover data-[selected=true]:text-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
         "[&_svg]:shrink-0 [&_svg]:text-muted-foreground",
         className,

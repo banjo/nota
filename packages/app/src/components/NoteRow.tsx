@@ -11,11 +11,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileText, FolderInput, MoreHorizontal, Trash2 } from "lucide-react";
 import { deleteNote } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { useLongPress } from "../lib/longPress.ts";
+import { useNarrow } from "../lib/viewport.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { Row } from "./Row.tsx";
+import { openRowSheet } from "./RowSheet.tsx";
 
-/** A note in the sidebar: opens on click, with a menu that is always reachable. */
+/**
+ * A note in the sidebar: opens on click. Its "…" menu shows on hover and
+ * focus; under a finger a long press opens the same actions as a sheet,
+ * so the tree doesn't carry a "…" on every row.
+ */
 export function NoteRow({
   note,
   depth,
@@ -32,6 +39,9 @@ export function NoteRow({
   const decos = decorators
     .map((d) => d.decorate({ kind: "note", path: note.path, note }))
     .filter((d) => d !== null);
+  const longPress = useLongPress(() =>
+    openRowSheet({ kind: "note", path: note.path, title: note.title }),
+  );
   return (
     <div className={cn("group/note relative", className)}>
       <Row
@@ -40,8 +50,9 @@ export function NoteRow({
         depth={depth}
         active={active}
         muted
-        className="pr-8"
+        className="pr-8 pointer-coarse:pr-2"
         onClick={() => navigate({ kind: "note", path: note.path })}
+        {...longPress}
         trailing={decos.map((d, i) =>
           d.dot ? (
             <span
@@ -60,17 +71,45 @@ export function NoteRow({
   );
 }
 
-export function NoteMenu({ path, active }: { path: string; active?: boolean }) {
+/**
+ * A note's actions. In the tree (`title` absent) it is the row's hover
+ * "…", hidden under a finger. In the page's top bar (`title` given) it is
+ * always there; on a phone it opens the note's sheet, which also holds
+ * the view modes.
+ */
+export function NoteMenu({
+  path,
+  active,
+  title,
+}: {
+  path: string;
+  active?: boolean;
+  title?: string;
+}) {
   const client = useClient();
   const qc = useQueryClient();
   const openPalette = useUI((s) => s.openPalette);
+  const narrow = useNarrow();
+  const inBar = title !== undefined;
+  if (inBar && narrow)
+    return (
+      <button
+        type="button"
+        aria-label="Note actions"
+        onClick={() => openRowSheet({ kind: "note", path, title, page: true })}
+        className="grid size-11 place-items-center rounded-sm text-muted-foreground outline-none active:bg-hover"
+      >
+        <MoreHorizontal className="size-5" />
+      </button>
+    );
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Note actions"
         className={cn(
           "absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-xs text-faint opacity-0 outline-none hover:bg-selected hover:text-foreground focus-visible:opacity-100 data-[state=open]:opacity-100",
-          "group-hover/note:opacity-100 pointer-coarse:size-9 pointer-coarse:opacity-100",
+          "group-hover/note:opacity-100",
+          inBar ? "pointer-coarse:size-11 pointer-coarse:opacity-100" : "pointer-coarse:hidden",
           active && "opacity-100",
         )}
       >

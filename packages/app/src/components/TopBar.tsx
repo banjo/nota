@@ -1,12 +1,13 @@
 import { cn } from "@nota/ui/utils";
-import { ChevronLeft, PanelLeft } from "lucide-react";
+import { ChevronLeft, PanelLeft, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useUI } from "../state.ts";
 
 /**
  * The bar above the page: breadcrumbs on the left, quiet details on the
- * right. On a narrow screen it leads with a back button to the sidebar;
- * with the sidebar hidden, with a button to bring it back.
+ * right. On a narrow screen it leads with a back button to the sidebar
+ * and ends with search (a phone has no ⌘K); with the sidebar hidden, it
+ * leads with a button to bring it back.
  */
 export function TopBar({
   crumbs,
@@ -18,16 +19,17 @@ export function TopBar({
   const sidebarOpen = useUI((s) => s.sidebarOpen);
   const toggleSidebar = useUI((s) => s.toggleSidebar);
   const back = useUI((s) => s.back);
+  const openPalette = useUI((s) => s.openPalette);
   return (
     <header
-      className="sticky top-0 z-10 flex h-11 shrink-0 items-center gap-1.5 bg-background/95 pr-[18px] pl-[18px] text-[12.5px] text-muted-foreground backdrop-blur-md [--app-region:drag] pointer-coarse:h-12 max-[720px]:pl-1.5"
+      className="sticky top-0 z-10 flex h-11 shrink-0 items-center gap-1.5 bg-background/95 pr-[18px] pl-[18px] text-[12.5px] text-muted-foreground backdrop-blur-md [--app-region:drag] pointer-coarse:h-12 max-[720px]:pr-1 max-[720px]:pl-1 max-[720px]:text-[15px]"
       style={{ paddingTop: "var(--mygo-titlebar-inset-top, 0px)" }}
     >
       <button
         type="button"
         aria-label="Back to notes"
         onClick={back}
-        className="hidden size-11 shrink-0 place-items-center rounded-sm text-ink [--app-region:no-drag] max-[720px]:grid"
+        className="hidden size-11 shrink-0 place-items-center rounded-sm text-ink outline-none [--app-region:no-drag] active:bg-hover max-[720px]:grid"
       >
         <ChevronLeft className="size-6" strokeWidth={2} />
       </button>
@@ -73,8 +75,16 @@ export function TopBar({
           );
         })}
       </nav>
-      <div className="ml-auto flex shrink-0 items-center gap-1 text-faint [--app-region:no-drag]">
+      <div className="ml-auto flex shrink-0 items-center gap-1 text-faint [--app-region:no-drag] max-[720px]:gap-0">
         {right}
+        <button
+          type="button"
+          aria-label="Search"
+          onClick={() => openPalette()}
+          className="hidden size-11 shrink-0 place-items-center rounded-sm text-muted-foreground outline-none active:bg-hover max-[720px]:grid"
+        >
+          <Search className="size-5" strokeWidth={1.75} />
+        </button>
       </div>
     </header>
   );

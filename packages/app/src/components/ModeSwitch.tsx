@@ -4,13 +4,16 @@ import { label } from "../lib/shortcuts.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
 import { useUI } from "../state.ts";
 
-const MODES: { id: NoteMode; name: string; icon: LucideIcon; hint: string }[] = [
+export const MODES: { id: NoteMode; name: string; icon: LucideIcon; hint: string }[] = [
   { id: "live", name: "Live", icon: PenLine, hint: "Edit with formatting" },
   { id: "reading", name: "Reading", icon: BookOpen, hint: "Read-only, as a finished page" },
   { id: "source", name: "Source", icon: Code2, hint: "The raw markdown" },
 ];
 
-/** Live / Reading / Source for the note on screen. Icons only on narrow screens. */
+/**
+ * Live / Reading / Source for the note on screen. On a phone it lives in
+ * the note's "…" sheet instead (RowSheet), so the bar keeps its room.
+ */
 export function ModeSwitch() {
   const mode = useUI((s) => s.noteMode);
   const setMode = useUI((s) => s.setNoteMode);
@@ -18,7 +21,7 @@ export function ModeSwitch() {
     <div
       role="group"
       aria-label="View mode"
-      className="flex items-center gap-0.5 rounded-md bg-hover p-0.5 text-[12px]"
+      className="flex items-center gap-0.5 rounded-md bg-hover p-0.5 text-[12px] max-[720px]:hidden"
     >
       {MODES.map((m) => {
         const on = mode === m.id;
@@ -36,7 +39,7 @@ export function ModeSwitch() {
             )}
           >
             <m.icon className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className="max-[720px]:hidden">{m.name}</span>
+            <span>{m.name}</span>
           </button>
         );
       })}
