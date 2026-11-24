@@ -3,6 +3,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, test } from "vite-plus/test";
 import {
   activeLines,
+  calloutKind,
   extensions,
   findTags,
   parseWikilink,
@@ -271,5 +272,57 @@ describe("tables", () => {
     expect(tableSpecs(s, { activeLines: new Set() })).toEqual([]);
     const sp = previewSpecs(s, { activeLines: new Set() });
     expect(hidden(quoted, sp)).toEqual(["> ", "> ", "> "]);
+  });
+});
+
+describe("callouts", () => {
+  const widgets = (all: DecoSpec[]) =>
+    all.filter(
+      (x): x is Extract<DecoSpec, { type: "widget" }> =>
+        x.type === "widget" && x.widget === "callout",
+    );
+
+  test("a GitHub alert becomes a callout with its type as title", () => {
+    const doc = "> [!WARNING]\n> Spara **först**.\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-callout-warning")).toEqual([0, doc.indexOf("> Spara")]);
+    expect(lines(sp, "cm-callout-title")).toEqual([0]);
+    expect(lines(sp, "cm-callout-last")).toEqual([doc.indexOf("> Spara")]);
+    expect(lines(sp, "cm-quote")).toEqual([]);
+    const [w, ...rest] = widgets(sp);
+    expect(rest).toEqual([]);
+    expect([text(doc, w!), w!.callout, w!.label]).toEqual(["[!WARNING]", "warning", "Warning"]);
+    expect(hidden(doc, sp).filter((h) => h === "> ")).toHaveLength(2);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["först"]);
+  });
+
+  test("an Obsidian callout keeps its own title, and maps its type", () => {
+    const doc = "> [!info]- Mer om det  \n> text";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(lines(sp, "cm-callout-note")).toEqual([0, doc.indexOf("> text")]);
+    const [w] = widgets(sp);
+    expect([text(doc, w!), w!.callout, w!.label]).toEqual(["[!info]- ", "note", undefined]);
+    expect(marks(doc, sp, "cm-callout-title-text").map((m) => m.text)).toEqual(["Mer om det"]);
+  });
+
+  test("Obsidian's types map onto GitHub's five; unknown ones are notes", () => {
+    expect(
+      ["tip", "success", "question", "bug", "attention", "Danger", "whatever"].map(calloutKind),
+    ).toEqual(["tip", "tip", "important", "caution", "warning", "caution", "note"]);
+  });
+
+  test("show their source on the title line being edited", () => {
+    const doc = "> [!TIP] Kort\n> text";
+    const { specs: sp } = specs(doc, { cursor: 3 });
+    expect(widgets(sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toContain("[!TIP]");
+    expect(lines(sp, "cm-callout-tip")).toEqual([0, doc.indexOf("> text")]);
+  });
+
+  test("a plain quote stays a quote", () => {
+    const doc = "> [inte] en callout\n> rad";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-quote")).toEqual([0, doc.indexOf("> rad")]);
+    expect(widgets(sp)).toEqual([]);
   });
 });

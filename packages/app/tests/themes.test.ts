@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { registerBuiltins } from "../src/builtins/index.tsx";
 import { createRegistry } from "../src/registry.ts";
 import { CLASSIC_THEMES } from "../src/theme/classics.ts";
-import { contrastIssues } from "../src/theme/custom.ts";
+import { contrastIssues, mix } from "../src/theme/custom.ts";
 import { BUILTIN_THEMES, type ColorTheme, contrast } from "../src/theme/themes.ts";
 
 // Read from disk: the test runner turns CSS imports into empty modules.
@@ -56,6 +56,26 @@ function expectReadableCode(v: Record<string, string>) {
   }
 }
 
+/**
+ * Callout titles and icons are accents on their own tint of the page:
+ * ≥ 3:1. Status colours a theme doesn't set come from tokens.css.
+ */
+function expectReadableCallouts(v: Record<string, string>) {
+  const danger = v["--danger"] ?? block(tokensCss, ":root")["--danger"]!;
+  const colors = {
+    note: v["--md-callout-note"] ?? v["--ink"],
+    tip: v["--md-callout-tip"] ?? v["--md-syntax-string"],
+    important: v["--md-callout-important"] ?? v["--ink-strong"],
+    warning: v["--md-callout-warning"] ?? v["--md-syntax-number"],
+    caution: v["--md-callout-caution"] ?? danger,
+  };
+  for (const [k, c] of Object.entries(colors)) {
+    expect(c, k).toBeDefined();
+    const tint = mix(c!, v["--background"]!, 0.08);
+    expect(contrast(c!, tint), `callout ${k}`).toBeGreaterThanOrEqual(3);
+  }
+}
+
 describe("colour themes", () => {
   const cases: [string, "light" | "dark"][] = BUILTIN_THEMES.flatMap((t) => [
     [t.id, "light"],
@@ -81,6 +101,7 @@ describe("colour themes", () => {
     if (vars["--muted-foreground"]?.startsWith("#"))
       expect(contrast(vars["--muted-foreground"], c.background)).toBeGreaterThanOrEqual(4.5);
     expectReadableCode(vars);
+    expectReadableCallouts(vars);
   });
 
   test.each(CLASSIC_THEMES.flatMap((t) => [[t.id, "light"] as const, [t.id, "dark"] as const]))(
@@ -107,6 +128,7 @@ describe("colour themes", () => {
       const headerText = tk["--foreground"]!;
       expect(contrast(headerText, header), "table header").toBeGreaterThanOrEqual(4.5);
       expectReadableCode(tk);
+      expectReadableCallouts(tk);
     },
   );
 

@@ -16,6 +16,7 @@ import {
 } from "@codemirror/view";
 import {
   activeLines,
+  type CalloutKind,
   type DecoSpec,
   type InlineSpec,
   previewSpecs,
@@ -160,6 +161,34 @@ const tablesField = (reading: boolean) =>
     provide: (f) => EditorView.decorations.from(f),
   });
 
+class CalloutWidget extends WidgetType {
+  constructor(
+    readonly kind: CalloutKind,
+    readonly label: string | undefined,
+  ) {
+    super();
+  }
+  eq(other: CalloutWidget) {
+    return other.kind === this.kind && other.label === this.label;
+  }
+  toDOM() {
+    const head = document.createElement("span");
+    head.className = "cm-callout-head";
+    const icon = document.createElement("span");
+    icon.className = "cm-callout-icon";
+    icon.dataset.callout = this.kind;
+    icon.setAttribute("aria-hidden", "true");
+    head.append(icon);
+    if (this.label) {
+      const label = document.createElement("span");
+      label.className = "cm-callout-label";
+      label.textContent = this.label;
+      head.append(label);
+    }
+    return head;
+  }
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
 const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
@@ -184,7 +213,12 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
         );
         break;
       case "widget":
-        ranges.push((s.widget === "bullet" ? bullet : checkbox(!!s.checked)).range(s.from, s.to));
+        if (s.widget === "callout") {
+          const widget = new CalloutWidget(s.callout ?? "note", s.label);
+          ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
+        } else {
+          ranges.push((s.widget === "bullet" ? bullet : checkbox(!!s.checked)).range(s.from, s.to));
+        }
         break;
     }
   }

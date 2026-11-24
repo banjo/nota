@@ -74,11 +74,14 @@ Set any of these to override what Nota works out. The names match the CSS variab
 | `md-table-border`, `md-table-header`                        | Table borders, and the background of the header row     |
 | `md-syntax-keyword`, `md-syntax-string`, `md-syntax-number` | Code in fenced blocks                                   |
 | `md-syntax-comment`, `md-syntax-function`, `md-syntax-type` | Code in fenced blocks                                   |
+| `md-callout-note`, `md-callout-tip`, `md-callout-important`  | Callouts (`> [!NOTE]`, `> [!info]` …)                   |
+| `md-callout-warning`, `md-callout-caution`                  | Callouts                                                |
 
 The `md-*` tokens give Markdown its own colours, like purple headings in Dracula. Without them,
 headings use `foreground`, links use `ink`, tags use `ink-strong`, table borders use `hairline`
 and table headers use `code`. Code colours are worked out from `ink`, `ink-strong`, `md-tag`,
-`muted-foreground`, `success` and `warning`, darkened or lightened until they read on `code`.
+`muted-foreground`, `success` and `warning`, darkened or lightened until they read on `code`. Callouts use `ink` (note), `md-syntax-string`
+(tip), `ink-strong` (important), `md-syntax-number` (warning) and `danger` (caution).
 
 Colours are `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`, `hsl()` or `hsla()`.
 `background`, `text` and `ink` have to be hex without alpha, because Nota works out the other

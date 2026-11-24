@@ -24,9 +24,11 @@ import { notaTheme } from "./theme.ts";
 
 export {
   activeLines,
+  calloutKind,
   previewSpecs,
   tableSpecs,
   toggleTaskAt,
+  type CalloutKind,
   type DecoSpec,
   type PreviewOptions,
   type TableSpec,

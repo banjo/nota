@@ -9,7 +9,10 @@ import { parseWikilink } from "./syntax.ts";
 // computed from the editor state alone, so they can be tested without
 // a DOM; livePreview() turns them into CodeMirror decorations.
 
-export type WidgetKind = "checkbox" | "bullet";
+export type WidgetKind = "checkbox" | "bullet" | "callout";
+
+/** GitHub's five alert kinds; Obsidian's callout types map onto them. */
+export type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
 
 export type DecoSpec =
   /** Hide a marker (replace it with nothing). */
@@ -19,7 +22,16 @@ export type DecoSpec =
   /** Style a whole line (at its start). */
   | { type: "line"; from: number; class: string; style?: string }
   /** Replace a range with a widget. */
-  | { type: "widget"; from: number; to: number; widget: WidgetKind; checked?: boolean };
+  | {
+      type: "widget";
+      from: number;
+      to: number;
+      widget: WidgetKind;
+      checked?: boolean;
+      callout?: CalloutKind;
+      /** The callout's title when it has none of its own: its type. */
+      label?: string;
+    };
 
 export type InlineSpec = Extract<DecoSpec, { type: "hide" | "mark" }>;
 
@@ -169,6 +181,43 @@ export function tableSpecs(state: EditorState, opts: PreviewOptions): TableSpec[
   return out;
 }
 
+const CALLOUT_KINDS: Record<string, CalloutKind> = {
+  note: "note",
+  info: "note",
+  todo: "note",
+  abstract: "note",
+  summary: "note",
+  tldr: "note",
+  quote: "note",
+  cite: "note",
+  tip: "tip",
+  hint: "tip",
+  success: "tip",
+  check: "tip",
+  done: "tip",
+  important: "important",
+  question: "important",
+  help: "important",
+  faq: "important",
+  example: "important",
+  warning: "warning",
+  attention: "warning",
+  caution: "caution",
+  failure: "caution",
+  fail: "caution",
+  missing: "caution",
+  danger: "caution",
+  error: "caution",
+  bug: "caution",
+};
+
+/** The kind of a callout type ("info" → note); unknown types are notes. */
+export const calloutKind = (type: string): CalloutKind =>
+  CALLOUT_KINDS[type.toLowerCase()] ?? "note";
+
+/** "> [!type]± title" on a quote's first line, from the quote's ">". */
+const CALLOUT = /^(>[ \t]?)\[!([\w-]+)\]([+-]?)([ \t]*)(.*)$/;
+
 /** Computes the live-preview decorations of a state. */
 export function previewSpecs(state: EditorState, opts: PreviewOptions): DecoSpec[] {
   return collect(state, opts, false);
@@ -285,13 +334,42 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             // A bare or <autolink> URL (link targets returned above).
             mark(ref.from, ref.to, "cm-link", { "data-href": doc.sliceString(ref.from, ref.to) });
             return false;
-          case "Blockquote":
-            for (let pos = ref.from; pos <= ref.to;) {
-              const l = doc.lineAt(pos);
-              line(l.from, "cm-quote");
-              pos = l.to + 1;
+          case "Blockquote": {
+            const first = doc.lineAt(ref.from);
+            const m = CALLOUT.exec(doc.sliceString(ref.from, first.to));
+            const last = lineOf(ref.to);
+            if (!m) {
+              for (let l = first.number; l <= last; l++) line(doc.line(l).from, "cm-quote");
+              return;
+            }
+            const [, lead = "", type = "", fold = "", gap = "", title = ""] = m;
+            const kind = calloutKind(type);
+            for (let l = first.number; l <= last; l++) {
+              const cls = [`cm-callout cm-callout-${kind}`];
+              if (l === first.number) cls.push("cm-callout-first cm-callout-title");
+              if (l === last) cls.push("cm-callout-last");
+              line(doc.line(l).from, cls.join(" "));
+            }
+            const markFrom = ref.from + lead.length;
+            const markTo = markFrom + type.length + 3 + fold.length;
+            const titleFrom = markTo + gap.length;
+            mark(titleFrom, titleFrom + title.trimEnd().length, "cm-callout-title-text");
+            if (active(ref.from)) {
+              mark(markFrom, markTo, "cm-marker");
+            } else {
+              specs.push({
+                type: "widget",
+                from: markFrom,
+                to: titleFrom,
+                widget: "callout",
+                callout: kind,
+                ...(title.trim()
+                  ? {}
+                  : { label: type[0]!.toUpperCase() + type.slice(1).toLowerCase() }),
+              });
             }
             return;
+          }
           case "QuoteMark":
             if (!active(ref.from)) hide(ref.from, withSpace(ref.to));
             else mark(ref.from, ref.to, "cm-marker");
