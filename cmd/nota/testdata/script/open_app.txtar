@@ -1,0 +1,62 @@
+# open --app hands the file to the desktop app: $NOTA_APP stands in for it
+# here (macOS runs open -b com.banjoanton.nota, Linux /opt/nota/nota).
+[!exec:sh] skip 'needs sh'
+chmod 755 fakeapp.sh
+chmod 755 failapp.sh
+env NOTA_APP=$WORK/fakeapp.sh
+env OPENED=$WORK/opened.txt
+
+# A note by title, path or prefix: the absolute path of its file.
+nota open --app 'Gammal plan'
+cmpenv opened.txt want-note.txt
+nota open -a Projekt/Arkiv/Gammal.md
+cmpenv opened.txt want-note.txt
+
+# Any Markdown file by its path, in the vault or not; the file is not
+# touched.
+nota open --app outside/README.markdown
+cmpenv opened.txt want-outside.txt
+cmp outside/README.markdown want-readme.txt
+nota open --app --json outside/README.markdown
+stdout '"file": ".*/outside/README.markdown"'
+nota open --app vault/Projekt/Arkiv/Gammal.md
+cmpenv opened.txt want-note.txt
+
+# Not Markdown, a folder: usage errors. A missing note: exit 3.
+exitcode 2 nota open --app outside/notes.txt
+stderr 'isn''t a Markdown file'
+exitcode 2 nota open --app outside
+stderr 'is a folder'
+exitcode 3 nota open --app nope
+stderr 'no note matches "nope"'
+
+# The app's command failing is exit 1, with what it said.
+env NOTA_APP=$WORK/failapp.sh
+exitcode 1 nota open --app outside/README.markdown
+stderr 'failapp.sh: exit status 3: no display'
+
+# Without --app, open still runs the editor.
+[!exec:cat] stop
+env EDITOR=cat
+nota open 'Gammal plan'
+stdout '^# Gammal plan$'
+
+-- fakeapp.sh --
+#!/bin/sh
+printf '%s\n' "$@" > "$OPENED"
+-- failapp.sh --
+#!/bin/sh
+echo 'no display' >&2
+exit 3
+-- want-note.txt --
+$WORK/vault/Projekt/Arkiv/Gammal.md
+-- want-outside.txt --
+$WORK/outside/README.markdown
+-- want-readme.txt --
+# Read me
+-- outside/README.markdown --
+# Read me
+-- outside/notes.txt --
+text
+-- vault/Projekt/Arkiv/Gammal.md --
+# Gammal plan
