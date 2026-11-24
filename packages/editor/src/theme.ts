@@ -4,6 +4,9 @@ import { EditorView } from "@codemirror/view";
 // with fallbacks, so it follows light and dark mode with the rest.
 
 const v = (name: string, fallback: string) => `var(--${name}, ${fallback})`;
+/** A theme's Markdown colour (--md-*), else the app token it refines. */
+const md = (name: string, token: string, fallback: string) =>
+  `var(--md-${name}, ${v(token, fallback)})`;
 const mono = 'ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace';
 const check =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E\")";
@@ -32,7 +35,11 @@ export const notaTheme = EditorView.theme({
   ".cm-placeholder": { color: v("faint", "#9ca0a8") },
 
   // Headings: sized, with room above. Title-like h1, quieter h2–h6.
-  ".cm-h": { fontWeight: "650", color: v("foreground", "#1d1f24"), letterSpacing: "-0.01em" },
+  ".cm-h": {
+    fontWeight: "650",
+    color: md("heading", "foreground", "#1d1f24"),
+    letterSpacing: "-0.01em",
+  },
   ".cm-h1": {
     fontSize: "1.6em",
     lineHeight: "1.3",
@@ -45,15 +52,16 @@ export const notaTheme = EditorView.theme({
   ".cm-h4, .cm-h5, .cm-h6": {
     fontSize: "1em",
     paddingTop: "0.5em !important",
-    color: v("muted-foreground", "#6b6f78"),
+    color: md("heading", "muted-foreground", "#6b6f78"),
   },
 
-  ".cm-strong": { fontWeight: "650", color: v("foreground", "#1d1f24") },
-  ".cm-em": { fontStyle: "italic" },
+  ".cm-strong": { fontWeight: "650", color: md("bold", "foreground", "#1d1f24") },
+  ".cm-em": { fontStyle: "italic", color: "var(--md-italic, inherit)" },
   ".cm-strike": { textDecoration: "line-through", color: v("faint", "#9ca0a8") },
   ".cm-inline-code": {
     fontFamily: mono,
     fontSize: "0.86em",
+    color: "var(--md-code, inherit)",
     backgroundColor: v("code", "#f1f1ee"),
     borderRadius: "4px",
     padding: "0.1em 0.35em",
@@ -61,14 +69,14 @@ export const notaTheme = EditorView.theme({
   ".cm-marker": { color: v("faint", "#9ca0a8") },
 
   ".cm-wikilink, .cm-link": {
-    color: v("ink", "#1e7363"),
+    color: md("link", "ink", "#1e7363"),
     textDecoration: "underline",
-    textDecorationColor: `color-mix(in srgb, ${v("ink", "#1e7363")} 32%, transparent)`,
+    textDecorationColor: `color-mix(in srgb, ${md("link", "ink", "#1e7363")} 32%, transparent)`,
     textUnderlineOffset: "3px",
     cursor: "pointer",
   },
   ".cm-tag": {
-    color: v("ink-strong", "#2f40b3"),
+    color: md("tag", "ink-strong", "#2f40b3"),
     backgroundColor: v("ink-soft", "#e6f3f0"),
     borderRadius: "5px",
     padding: "0.05em 0.3em",
@@ -79,7 +87,7 @@ export const notaTheme = EditorView.theme({
   ".cm-quote": {
     borderLeft: `3px solid ${v("hairline", "#e7e7e4")}`,
     paddingLeft: "14px !important",
-    color: v("muted-foreground", "#6b6f78"),
+    color: md("quote", "muted-foreground", "#6b6f78"),
   },
   ".cm-hr": { position: "relative", height: "1.65em" },
   ".cm-hr::after": {

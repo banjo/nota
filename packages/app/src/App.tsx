@@ -13,6 +13,7 @@ import { useChangeSubscription } from "./queries.ts";
 import { useNarrow, useViewport } from "./lib/viewport.ts";
 import { useUI } from "./state.ts";
 import { createRegistry, type Registry, RegistryContext, useContributions } from "./registry.ts";
+import { usePluginThemes } from "./theme/register.ts";
 import { useTheme, useThemeChrome, useThemeTokens } from "./theme/useTheme.ts";
 
 // Apple platforms get their system font; others Inter (see styles.css).
@@ -39,7 +40,9 @@ function Themed({ client }: { client: NotesClient }) {
   const narrow = useNarrow();
   const navPane = useUI((s) => s.pane === "nav");
   useViewport();
-  useThemeTokens(theme, useContributions("theme"));
+  const plugins = usePluginThemes();
+  const themes = useContributions("theme");
+  useThemeTokens(theme, [...themes, ...plugins.themes], plugins.pending);
   // A phone's status bar sits over whichever pane is on screen.
   useThemeChrome(theme, client.shell, narrow && navPane ? "--sidebar" : "--background");
   // On a phone toasts drop in from the top, clear of the notch, where
