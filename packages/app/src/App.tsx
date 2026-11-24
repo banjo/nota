@@ -3,7 +3,7 @@ import { Toaster } from "@nota/ui/sonner";
 import { TooltipProvider } from "@nota/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { registerBuiltins } from "./builtins/index.tsx";
 import { Shell } from "./components/Shell.tsx";
 import { Onboarding } from "./onboarding/Onboarding.tsx";
@@ -13,6 +13,7 @@ import { useChangeSubscription } from "./queries.ts";
 import { useNarrow, useViewport } from "./lib/viewport.ts";
 import { useUI } from "./state.ts";
 import { createRegistry, type Registry, RegistryContext, useContributions } from "./registry.ts";
+import { settingsSync } from "./settings/index.ts";
 import { usePluginThemes } from "./theme/register.ts";
 import { useTheme, useThemeChrome, useThemeTokens } from "./theme/useTheme.ts";
 
@@ -31,6 +32,12 @@ function makeQueryClient() {
 
 function Changes({ client }: { client: NotesClient }) {
   useChangeSubscription(client);
+  return null;
+}
+
+/** Brings in settings.toml and the account's settings, and follows them. */
+function SettingsLayers({ client }: { client: NotesClient }) {
+  useEffect(() => settingsSync.connect(client.settings), [client.settings]);
   return null;
 }
 
@@ -81,6 +88,7 @@ export function NotaProviders({
         <RegistryContext.Provider value={reg}>
           <TooltipProvider>
             <Changes client={client} />
+            <SettingsLayers client={client} />
             {children}
             <Themed client={client} />
           </TooltipProvider>
