@@ -38,7 +38,9 @@ const DOC = [
 function parsed(doc: string, cursor: number) {
   const s = EditorState.create({ doc, extensions, selection: EditorSelection.cursor(cursor) });
   ensureSyntaxTree(s, s.doc.length, 5000);
-  return s;
+  // syntaxTree(s) is still the tree of the state's first, time-boxed
+  // parse (partial on a slow machine); a transaction picks up the rest.
+  return s.update({}).state;
 }
 
 // Spec order inside a code fence depends on the parse, so compare sorted.
