@@ -46,7 +46,8 @@ Plugins live in the vault's \`.nota/\` folder and sync with it.
 
 - Views: \`.nota/views/*.yaml\` are saved queries shown as virtual folders (\`name\`, \`where\`, \`tag\`, \`folder\`, \`sort\`, \`limit\`). \`nota ls --view <id>\`.
 - Hooks: \`.nota/hooks.toml\` runs shell commands on \`note.created\`, \`note.saved\`, \`note.moved\`, \`note.deleted\`, \`inbox.added\`, \`sync.completed\`, with the event as JSON on stdin. \`transform\` hooks (on \`note.created\` and \`inbox.added\`) print a patch such as \`{"folder": "Recipes", "tags": {"add": ["x"]}, "set": {"status": "todo"}}\`. The server runs them too with \`NOTA_SERVER_HOOKS=on\`. \`nota hooks list\`, \`nota hooks test <event> <note>\`.
-- UI plugins (commands, panels, editor widgets with a manifest and permissions) are planned, not released.
+- Themes: \`.nota/plugins/<id>/manifest.json\` contributes colour themes (\`contributes.themes\`: \`background\`, \`text\` and \`ink\` per mode, other tokens optional). \`nota plugins\` lists them. Nine classics (Dracula, Nord, Solarized, Gruvbox, Catppuccin, Tokyo Night, Rosé Pine, One, GitHub) are built in.
+- UI plugins that run code (commands, panels, editor widgets with permissions) are planned, not released.
 
 ## Sync
 

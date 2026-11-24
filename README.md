@@ -33,6 +33,7 @@
 - 📖 Three views per note: Live preview while you write, a read-only Reading mode (⌘E) and the raw Source, all from the top bar or ⌘K.
 - 📂 Open any Markdown file: Finder's **Open With ▸ Nota**, the Dock or `nota open --app file.md` shows it as a read-only preview, editable as a draft and saved to the vault only when you say so. Nota is never made the default `.md` app.
 - 🔑 No passwords: accounts are an e-mail address and a passkey, only needed for sync.
+- 🎨 Themes: Nota's own, classics like Dracula, Nord and Solarized, and your own as a small JSON file in the vault.
 - 🧩 Extensible: saved views without code, and hooks that run your scripts when notes change.
 
 ## Install
@@ -130,6 +131,7 @@ Both sync with the vault. Details and examples: [docs/hooks.md](docs/hooks.md).
 - [CLI](docs/cli.md): commands, configuration, ignore rules, timestamps.
 - [Agents](docs/agents.md): MCP over stdio and HTTP, the tools and resources.
 - [Views and hooks](docs/hooks.md): saved queries and scripts on note events.
+- [Themes](docs/themes.md): the built-in themes and how to make your own.
 - [Sync](docs/sync.md): remotes, conflicts, history and restore.
 - [Self-hosting](docs/deploy.md): the server, its configuration and the static web app.
 - [Web API](docs/api.md) and [sync protocol](docs/sync-protocol.md): for clients.
