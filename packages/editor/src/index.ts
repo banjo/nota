@@ -41,6 +41,17 @@ export const notaMarkdown = () =>
 /** Extensions shared by every editor instance (no DOM handlers). */
 export const extensions: Extension[] = [notaMarkdown(), EditorView.lineWrapping];
 
+/**
+ * Under a finger, scrolling to the caret leaves room for the page's
+ * sticky top bar above and a little air above the keyboard below;
+ * nothing changes with a mouse.
+ */
+export const touchScrollMargins = EditorView.scrollMargins.of(() =>
+  typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches
+    ? { top: 64, bottom: 32 }
+    : null,
+);
+
 /** Marks a transaction that came from outside (a reload), not typing. */
 export const external = Annotation.define<boolean>();
 
@@ -83,6 +94,7 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
         placeholder ? placeholderExt(placeholder) : [],
         modeCompartment.of(modeExtensions(mode, handlers)),
         notaTheme,
+        touchScrollMargins,
         EditorView.updateListener.of((u) => {
           if (!u.docChanged || !onChange) return;
           if (u.transactions.every((tr) => tr.annotation(external))) return;

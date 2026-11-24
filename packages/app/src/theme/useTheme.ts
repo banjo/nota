@@ -20,14 +20,21 @@ export function currentBackground(name = "--background"): string {
  * theme-color metas (browser and phone chrome) and, on the desktop, the
  * windows' native appearance and the colour behind the page.
  */
-export function useThemeChrome(theme: ThemeState, shell?: ShellApi) {
+export function useThemeChrome(
+  theme: ThemeState,
+  shell?: ShellApi,
+  /** The token at the very top of the page (a phone's sidebar pane is --sidebar). */
+  top = "--background",
+) {
+  useEffect(() => {
+    const color = currentBackground(top);
+    if (!color) return;
+    for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
+      m.setAttribute("content", color);
+    }
+  }, [theme.mode, theme.palette, theme.resolved, top]);
   useEffect(() => {
     const bg = currentBackground();
-    if (bg) {
-      for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
-        m.setAttribute("content", bg);
-      }
-    }
     void shell
       ?.setAppearance?.({
         mode: theme.mode,

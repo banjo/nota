@@ -17,6 +17,7 @@ import { NotePage } from "./NotePage.tsx";
 import { Settings } from "./Settings.tsx";
 import { Palette } from "./Palette.tsx";
 import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
+import { RowSheet } from "./RowSheet.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
 
@@ -76,13 +77,19 @@ function Home({ run }: { run: (id: string) => void }) {
         title="Pick a note, or start a new one"
         body={
           <>
-            Search everything with{" "}
-            <Kbd className="text-ui text-muted-foreground">{label("mod+k")}</Kbd>.
+            <span className="pointer-coarse:hidden">
+              Search everything with{" "}
+              <Kbd className="text-ui text-muted-foreground">{label("mod+k")}</Kbd>.
+            </span>
+            <span className="hidden pointer-coarse:inline">
+              Search everything from the top bar.
+            </span>
           </>
         }
         action={
           <Button variant="secondary" onClick={() => run("note.new")}>
-            New note <Kbd className="text-muted-foreground">{label("mod+n")}</Kbd>
+            New note{" "}
+            <Kbd className="text-muted-foreground pointer-coarse:hidden">{label("mod+n")}</Kbd>
           </Button>
         }
       />
@@ -94,7 +101,7 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
   switch (route.kind) {
     case "note":
       return (
-        <div className="h-full overflow-y-auto">
+        <div className="h-full overflow-y-auto overscroll-contain">
           <NotePage path={route.path} />
         </div>
       );
@@ -147,17 +154,21 @@ export function Shell({ children }: { children?: ReactNode }) {
     >
       <div
         className={cn(
-          "min-h-0 overflow-hidden border-r border-hairline",
+          "min-h-0 overflow-hidden border-r border-hairline bg-sidebar pl-(--safe-left)",
           !sidebarOpen && "invisible border-r-0",
-          "max-[720px]:visible max-[720px]:border-r-0",
+          "max-[720px]:visible max-[720px]:border-r-0 max-[720px]:pr-(--safe-right)",
           pane === "main" && "max-[720px]:hidden",
+          // Back to the list: it slides in from where it went, the left.
+          pane === "nav" && "max-[720px]:animate-slide-back",
         )}
       >
         <Sidebar />
       </div>
       <main
         className={cn(
-          "flex min-h-0 min-w-0 flex-col overflow-hidden",
+          // The status bar's strip and landscape's notch side stay page-coloured.
+          "flex min-h-0 min-w-0 flex-col overflow-hidden pt-(--safe-top) pr-(--safe-right)",
+          "max-[720px]:pl-(--safe-left)",
           pane === "nav" && "max-[720px]:hidden",
           pane === "main" && "max-[720px]:animate-slide-in",
         )}
@@ -167,6 +178,7 @@ export function Shell({ children }: { children?: ReactNode }) {
       <OpenRecent />
       <Palette />
       <VaultDialogs />
+      <RowSheet />
       {vaultFlow ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
           <Onboarding flow="switch" initialMode={vaultFlow.mode} onCancel={closeVaultFlow} />

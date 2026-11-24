@@ -37,7 +37,7 @@ export function DropdownMenuContent({
 }
 
 const item =
-  "relative flex h-8 cursor-default items-center gap-2 rounded-sm px-2 text-ui text-text-soft outline-none select-none data-[highlighted]:bg-hover data-[highlighted]:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:shrink-0 [&_svg]:text-muted-foreground [&_svg:not([class*='size-'])]:size-[15px]";
+  "relative flex h-8 cursor-default items-center gap-2 rounded-sm px-2 text-ui text-text-soft outline-none select-none pointer-coarse:h-11 pointer-coarse:text-[15px] data-[highlighted]:bg-hover data-[highlighted]:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:shrink-0 [&_svg]:text-muted-foreground [&_svg:not([class*='size-'])]:size-[15px]";
 
 export function DropdownMenuItem({
   className,

@@ -4,7 +4,7 @@ import type * as React from "react";
 import { cn } from "../lib/utils.ts";
 
 export const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium outline-none transition-[background-color,color,transform] duration-150 ease-out select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[15px]",
+  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium outline-none transition-[background-color,color,transform] duration-150 ease-out select-none active:scale-[0.97] [touch-action:manipulation] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[15px]",
   {
     variants: {
       variant: {
@@ -17,11 +17,13 @@ export const buttonVariants = cva(
         link: "text-ink underline-offset-4 hover:underline active:scale-100",
       },
       size: {
-        default: "h-8 px-3 text-ui",
-        sm: "h-[26px] px-2.5 text-[12.5px] rounded-md",
-        lg: "h-10 px-4 text-[14px] rounded-lg",
-        icon: "size-8",
-        "icon-sm": "size-7 rounded-sm",
+        // Under a finger every button is a 44px target.
+        default:
+          "h-8 px-3 text-ui pointer-coarse:h-11 pointer-coarse:px-4 pointer-coarse:text-[15px]",
+        sm: "h-[26px] px-2.5 text-[12.5px] rounded-md pointer-coarse:h-11 pointer-coarse:px-3 pointer-coarse:text-[14px]",
+        lg: "h-10 px-4 text-[14px] rounded-lg pointer-coarse:h-11 pointer-coarse:text-[15px]",
+        icon: "size-8 pointer-coarse:size-11",
+        "icon-sm": "size-7 rounded-sm pointer-coarse:size-11",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

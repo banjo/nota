@@ -62,6 +62,7 @@ export function CaptureField({
         autoFocus={autoFocus}
         aria-label="Capture a thought"
         placeholder="Capture a thought…"
+        enterKeyHint="send"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {

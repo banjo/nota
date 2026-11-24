@@ -183,6 +183,23 @@ describe("accessible names", () => {
     expect(out.match(/<button type="button"/g)?.length).toBe(2);
   });
 
+  test("under a finger one named “…” stands in for the two hover buttons", () => {
+    const out = html(
+      <FolderRowActions
+        name="Projects"
+        onNewNote={() => {}}
+        onNewFolder={() => {}}
+        onMore={() => {}}
+      />,
+    );
+    expect(out).toContain('aria-label="Actions for Projects"');
+    // The hover pair hides under a coarse pointer; the "…" shows only there.
+    expect(out).toMatch(/pointer-coarse:hidden[^>]*>.*New note in Projects/);
+    expect(out).toMatch(
+      /hidden[^"]*pointer-coarse:grid[^>]*aria-label="Actions for Projects"|aria-label="Actions for Projects"[^>]*hidden[^"]*pointer-coarse:grid/,
+    );
+  });
+
   test("the name field is labelled, and its error is announced and linked", () => {
     const ok = html(<FolderNameField depth={0} value="" error="" onChange={() => {}} />);
     expect(ok).toContain('aria-label="New folder name"');

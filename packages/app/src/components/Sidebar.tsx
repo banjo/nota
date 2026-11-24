@@ -29,7 +29,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className="flex h-full min-h-0 flex-col bg-sidebar pt-[calc(var(--mygo-titlebar-controls-bottom,0px)+10px)]"
+      className="flex h-full min-h-0 flex-col bg-sidebar pt-[calc(var(--mygo-titlebar-controls-bottom,0px)+10px+var(--safe-top))]"
       aria-label="Sidebar"
     >
       <div className="flex items-center gap-[9px] px-4 pt-1.5 pb-2.5 pointer-coarse:pt-3">
@@ -44,11 +44,15 @@ export function Sidebar() {
           className="flex h-[30px] w-full items-center gap-2 rounded-md bg-surface px-[9px] text-faint shadow-card outline-none hover:text-muted-foreground focus-visible:shadow-[0_0_0_1px_var(--ink),0_0_0_4px_var(--ink-soft)] pointer-coarse:h-11"
         >
           <Search className="size-3.5" strokeWidth={1.75} />
-          <span className="text-ui">Search</span>
-          <Kbd className="ml-auto">{label("mod+k")}</Kbd>
+          <span className="text-ui pointer-coarse:text-[15px]">Search</span>
+          <Kbd className="ml-auto pointer-coarse:hidden">{label("mod+k")}</Kbd>
         </button>
       </div>
-      <ScrollArea className="min-h-0 flex-1" viewportRef={setScrollEl}>
+      <ScrollArea
+        className="min-h-0 flex-1"
+        viewportRef={setScrollEl}
+        viewportClassName="overscroll-contain"
+      >
         <SidebarScroll.Provider value={scrollEl}>
           <nav className="flex flex-col px-2 pb-3">
             {sections.map((s) => (
@@ -57,7 +61,7 @@ export function Sidebar() {
           </nav>
         </SidebarScroll.Provider>
       </ScrollArea>
-      <div className="flex flex-col gap-0.5 border-t border-divider px-2 pt-1.5 pb-2">
+      <div className="flex flex-col gap-0.5 border-t border-divider px-2 pt-1.5 pb-[max(8px,var(--safe-bottom))]">
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -68,11 +72,11 @@ export function Sidebar() {
                 newNoteFolder(useUI.getState().route, tree.data?.inbox ?? "Inbox"),
               )
             }
-            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-ui text-muted-foreground outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover pointer-coarse:h-11"
+            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-ui text-muted-foreground outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover active:bg-hover pointer-coarse:h-11 pointer-coarse:text-[15px]"
           >
             <Plus className="size-[15px]" strokeWidth={1.75} />
             New note
-            <Kbd className="ml-auto">{label("mod+n")}</Kbd>
+            <Kbd className="ml-auto pointer-coarse:hidden">{label("mod+n")}</Kbd>
           </button>
           <IconButton
             label="New folder"

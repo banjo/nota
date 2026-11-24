@@ -4,13 +4,16 @@ import { label } from "../lib/shortcuts.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
 import { useUI } from "../state.ts";
 
-const MODES: { id: NoteMode; name: string; icon: LucideIcon; hint: string }[] = [
+export const MODES: { id: NoteMode; name: string; icon: LucideIcon; hint: string }[] = [
   { id: "live", name: "Live", icon: PenLine, hint: "Edit with formatting" },
   { id: "reading", name: "Reading", icon: BookOpen, hint: "Read-only, as a finished page" },
   { id: "source", name: "Source", icon: Code2, hint: "The raw markdown" },
 ];
 
-/** Live / Reading / Source for the note on screen. Icons only on narrow screens. */
+/**
+ * Live / Reading / Source for the note on screen. On a phone it lives in
+ * the note's "…" sheet instead (RowSheet), so the bar keeps its room.
+ */
 export function ModeSwitch() {
   const mode = useUI((s) => s.noteMode);
   const setMode = useUI((s) => s.setNoteMode);
@@ -18,7 +21,7 @@ export function ModeSwitch() {
     <div
       role="group"
       aria-label="View mode"
-      className="flex items-center gap-0.5 rounded-md bg-hover p-0.5 text-[12px]"
+      className="flex items-center gap-0.5 rounded-md bg-hover p-0.5 text-[12px] max-[720px]:hidden"
     >
       {MODES.map((m) => {
         const on = mode === m.id;
@@ -31,12 +34,12 @@ export function ModeSwitch() {
             title={`${m.name}: ${m.hint}${m.id === "reading" ? ` (${label("mod+e")})` : ""}`}
             onClick={() => setMode(m.id)}
             className={cn(
-              "flex h-6 items-center gap-1 rounded-[5px] px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 pointer-coarse:h-9 pointer-coarse:px-2.5",
+              "flex h-6 items-center gap-1 rounded-[5px] px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 pointer-coarse:h-10 pointer-coarse:px-2.5",
               on ? "bg-background text-foreground shadow-xs" : "text-faint hover:text-foreground",
             )}
           >
             <m.icon className="size-3.5" strokeWidth={1.75} aria-hidden />
-            <span className="max-[720px]:hidden">{m.name}</span>
+            <span>{m.name}</span>
           </button>
         );
       })}
