@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@nota/ui/
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Folder, FolderPlus, FolderRoot, Inbox, Plus } from "lucide-react";
-import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   addFolder,
   addFolderThenNote,
@@ -108,17 +108,20 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
   const route = useUI((s) => s.route);
   const q = fold(query.trim());
 
-  const ctx: CommandContext = {
-    client,
-    queryClient: qc,
-    route,
-    notePath: currentPath(route),
-    navigate,
-  };
-  const open = (path: string) => {
-    close();
-    navigate({ kind: "note", path });
-  };
+  // Stable between keystrokes, so the memoised rows skip re-rendering.
+  // Spelled out rather than left to the React Compiler: measured, the rows
+  // re-rendered on every keystroke without it.
+  const ctx = useMemo<CommandContext>(
+    () => ({ client, queryClient: qc, route, notePath: currentPath(route), navigate }),
+    [client, qc, route, navigate],
+  );
+  const open = useCallback(
+    (path: string) => {
+      close();
+      navigate({ kind: "note", path });
+    },
+    [close, navigate],
+  );
 
   // Titles match instantly from the tree; full text follows from the index.
   const notes = useMemo(() => {
