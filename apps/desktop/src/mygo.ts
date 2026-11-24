@@ -59,7 +59,8 @@ export interface Appearance {
 export interface Changes {
   /**
    * Paths are the vault paths that changed (old and new paths of a
-   * move). ".nota/views" stands for the saved views.
+   * move). ".nota/views" stands for the saved views, ".nota/plugins"
+   * for the plugins.
    */
   paths: string[];
   /** Seq counts the change batches since the app started. */
@@ -72,6 +73,11 @@ export interface Changes {
  */
 export interface Command {
   id: string;
+}
+
+/** Contributes is what a plugin adds to the app. */
+export interface Contributes {
+  themes: Theme[];
 }
 
 /**
@@ -256,6 +262,23 @@ export interface PatchRequest {
   tags?: TagEdit;
 }
 
+/**
+ * Plugin is one folder of .nota/plugins. A plugin that could not be
+ * read has Error set and nothing else but ID and Dir.
+ */
+export interface Plugin {
+  id: string;
+  name: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  contributes: Contributes;
+  /** Dir is the vault-relative folder of the plugin. */
+  dir: string;
+  /** Error says why the plugin did not load. */
+  error?: string;
+}
+
 /** RemoteVault is a vault of the account on the server. */
 export interface RemoteVault {
   name: string;
@@ -335,6 +358,17 @@ export interface TagCount {
 export interface TagEdit {
   add?: string[];
   remove?: string[];
+}
+
+/**
+ * Theme is a colour theme. It has a light and a dark variant, or one
+ * of them: picking a theme with one variant switches the app to it.
+ */
+export interface Theme {
+  id: string;
+  name: string;
+  light?: Record<string, string>;
+  dark?: Record<string, string>;
 }
 
 /** Tree is every folder and every note of the vault. */
@@ -430,6 +464,11 @@ export const Vault = {
    * tags); only the touched lines change. baseHash works as in Save.
    */
   patch: bind<[string, PatchRequest, string], SaveResult>("Vault.Patch", (path: string, req: PatchRequest, baseHash: string) => [path, req, baseHash]),
+  /**
+   * Plugins returns the plugins of .nota/plugins, broken ones with their
+   * error.
+   */
+  plugins: bind<[], Plugin[]>("Vault.Plugins", () => []),
   /** Rename gives a note a new path (a new name, a new folder, or both). */
   rename: bind<[string, string], MoveResult>("Vault.Rename", (path: string, to: string) => [path, to]),
   /**

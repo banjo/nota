@@ -21,6 +21,7 @@ import (
 	"github.com/banjo/nota/internal/frontmatter"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/markdown"
+	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -837,6 +838,51 @@ func (a *app) viewsCmd() *cobra.Command {
 				out[i] = []string{r.ID, r.Name, strconv.Itoa(r.Count)}
 			}
 			return table(a.stdout, out)
+		},
+	}
+}
+
+func (a *app) pluginsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "plugins",
+		Short: "List the vault's plugins (.nota/plugins) and their themes; exit 1 if one is broken",
+		Args:  exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := a.openVault(false); err != nil {
+				return err
+			}
+			ps, err := plugins.Load(a.vault)
+			if err != nil {
+				return err
+			}
+			broken := 0
+			rows := make([][]string, len(ps))
+			for i, p := range ps {
+				what := ""
+				if p.Error != "" {
+					broken++
+					what = "error: " + p.Error
+				} else {
+					names := make([]string, len(p.Contributes.Themes))
+					for j, t := range p.Contributes.Themes {
+						names[j] = t.Name
+					}
+					what = "themes: " + strings.Join(names, ", ")
+				}
+				rows[i] = []string{p.ID, p.Dir, what}
+			}
+			if a.json {
+				err = a.printJSON(ps)
+			} else {
+				err = table(a.stdout, rows)
+			}
+			if err != nil {
+				return err
+			}
+			if broken > 0 {
+				return &Error{Code: ExitError, Kind: "broken_plugin", Message: fmt.Sprintf("%d of %d plugins did not load", broken, len(ps))}
+			}
+			return nil
 		},
 	}
 }

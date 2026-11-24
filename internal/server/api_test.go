@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
 )
 
@@ -272,6 +273,19 @@ func TestWebAPINotes(t *testing.T) {
 	}
 	if st, _ := b.call("GET", api+"/notes?view=nope", nil, nil); st != 404 {
 		t.Fatalf("unknown view: %d", st)
+	}
+	// A plugin synced into .nota/plugins/ brings its themes.
+	var ps struct{ Plugins []plugins.Plugin }
+	if st, m := b.call("GET", api+"/plugins", nil, &ps); st != 200 || ps.Plugins == nil || len(ps.Plugins) != 0 {
+		t.Fatalf("no plugins: %d %v %+v", st, m, ps)
+	}
+	manifest := `{"id":"night","contributes":{"themes":[{"id":"ink","dark":{"background":"#000000","text":"#ffffff","ink":"#8be9fd"}}]}}`
+	if st, _, _ := e.put(tok, ".nota/plugins/night/manifest.json", 0, manifest); st != 200 {
+		t.Fatal(st)
+	}
+	if st, m := b.call("GET", api+"/plugins", nil, &ps); st != 200 || len(ps.Plugins) != 1 ||
+		ps.Plugins[0].Dir != ".nota/plugins/night" || ps.Plugins[0].Contributes.Themes[0].Dark["ink"] != "#8be9fd" {
+		t.Fatalf("plugins: %d %v %+v", st, m, ps)
 	}
 	// Raw files (attachments) for the browser.
 	if st, _, _ := e.put(tok, "attachments/a.png", 0, "PNG"); st != 200 {
