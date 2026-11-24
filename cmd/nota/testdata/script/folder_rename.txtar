@@ -1,0 +1,47 @@
+# folder rename moves every file in a folder to the new path (notes keep
+# their names; empty subfolders and attachments come along).
+mkdir vault/Projekt/Tom
+nota folder rename Projekt Arbete
+stdout '^Arbete$'
+exists vault/Arbete/Plan.md
+exists vault/Arbete/Under/Djup.md
+exists vault/Arbete/Under/bild.png
+exists vault/Arbete/Tom
+! exists vault/Projekt
+nota ls
+stdout '^Arbete/Plan.md'
+stdout '^Arbete/Under/Djup.md'
+! stdout 'Projekt'
+nota folder ls
+stdout '^Arbete\s+2$'
+stdout '^Arbete/Tom\s+0$'
+
+# It can move the folder under another one, and --json says from and to.
+nota folder rename --json Arbete Arkiv/2027/Arbete
+stdout '"from": "Arbete"'
+stdout '"path": "Arkiv/2027/Arbete"'
+exists vault/Arkiv/2027/Arbete/Plan.md
+! exists vault/Arbete
+
+# Errors: missing (3), exists (5), case collision (5), bad names (2).
+exitcode 3 nota folder rename Nej Ja
+exitcode 5 nota folder rename Arkiv Andra
+stderr 'already exists'
+exitcode 5 nota folder rename Arkiv andra
+stderr 'differs only in case'
+exitcode 2 nota folder rename Arkiv Arkiv/Inuti
+stderr 'into itself'
+exitcode 2 nota folder rename Arkiv .nota
+exitcode 2 nota folder rename Arkiv 'a:b'
+exitcode 2 nota folder rename / X
+exitcode 2 nota folder rename Arkiv
+exists vault/Arkiv/2027/Arbete/Plan.md
+
+-- vault/Projekt/Plan.md --
+# Plan
+-- vault/Projekt/Under/Djup.md --
+# Djup
+-- vault/Projekt/Under/bild.png --
+png
+-- vault/Andra/Annan.md --
+# Annan

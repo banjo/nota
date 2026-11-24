@@ -4,6 +4,7 @@ import {
   createContext,
   type ReactNode,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -18,6 +19,7 @@ import { useUI } from "../state.ts";
 import { FolderActions, NewFolderRow, useFolderDraft } from "./NewFolder.tsx";
 import { NoteRow } from "./NoteRow.tsx";
 import { Row } from "./Row.tsx";
+import { RenameRow, useRename, useRenaming } from "./Rename.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
 
 /** A folder row, its hover buttons, and a long press for its sheet under a finger. */
@@ -37,9 +39,15 @@ function FolderRow({
   onToggle: () => void;
 }) {
   const longPress = useLongPress(() => openRowSheet({ kind: "folder", path, name }));
+  const renaming = useRenaming("folder", path);
+  // Lines up with the row it replaces: its chevron, then the icon.
+  if (renaming)
+    return <RenameRow target={{ kind: "folder", path }} indent={8 + depth * 16 + 16 + 7} />;
   return (
     <>
       <Row
+        data-ctx-kind="folder"
+        data-ctx-path={path}
         chevron={open}
         icon={open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />}
         label={name}
@@ -104,6 +112,21 @@ export function FolderTree() {
       return r.kind === "folder" ? `f:${r.node.path}` : `n:${r.note.path}`;
     },
   });
+
+  // A rename started from ⌘K may be for a row that is not rendered yet.
+  const renaming = useRename((s) => s.target);
+  const renamingAt = renaming
+    ? rows.findIndex(
+        (r) =>
+          r.kind === renaming.kind &&
+          (r.kind === "folder" ? r.node.path : r.kind === "note" ? r.note.path : "") ===
+            renaming.path,
+      )
+    : -1;
+  useEffect(() => {
+    if (renamingAt >= 0) v.scrollToIndex(renamingAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renamingAt]);
 
   if (!root) return null;
   if (rows.length === 0) return <p className="px-2 py-1 text-small text-faint">No folders yet</p>;

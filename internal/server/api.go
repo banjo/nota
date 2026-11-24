@@ -38,6 +38,7 @@ func (s *Server) apiRoutes() {
 	s.route("DELETE /v1/api/vaults/{vault}/notes/{path...}", ro, s.apiDelete)
 	s.route("POST /v1/api/vaults/{vault}/move", ro, s.apiMove)
 	s.route("POST /v1/api/vaults/{vault}/folders", ro, s.apiCreateFolder)
+	s.route("POST /v1/api/vaults/{vault}/folders/rename", ro, s.apiRenameFolder)
 	s.route("GET /v1/api/vaults/{vault}/search", ro, s.apiSearch)
 	s.route("GET /v1/api/vaults/{vault}/tags", ro, s.apiTags)
 	s.route("GET /v1/api/vaults/{vault}/views", ro, s.apiViews)
@@ -900,5 +901,44 @@ func (s *Server) apiRestore(w http.ResponseWriter, r *http.Request, p Principal)
 	}
 	info(r).attrs = append(info(r).attrs, "file", np, "restored", req.Version, "version", cur.Version)
 	writeJSON(w, http.StatusOK, cur)
+	return nil
+}
+
+// RenameFolderRequest is the body of POST …/folders/rename: To is the
+// folder's new vault path (a new name, a new parent, or both).
+type RenameFolderRequest struct {
+	Path string `json:"path"`
+	To   string `json:"to"`
+}
+
+// RenameFolderResponse is where the folder went.
+type RenameFolderResponse struct {
+	From string `json:"from"`
+	Path string `json:"path"`
+}
+
+// apiRenameFolder renames a folder by moving the files in it one by one,
+// as versions of the calling device, so sync sees plain note moves.
+func (s *Server) apiRenameFolder(w http.ResponseWriter, r *http.Request, p Principal) error {
+	var req RenameFolderRequest
+	if err := decodeJSON(r, &req); err != nil {
+		return err
+	}
+	ws, err := s.openWS(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	ed, err := ws.editor(p.Device)
+	if err != nil {
+		return err
+	}
+	to, err := ed.RenameFolder(req.Path, req.To)
+	if err != nil {
+		return vaultErr(err)
+	}
+	info(r).attrs = append(info(r).attrs, "folder", to, "from", req.Path)
+	writeJSON(w, http.StatusOK, RenameFolderResponse{From: req.Path, Path: to})
 	return nil
 }

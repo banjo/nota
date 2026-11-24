@@ -204,6 +204,12 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     async createFolder(path: string): Promise<string> {
       return (await request<{ path: string }>("POST", "/folders", { body: { path } })).path;
     },
+    async renameFolder(path: string, to: string): Promise<MoveResult> {
+      const r = await request<{ from: string; path: string }>("POST", "/folders/rename", {
+        body: { path, to },
+      });
+      return { from: r.from, path: r.path };
+    },
     async rename(path: string, to: string): Promise<MoveResult> {
       const r = await request<{ from: string; path: string }>("POST", "/move", {
         body: { path, to },

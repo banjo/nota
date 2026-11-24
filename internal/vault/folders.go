@@ -114,3 +114,116 @@ func (v *Vault) Folders() ([]string, error) {
 	slices.Sort(out)
 	return out, err
 }
+
+// RenameFolder renames a folder, or moves it under another one, by
+// moving every file in it to its new path one by one (so each note emits
+// note.moved, and sync sees plain path moves). Empty subfolders come
+// along. Like Move it does not rewrite wikilinks: they name notes, not
+// folders. It fails with ErrNotFound when the folder is not there,
+// ErrExists when the target is, ErrCaseCollision when it differs from an
+// existing folder only in letter case (a case-only rename of the folder
+// itself is refused too), and ErrInvalidPath for the vault root, hidden
+// or ignored names and a target inside the folder itself. Files the
+// ignore rules hide stay behind, and so does the old folder then.
+func (v *Vault) RenameFolder(from, to string) (string, error) {
+	from, err := CleanPath(from)
+	if err != nil {
+		return "", err
+	}
+	to, err = CleanPath(to)
+	if err != nil {
+		return "", err
+	}
+	bad := func(why string) error {
+		return &PathError{Op: "rename", Path: from, Err: fmt.Errorf("%w: %s", ErrInvalidPath, why)}
+	}
+	if from == "" {
+		return "", bad("the vault root cannot be renamed")
+	}
+	if err := checkFolderName(from); err != nil {
+		return "", err
+	}
+	if err := checkFolderName(to); err != nil {
+		return "", err
+	}
+	if v.ignore.Match(to, true) {
+		return "", bad("ignored by the vault's ignore rules")
+	}
+	if strings.HasPrefix(to+"/", from+"/") && to != from {
+		return "", bad("a folder cannot move into itself")
+	}
+	src, err := v.resolve(from)
+	if err != nil {
+		return "", err
+	}
+	if st, err := v.fs.Stat(src.disk); !src.exists || err != nil || !st.IsDir() {
+		return "", &PathError{Op: "rename", Path: from, Existing: src.collision, Err: ErrNotFound}
+	}
+	if to == from {
+		return to, nil
+	}
+	dst, err := v.resolve(to)
+	if err != nil {
+		return "", err
+	}
+	if dst.collision != "" {
+		return "", &PathError{Op: "rename", Path: to, Existing: dst.collision, Err: ErrCaseCollision}
+	}
+	if dst.exists {
+		return "", &PathError{Op: "rename", Path: to, Existing: to, Err: ErrExists}
+	}
+	// A file in the way of a parent of the target is not a folder.
+	for p := Folder(to); p != ""; p = Folder(p) {
+		pr, err := v.resolve(p)
+		if err != nil {
+			return "", err
+		}
+		if !pr.exists {
+			continue
+		}
+		if st, err := v.fs.Stat(pr.disk); err == nil && !st.IsDir() {
+			return "", &PathError{Op: "rename", Path: to, Existing: p, Err: fmt.Errorf("%w: %s is a file", ErrExists, p)}
+		}
+		break
+	}
+
+	dirs, err := v.Folders()
+	if err != nil {
+		return "", err
+	}
+	var sub []string
+	for _, d := range dirs {
+		if d == from || strings.HasPrefix(d, from+"/") {
+			sub = append(sub, d) // sorted: parents before children
+		}
+	}
+	var files []string
+	err = v.WalkFiles(func(e Entry) error {
+		if strings.HasPrefix(e.Path, from+"/") {
+			files = append(files, e.Path)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	swap := func(p string) string { return to + strings.TrimPrefix(p, from) }
+	for _, d := range sub {
+		if _, err := v.mkdirs(swap(d)); err != nil {
+			return "", err
+		}
+	}
+	for _, f := range files {
+		if _, err := v.rename(f, swap(f)); err != nil {
+			return "", err
+		}
+	}
+	// Drop what is left of the old tree, deepest first; a folder that
+	// still holds hidden or ignored files is kept.
+	for i := len(sub) - 1; i >= 0; i-- {
+		if r, err := v.resolve(sub[i]); err == nil && r.exists {
+			_ = v.fs.Remove(r.disk)
+		}
+	}
+	return to, nil
+}

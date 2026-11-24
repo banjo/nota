@@ -51,6 +51,12 @@ export interface NotesClient {
    * allowed.
    */
   createFolder(path: string): Promise<string>;
+  /**
+   * Renames a folder (or moves it) to a new vault path: every note in it
+   * moves with it. Rejects when the target exists or the name is not
+   * allowed.
+   */
+  renameFolder(path: string, to: string): Promise<MoveResult>;
   /** Gives a note a new path. */
   rename(path: string, to: string): Promise<MoveResult>;
   /** Moves a note to the trash. */

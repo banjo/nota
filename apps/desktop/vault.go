@@ -661,6 +661,22 @@ func (s *Vault) Move(path, folder string) (MoveResult, error) {
 	return MoveResult{From: path, Path: where(to)}, nil
 }
 
+// RenameFolder renames a folder, or moves it, to a new vault path: every
+// file in it moves with it, one note.moved event per note.
+func (s *Vault) RenameFolder(path, to string) (MoveResult, error) {
+	if s.v == nil {
+		return MoveResult{}, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, err := s.v.RenameFolder(path, to)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	s.changes.add(path, p)
+	return MoveResult{From: path, Path: p}, nil
+}
+
 // Rename gives a note a new path (a new name, a new folder, or both).
 func (s *Vault) Rename(path, to string) (MoveResult, error) {
 	if s.v == nil {

@@ -11,6 +11,7 @@ import { useTree, useVaultInfo } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { SidebarScroll } from "./FolderTree.tsx";
+import { SidebarContextMenu } from "./RowMenu.tsx";
 import { IconButton, startNewFolder } from "./NewFolder.tsx";
 import { SyncStatusRow } from "./SyncStatus.tsx";
 import { VaultSwitcher } from "../vaults/VaultSwitcher.tsx";
@@ -48,19 +49,21 @@ export function Sidebar() {
           <Kbd className="ml-auto pointer-coarse:hidden">{label("mod+k")}</Kbd>
         </button>
       </div>
-      <ScrollArea
-        className="min-h-0 flex-1"
-        viewportRef={setScrollEl}
-        viewportClassName="overscroll-contain"
-      >
-        <SidebarScroll.Provider value={scrollEl}>
-          <nav className="flex flex-col px-2 pb-3">
-            {sections.map((s) => (
-              <s.component key={s.id} />
-            ))}
-          </nav>
-        </SidebarScroll.Provider>
-      </ScrollArea>
+      <SidebarContextMenu>
+        <ScrollArea
+          className="min-h-0 flex-1"
+          viewportRef={setScrollEl}
+          viewportClassName="overscroll-contain"
+        >
+          <SidebarScroll.Provider value={scrollEl}>
+            <nav className="flex flex-col px-2 pb-3">
+              {sections.map((s) => (
+                <s.component key={s.id} />
+              ))}
+            </nav>
+          </SidebarScroll.Provider>
+        </ScrollArea>
+      </SidebarContextMenu>
       <div className="flex flex-col gap-0.5 border-t border-divider px-2 pt-1.5 pb-[max(8px,var(--safe-bottom))]">
         <div className="flex items-center gap-0.5">
           <button

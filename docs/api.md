@@ -164,6 +164,7 @@ Shapes:
 | `PATCH …/notes/{path}` | optional `Base-Version`; `{set?: {k: v}, unset?: [k], tags?: {add?, remove?}}` → `Note`. Only the touched frontmatter lines change. |
 | `DELETE …/notes/{path}` | optional `Base-Version` → the tombstone entry. Devices move the file to `.trash/`; the server keeps every version. |
 | `POST …/move` | `{path, folder}` (keep the name; `"/"` = root) or `{path, to}` (rename), optional `base_version` → `{from, path, version}`; `409 exists` / `case_collision` |
+| `POST …/folders/rename` | `{path, to}` (`to` is the new vault path, so it can move the folder too) → `200 {from, path}`. Every file in the folder moves to the new path one by one, as versions of the calling device, so sync sees plain note moves; wikilinks are not rewritten (they name notes). `404 not_found`, `409 exists` / `case_collision` (a case-only rename is refused), `400 invalid_path` (root, hidden names, into itself). |
 | `POST …/folders` | `{path}` (nested `a/b` makes the parents) → `201 {path}`; `409 exists` / `case_collision`, `400 invalid_path` (hidden, ignored or reserved names). An empty folder is not a version: it stays on this server, sends no event and does not sync until a note lands in it. |
 | `GET …/history/{path}` | → `{path, versions: [Entry]}` newest first, through renames |
 | `GET …/history/{path}?version=N` | → `Entry` plus `content` (absent for a delete) |
