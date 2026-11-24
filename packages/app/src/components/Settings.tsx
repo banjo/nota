@@ -63,6 +63,40 @@ const MODES: { id: ThemeMode; label: string; icon: LucideIcon }[] = [
   { id: "dark", label: "Dark", icon: Moon },
 ];
 
+/** Show or hide a note's properties; the same choice as the chip on the note. */
+function PropertiesSetting() {
+  const pref = useUI((s) => s.properties);
+  const set = useUI((s) => s.setProperties);
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Properties"
+      className="inline-flex gap-0.5 rounded-md bg-chip p-0.5"
+    >
+      {(["hide", "show"] as const).map((p) => {
+        const on = pref === p;
+        return (
+          <button
+            key={p}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => set(p)}
+            className={cn(
+              "flex h-7 items-center rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150 pointer-coarse:h-10 pointer-coarse:px-3.5 pointer-coarse:text-[14px]",
+              on
+                ? "bg-surface text-foreground shadow-card dark:bg-foreground/12"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {p === "hide" ? "Hidden" : "Shown"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Mode and colour theme. Applies at once; kept on this device. */
 function Appearance() {
   const theme = useTheme();
@@ -98,6 +132,9 @@ function Appearance() {
             );
           })}
         </div>
+      </Field>
+      <Field label="Properties">
+        <PropertiesSetting />
       </Field>
       <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-ui max-[520px]:grid-cols-1 max-[520px]:gap-1">
         <span className="pt-1 text-muted-foreground">Theme</span>

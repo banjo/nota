@@ -10,7 +10,7 @@ import { NoteEditor } from "./NoteEditor.tsx";
 import { ModeSwitch } from "./ModeSwitch.tsx";
 import { NoteMenu } from "./NoteRow.tsx";
 import { OpenedNoteStrip } from "./OpenBanner.tsx";
-import { PropertiesPanel } from "./PropertiesPanel.tsx";
+import { PropertiesSection } from "./PropertiesSection.tsx";
 import { TopBar } from "./TopBar.tsx";
 
 /** One note: breadcrumbs, title, properties, the editor and the panels. */
@@ -82,7 +82,7 @@ export function NotePage({ path }: { path: string }) {
       />
       {opened ? <OpenedNoteStrip /> : null}
       <article className="mx-auto w-full max-w-[740px] px-14 pt-10 pb-[140px] max-[720px]:px-5 max-[720px]:pt-5">
-        <NoteEditor key={n.path} note={n} between={<PropertiesPanel note={n} />} />
+        <NoteEditor key={n.path} note={n} between={<PropertiesSection note={n} />} />
         {panels
           .filter((p) => !p.when || p.when(n))
           .map((p) => (

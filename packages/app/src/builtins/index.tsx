@@ -12,6 +12,7 @@ import {
   FolderOpen,
   FolderPlus,
   Inbox,
+  ListTree,
   PanelLeft,
   Palette,
   PenLine,
@@ -34,17 +35,28 @@ import {
 } from "../external.ts";
 import { createNote, deleteNote, newNoteFolder, openVaultFlow } from "../actions.ts";
 import { baseFolder } from "../lib/folders.ts";
+import { focusNoteTitle } from "../components/RowMenu.tsx";
+import { startRename } from "../components/Rename.tsx";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
 
 import { suggestFolders } from "../lib/suggest.ts";
 import { themeStore } from "../theme/store.ts";
 import { BUILTIN_THEMES } from "../theme/themes.ts";
-import { useUI } from "../state.ts";
+import { type Route, useUI } from "../state.ts";
+import type { Tree } from "@nota/client";
+import type { QueryClient } from "@tanstack/react-query";
 import { onlineVaults, useVaultDialog } from "../vaults/online.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
 import { FoldersSection, NavSection, ViewsSection } from "./sections.tsx";
 import { OpenedSection } from "../components/OpenedSection.tsx";
+
+/** The folder on screen (a note's, or the list's) that can be renamed, else "". */
+function currentFolder(ctx: { route: Route; client: unknown; queryClient: QueryClient }): string {
+  const tree = ctx.queryClient.getQueryData<Tree>(keys.tree);
+  const f = baseFolder(ctx.route, tree?.inbox ?? "Inbox");
+  return f === (tree?.inbox ?? "Inbox") ? "" : f;
+}
 
 /**
  * Registers Nota's own features through the contribution registry, the
@@ -92,6 +104,26 @@ export function registerBuiltins(r: Registry): () => void {
       shortcut: "mod+shift+m",
       when: (ctx) => !!ctx.notePath,
       run: (ctx) => useUI.getState().openPalette("move", ctx.notePath),
+    }),
+    r.register("command", {
+      id: "note.rename",
+      title: "Rename note",
+      group: "Notes",
+      keywords: ["title", "name", "rename"],
+      icon: PenLine,
+      when: (ctx) => !!ctx.notePath,
+      // The title field is where a note is renamed, in place.
+      run: () => focusNoteTitle(),
+    }),
+    r.register("command", {
+      id: "folder.rename",
+      title: "Rename folder",
+      group: "Notes",
+      keywords: ["name", "rename", "folder", "mapp", "byt namn"],
+      icon: PenLine,
+      // The folder of the note or list on screen, never the inbox itself.
+      when: (ctx) => currentFolder(ctx) !== "",
+      run: (ctx) => startRename({ kind: "folder", path: currentFolder(ctx) }),
     }),
     r.register("command", {
       id: "note.newInFolder",
@@ -286,6 +318,14 @@ export function registerBuiltins(r: Registry): () => void {
       icon: Code2,
       when: (ctx) => !!ctx.notePath,
       run: () => useUI.getState().setNoteMode("source"),
+    }),
+    r.register("command", {
+      id: "view.properties.toggle",
+      title: "Toggle properties",
+      group: "View",
+      keywords: ["frontmatter", "metadata", "tags", "status", "hide", "show"],
+      icon: ListTree,
+      run: () => useUI.getState().toggleProperties(),
     }),
     // No shortcut: ⌘⇧L is CodeMirror's select-matches and Safari's
     // sidebar, ⌘⇧D bookmarks every tab in browsers.

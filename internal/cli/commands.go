@@ -423,10 +423,10 @@ The file's content is not touched, so its "updated" timestamp stays.`,
 func (a *app) folderCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "folder",
-		Short: "Make and list folders",
+		Short: "Make, list and rename folders",
 		Long: `Folders are real directories in the vault. "nota folder add" makes empty ones,
 which stay local until a note lands in them (see docs/sync.md); notes are moved
-into folders with "nota mv".`,
+into folders with "nota mv", and folders renamed with "nota folder rename".`,
 	}
 	add := &cobra.Command{
 		Use:   "add <path>...",
@@ -482,7 +482,36 @@ into folders with "nota mv".`,
 			return table(a.stdout, rows)
 		},
 	}
-	cmd.AddCommand(add, ls)
+	rename := &cobra.Command{
+		Use:   "rename <folder> <new-path>",
+		Short: "Rename a folder, or move it under another one",
+		Long: `Rename a folder by moving every file in it to the new path, so each note
+moves like with "nota mv" (links name notes, not folders, so none change).
+The new path is a full vault path: nota folder rename Work Projects, or
+nota folder rename Work Archive/2026 to move it as well.`,
+		Example: `  nota folder rename Projects Work
+  nota folder rename --json Inbox/Old Archive/Old`,
+		Args: exactArgs(2, "a folder and its new path"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := a.openVault(false); err != nil {
+				return err
+			}
+			from, err := vault.CleanPath(args[0])
+			if err != nil {
+				return err
+			}
+			to, err := a.vault.RenameFolder(from, args[1])
+			if err != nil {
+				return err
+			}
+			if a.json {
+				return a.printJSON(map[string]string{"from": from, "path": to})
+			}
+			fmt.Fprintln(a.stdout, to)
+			return nil
+		},
+	}
+	cmd.AddCommand(add, ls, rename)
 	return cmd
 }
 

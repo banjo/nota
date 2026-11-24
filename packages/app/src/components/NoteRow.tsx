@@ -15,6 +15,7 @@ import { useLongPress } from "../lib/longPress.ts";
 import { useNarrow } from "../lib/viewport.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
+import { RenameRow, useRenaming } from "./Rename.tsx";
 import { Row } from "./Row.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
 
@@ -42,9 +43,23 @@ export function NoteRow({
   const longPress = useLongPress(() =>
     openRowSheet({ kind: "note", path: note.path, title: note.title }),
   );
+  const renaming = useRenaming("note", note.path);
+  if (renaming)
+    return (
+      <div className={cn("h-7 pointer-coarse:h-11", className)}>
+        <RenameRow
+          target={{ kind: "note", path: note.path }}
+          title={note.title}
+          indent={8 + depth * 16}
+        />
+      </div>
+    );
   return (
     <div className={cn("group/note relative", className)}>
       <Row
+        data-ctx-kind="note"
+        data-ctx-path={note.path}
+        data-ctx-title={note.title}
         icon={<FileText strokeWidth={1.75} />}
         label={note.title}
         depth={depth}

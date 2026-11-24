@@ -19,6 +19,7 @@ nota tag Plan +nota -draft                     # Flags go before the note.
 nota mv Plan Archive
 nota folder add Projects/Ideas                  # Empty folders, nested paths too.
 nota folder ls                                 # Every folder with its note count.
+nota folder rename Projects Work                # Moves every note in it; links name notes, so none change.
 nota inbox
 nota ls --view drafts                          # .nota/views/drafts.yaml
 nota backlinks Plan

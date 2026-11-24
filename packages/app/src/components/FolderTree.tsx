@@ -19,6 +19,7 @@ import { type Route, useUI } from "../state.ts";
 import { FolderActions, NewFolderRow, useFolderDraft } from "./NewFolder.tsx";
 import { NoteRow } from "./NoteRow.tsx";
 import { Row } from "./Row.tsx";
+import { RenameRow, useRename, useRenaming } from "./Rename.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
 
 /** A folder row, its hover buttons, and a long press for its sheet under a finger. */
@@ -38,9 +39,15 @@ function FolderRow({
   onToggle: () => void;
 }) {
   const longPress = useLongPress(() => openRowSheet({ kind: "folder", path, name }));
+  const renaming = useRenaming("folder", path);
+  // Lines up with the row it replaces: its chevron, then the icon.
+  if (renaming)
+    return <RenameRow target={{ kind: "folder", path }} indent={8 + depth * 16 + 16 + 7} />;
   return (
     <>
       <Row
+        data-ctx-kind="folder"
+        data-ctx-path={path}
         chevron={open}
         icon={open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />}
         label={name}
@@ -106,6 +113,20 @@ export function FolderTree() {
     },
   });
 
+  // A rename started from ⌘K may be for a row that is not rendered yet.
+  const renaming = useRename((s) => s.target);
+  const renamingAt = renaming
+    ? rows.findIndex(
+        (r) =>
+          r.kind === renaming.kind &&
+          (r.kind === "folder" ? r.node.path : r.kind === "note" ? r.note.path : "") ===
+            renaming.path,
+      )
+    : -1;
+  useEffect(() => {
+    if (renamingAt >= 0) v.scrollToIndex(renamingAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renamingAt]);
   // A note opened from the file manager: once its folders are open,
   // scroll its row into view (once per open).
   const route = useUI((s) => s.route);
@@ -154,8 +175,13 @@ export function FolderTree() {
               right: 0,
               height: rowHeight,
               transform: `translateY(${item.start - margin}px)`,
-              // The draft row's error hangs over the rows below it.
-              zIndex: row.kind === "draft" ? 1 : undefined,
+              // The error of a draft or rename row hangs over the rows below it.
+              zIndex:
+                row.kind === "draft" ||
+                (renaming?.kind === row.kind &&
+                  renaming.path === (row.kind === "folder" ? row.node.path : row.note.path))
+                  ? 1
+                  : undefined,
             }}
           >
             {row.kind === "draft" ? (

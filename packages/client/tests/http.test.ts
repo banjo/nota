@@ -172,6 +172,14 @@ describe("createHttpClient", () => {
     expect(f.call(3).method).toBe("DELETE");
   });
 
+  test("renames a folder through its own route", async () => {
+    const f = mockFetch(json({ from: "Hem", path: "Hus" }));
+    const c = client(f);
+    expect(await c.renameFolder("Hem", "Hus")).toEqual({ from: "Hem", path: "Hus" });
+    expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/folders/rename");
+    expect(f.call(0).body).toEqual({ path: "Hem", to: "Hus" });
+  });
+
   test("maps history entries and restores", async () => {
     const f = mockFetch(
       json({

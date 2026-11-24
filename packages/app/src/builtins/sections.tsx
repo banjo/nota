@@ -12,6 +12,7 @@ import {
   Star,
 } from "lucide-react";
 import { FolderTree } from "../components/FolderTree.tsx";
+import { FoldersHeaderActions } from "../components/FoldersHeader.tsx";
 import { NoteRow } from "../components/NoteRow.tsx";
 import { Row, SectionHeader } from "../components/Row.tsx";
 import { useInbox, useList, useTags, useViews } from "../queries.ts";
@@ -132,9 +133,12 @@ export function FoldersSection() {
   const toggle = useUI((s) => s.toggle);
   return (
     <div className="flex flex-col">
-      <SectionHeader open={open} onClick={() => toggle("section:folders", !open)}>
-        Folders
-      </SectionHeader>
+      <div className="relative">
+        <SectionHeader open={open} onClick={() => toggle("section:folders", !open)}>
+          Folders
+        </SectionHeader>
+        <FoldersHeaderActions />
+      </div>
       {open ? <FolderTree /> : null}
     </div>
   );

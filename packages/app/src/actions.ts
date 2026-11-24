@@ -2,8 +2,9 @@ import { type NotesClient, NotaError } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { rememberFolder } from "./lib/folders.ts";
-import { folderLabel, folderOf, resolveLink } from "./lib/notes.ts";
-import { keys, noteWritten } from "./queries.ts";
+import { folderLabel, folderOf, joinTitle, resolveLink, splitTitle } from "./lib/notes.ts";
+import { followedPath, remapFolder } from "./lib/rename.ts";
+import { keys, noteWritten, setNoteBase } from "./queries.ts";
 import { type Route, useUI } from "./state.ts";
 
 // What commands, menus and rows do, in one place.
@@ -90,6 +91,87 @@ export async function addFolder(
   } catch (e) {
     if (inline) inline.onError(message(e));
     else fail("Couldn't create the folder", e);
+    return undefined;
+  }
+}
+
+/**
+ * Renames a folder (its notes move with it) and keeps the screen on the
+ * same things: unfolded folders stay unfolded, and the open note or list
+ * follows. `inline` shows the outcome in the rename row instead of a toast.
+ */
+export async function renameFolder(
+  client: NotesClient,
+  qc: QueryClient,
+  path: string,
+  to: string,
+  inline?: { onError: (message: string) => void },
+) {
+  try {
+    const r = await client.renameFolder(path, to);
+    const ui = useUI.getState();
+    const expanded: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(ui.expanded))
+      expanded[k.startsWith("folder:") ? `folder:${remapFolder(k.slice(7), path, r.path)}` : k] = v;
+    const route: Route =
+      ui.route.kind === "note"
+        ? { kind: "note", path: remapFolder(ui.route.path, path, r.path) }
+        : ui.route.kind === "list" && ui.route.list.type === "folder"
+          ? {
+              kind: "list",
+              list: { type: "folder", path: remapFolder(ui.route.list.path, path, r.path) },
+            }
+          : ui.route;
+    useUI.setState({ expanded, route });
+    qc.removeQueries({ queryKey: ["note"] });
+    void qc.invalidateQueries();
+    return r.path;
+  } catch (e) {
+    if (inline) inline.onError(message(e));
+    else fail("Couldn't rename the folder", e);
+    return undefined;
+  }
+}
+
+/**
+ * Renames a note: its title (the first line) becomes `title`, and its
+ * file follows when it was named after the old title, as in the page's
+ * own title field.
+ */
+export async function renameNote(
+  client: NotesClient,
+  qc: QueryClient,
+  path: string,
+  title: string,
+  inline?: { onError: (message: string) => void },
+) {
+  try {
+    const note = await client.get(path);
+    const parts = splitTitle(note.body);
+    let cur = note;
+    if (parts.title !== title) {
+      const r = await client.save(path, joinTitle({ ...parts, title }), {
+        version: note.version,
+        hash: note.hash,
+      });
+      if (r.conflict) throw new Error("The note changed somewhere else. Try again.");
+      cur = r.note;
+      noteWritten(qc, cur);
+    }
+    const to = followedPath(path, parts.title, title);
+    let at = path;
+    if (to) {
+      setNoteBase(cur);
+      const m = await client.rename(path, to);
+      useUI.getState().moved(m.from, m.path);
+      qc.removeQueries({ queryKey: keys.note(m.from) });
+      at = m.path;
+    }
+    void qc.invalidateQueries();
+    return at;
+  } catch (e) {
+    if (inline) inline.onError(message(e));
+    else fail("Couldn't rename the note", e);
     return undefined;
   }
 }

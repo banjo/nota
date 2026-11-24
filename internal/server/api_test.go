@@ -215,6 +215,23 @@ func TestWebAPINotes(t *testing.T) {
 	if st, _ := b.call("GET", api+"/notes?folder=Projekt", nil, &list); st != 200 || list.Count != 1 {
 		t.Fatalf("folder filter: %+v", list)
 	}
+	// Renaming a folder moves its notes; renaming it back restores them.
+	var rf RenameFolderResponse
+	if st, m := b.call("POST", api+"/folders/rename", RenameFolderRequest{Path: "Projekt", To: "Arbete"}, &rf); st != 200 || rf.From != "Projekt" || rf.Path != "Arbete" {
+		t.Fatalf("rename folder: %d %v %+v", st, m, rf)
+	}
+	if st, _ := b.call("GET", api+"/notes?folder=Arbete", nil, &list); st != 200 || list.Count != 1 {
+		t.Fatalf("folder after rename: %+v", list)
+	}
+	if st, m := b.call("POST", api+"/folders/rename", RenameFolderRequest{Path: "Arbete", To: "Tomt"}, nil); st != 409 || code(m) != protocol.CodeExists {
+		t.Fatalf("rename onto a folder: %d %v", st, m)
+	}
+	if st, m := b.call("POST", api+"/folders/rename", RenameFolderRequest{Path: "Nej", To: "Ja"}, nil); st != 404 {
+		t.Fatalf("rename a missing folder: %d %v", st, m)
+	}
+	if st, m := b.call("POST", api+"/folders/rename", RenameFolderRequest{Path: "Arbete", To: "Projekt"}, nil); st != 200 {
+		t.Fatalf("rename back: %d %v", st, m)
+	}
 	if st, m := b.call("GET", api+"/notes?sort=bogus", nil, nil); st != 400 {
 		t.Fatalf("bad sort: %d %v", st, m)
 	}

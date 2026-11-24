@@ -4,7 +4,7 @@ import { toast } from "@nota/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@nota/ui/tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { Folder, Inbox as InboxIcon } from "lucide-react";
-import { useState } from "react";
+import { type MouseEvent, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { fail, moveNote } from "../actions.ts";
@@ -94,7 +94,7 @@ function useSuggestions(note: NoteInfo, tree: Tree | undefined): Suggestion | un
   return suggesters.flatMap((s) => s.suggest(note, { tree })).sort((a, b) => b.score - a.score)[0];
 }
 
-function InboxItem({ note, tree }: { note: NoteInfo; tree: Tree | undefined }) {
+export function InboxItem({ note, tree }: { note: NoteInfo; tree: Tree | undefined }) {
   const client = useClient();
   const qc = useQueryClient();
   const navigate = useUI((s) => s.navigate);
@@ -117,63 +117,81 @@ function InboxItem({ note, tree }: { note: NoteInfo; tree: Tree | undefined }) {
     });
   };
 
+  const open = () => navigate({ kind: "note", path: note.path });
+  // Buttons inside the row act on their own; they must not open the note too.
+  const own = {
+    onClick: (e: MouseEvent) => {
+      if ((e.target as Element).closest("button")) e.stopPropagation();
+    },
+  };
+
   return (
-    <li className="border-t border-divider px-5 py-3.5 first:border-t-0 max-[720px]:px-4">
-      <button
-        type="button"
-        onClick={() => navigate({ kind: "note", path: note.path })}
-        className="block w-full text-left outline-none focus-visible:underline"
+    <li className="list-none">
+      {/* The whole card opens the note. The title is its keyboard stop. */}
+      <div
+        onClick={open}
+        className="group/card cursor-pointer rounded-lg bg-surface px-4 py-3 shadow-card transition-colors duration-150 hover:bg-hover has-[[data-open]:focus-visible]:shadow-[0_0_0_1px_var(--ink),0_0_0_4px_var(--ink-soft)] pointer-coarse:py-3.5"
       >
-        <h3 className="flex items-baseline gap-2 text-[14px] font-semibold text-foreground">
-          <span className="truncate">{note.title}</span>
-          <span className="ml-auto shrink-0 text-small font-normal text-faint">
-            {relativeTime(note.created ?? note.modified)}
-          </span>
-        </h3>
-        {preview ? (
-          <p className="mt-[3px] line-clamp-2 text-[12.5px] leading-[1.45] text-muted-foreground">
-            {preview}
-          </p>
-        ) : null}
-      </button>
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        {suggestion && !kept ? (
-          <>
-            <span className="mr-0.5 text-small text-faint">Suggested</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="soft"
-                  size="sm"
-                  onClick={() => void move(suggestion.folder)}
-                  className="pointer-coarse:h-11"
-                >
-                  <Folder className="size-3.5" strokeWidth={2} />
-                  Move to {folderLabel(suggestion.folder)}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{suggestion.reason}</TooltipContent>
-            </Tooltip>
-          </>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => openPalette("move", note.path)}
-          className="pointer-coarse:h-11"
+        <button
+          type="button"
+          data-open
+          onClick={(e) => {
+            e.stopPropagation();
+            open();
+          }}
+          className="block w-full cursor-pointer text-left outline-none"
         >
-          Other folder…
-        </Button>
-        {!kept ? (
+          <h3 className="flex items-baseline gap-2 text-[14px] font-semibold text-foreground">
+            <span className="truncate">{note.title}</span>
+            <span className="ml-auto shrink-0 text-small font-normal text-faint">
+              {relativeTime(note.created ?? note.modified)}
+            </span>
+          </h3>
+          {preview ? (
+            <p className="mt-[3px] line-clamp-2 text-[12.5px] leading-[1.45] text-muted-foreground">
+              {preview}
+            </p>
+          ) : null}
+        </button>
+        <div {...own} className="mt-2.5 -ml-2 flex flex-wrap items-center gap-1.5">
+          {suggestion && !kept ? (
+            <>
+              <span className="mr-0.5 pl-2 text-small text-faint">Suggested</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => void move(suggestion.folder)}
+                    className="cursor-pointer pointer-coarse:h-11"
+                  >
+                    <Folder className="size-3.5" strokeWidth={2} />
+                    Move to {folderLabel(suggestion.folder)}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{suggestion.reason}</TooltipContent>
+              </Tooltip>
+            </>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => keep(note.path)}
-            className="pointer-coarse:h-11"
+            onClick={() => openPalette("move", note.path)}
+            className="cursor-pointer pointer-coarse:h-11"
           >
-            Keep in inbox
+            Other folder…
           </Button>
-        ) : null}
+          {!kept ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => keep(note.path)}
+              className="cursor-pointer pointer-coarse:h-11"
+            >
+              Keep in inbox
+            </Button>
+          ) : null}
+        </div>
       </div>
     </li>
   );
@@ -188,7 +206,7 @@ export function InboxView() {
       <TopBar crumbs={[{ label: "Inbox" }]} />
       <div className="mx-auto w-full max-w-[680px] px-6 pt-5 pb-24 max-[720px]:px-3">
         <CaptureField autoFocus={notes.length === 0} />
-        <div className="flex items-baseline gap-2 px-5 pt-6 pb-2 max-[720px]:px-4">
+        <div className="flex items-baseline gap-2 px-1 pt-6 pb-3">
           <h1 className="text-[18px] font-[650] tracking-[-0.01em] text-foreground">Inbox</h1>
           {notes.length ? <span className="text-ui text-faint">{notes.length} to sort</span> : null}
         </div>
@@ -199,7 +217,7 @@ export function InboxView() {
             body="Everything has a place. New thoughts land here."
           />
         ) : (
-          <ul>
+          <ul className="flex flex-col gap-2">
             {notes.map((n) => (
               <InboxItem key={n.path} note={n} tree={tree.data} />
             ))}

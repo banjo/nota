@@ -1,24 +1,22 @@
 import { Sheet, SheetContent, SheetItem, SheetSeparator } from "@nota/ui/sheet";
 import { cn } from "@nota/ui/utils";
-import { useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, FolderInput, FolderPlus, Trash2 } from "lucide-react";
-import { useRef } from "react";
+import { Fragment, useRef } from "react";
 import { create } from "zustand";
-import { createNoteIn, deleteNote } from "../actions.ts";
-import { useClient } from "../context.ts";
 import { useNoteMode, useUI } from "../state.ts";
 import { MODES } from "./ModeSwitch.tsx";
-import { startNewFolder } from "./NewFolder.tsx";
+import { type MenuTarget, useRowActions } from "./RowMenu.tsx";
 
 // The touch twin of the tree's hover buttons and "…" menus: one bottom
 // sheet for a note or a folder, opened by a row's "…" under a finger, a
 // long press on a row, or the note page's "…" on a phone. Every action
 // in it is also a ⌘K command (note.addToFolder, note.delete,
-// note.newInFolder, folder.add, view.mode.*).
+// note.newInFolder, note.rename, folder.rename, folder.add, view.mode.*),
+// and the list comes from RowMenu, which the right-click menu uses too.
 
 export type RowTarget =
   | { kind: "note"; path: string; title: string; page?: boolean }
-  | { kind: "folder"; path: string; name: string };
+  | { kind: "folder"; path: string; name: string }
+  | { kind: "empty" };
 
 export const useRowSheet = create<{ target: RowTarget | null }>(() => ({ target: null }));
 export const openRowSheet = (target: RowTarget) => useRowSheet.setState({ target });
@@ -53,9 +51,7 @@ function ModeSegments() {
 }
 
 export function RowSheet() {
-  const client = useClient();
-  const qc = useQueryClient();
-  const openPalette = useUI((s) => s.openPalette);
+  const actionsFor = useRowActions();
   const target = useRowSheet((s) => s.target);
   // Keep the content while the sheet slides out.
   const last = useRef(target);
@@ -74,7 +70,9 @@ export function RowSheet() {
     <Sheet open={!!target} onOpenChange={(o) => (o ? null : close())}>
       {t ? (
         <SheetContent
-          title={t.kind === "note" ? t.title || "Untitled" : t.name}
+          title={
+            t.kind === "note" ? t.title || "Untitled" : t.kind === "folder" ? t.name : "Folders"
+          }
           onOpenAutoFocus={(e) => {
             acted.current = false;
             // No focus ring on the first item for a finger.
@@ -84,30 +82,15 @@ export function RowSheet() {
             if (acted.current) e.preventDefault();
           }}
         >
-          {t.kind === "note" ? (
-            <>
-              {t.page ? <ModeSegments /> : null}
-              <SheetItem onClick={act(() => openPalette("move", t.path))}>
-                <FolderInput strokeWidth={1.75} /> Move to…
+          {t.kind === "note" && t.page ? <ModeSegments /> : null}
+          {actionsFor(t satisfies MenuTarget).map((a, i, all) => (
+            <Fragment key={a.id}>
+              {i > 0 && all[i - 1]!.group !== a.group ? <SheetSeparator /> : null}
+              <SheetItem variant={a.destructive ? "destructive" : undefined} onClick={act(a.run)}>
+                <a.icon strokeWidth={1.75} /> {a.label}
               </SheetItem>
-              <SheetSeparator />
-              <SheetItem
-                variant="destructive"
-                onClick={act(() => void deleteNote(client, qc, t.path))}
-              >
-                <Trash2 strokeWidth={1.75} /> Move to trash
-              </SheetItem>
-            </>
-          ) : (
-            <>
-              <SheetItem onClick={act(() => void createNoteIn(client, qc, t.path))}>
-                <FilePlus2 strokeWidth={1.75} /> New note in {t.name}
-              </SheetItem>
-              <SheetItem onClick={act(() => startNewFolder(t.path))}>
-                <FolderPlus strokeWidth={1.75} /> New folder in {t.name}
-              </SheetItem>
-            </>
-          )}
+            </Fragment>
+          ))}
         </SheetContent>
       ) : null}
     </Sheet>

@@ -402,7 +402,7 @@ export function PropertiesPanel({ note }: { note: Note }) {
   const tags = note.tags;
 
   return (
-    <dl className="mb-7 grid grid-cols-[110px_1fr] gap-y-1 border-b border-divider pb-5 text-ui max-[520px]:grid-cols-[92px_1fr]">
+    <dl className="mt-2 grid grid-cols-[110px_1fr] gap-y-1 border-b border-divider pb-5 text-ui max-[520px]:grid-cols-[92px_1fr]">
       <Label icon={Hash}>Tags</Label>
       <dd className="flex min-h-7 flex-wrap items-center gap-1.5 py-[3px]">
         {tags.map((t) => (

@@ -157,3 +157,78 @@ func TestMkdirThenWrite(t *testing.T) {
 		}
 	})
 }
+
+func TestRenameFolder(t *testing.T) {
+	folderVaults(t, func(t *testing.T, v *Vault) {
+		for p, c := range map[string]string{
+			"Work/a.md":         "# A",
+			"Work/Deep/b.md":    "# B",
+			"Work/Deep/pic.png": "png",
+			"Other/c.md":        "# C",
+		} {
+			if _, _, err := v.write(p, []byte(c)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := v.Mkdir("Work/Empty"); err != nil {
+			t.Fatal(err)
+		}
+		got, err := v.RenameFolder("Work", "Projects")
+		if err != nil || got != "Projects" {
+			t.Fatalf("RenameFolder = %q, %v", got, err)
+		}
+		want := []string{"Other", "Projects", "Projects/Deep", "Projects/Empty"}
+		if fs := folders(t, v); !slices.Equal(fs, want) {
+			t.Fatalf("Folders = %q, want %q", fs, want)
+		}
+		if ps := paths(t, v); !slices.Equal(ps, []string{"Other/c.md", "Projects/Deep/b.md", "Projects/a.md"}) {
+			t.Fatalf("notes = %q", ps)
+		}
+		if !v.FileExists("Projects/Deep/pic.png") || v.FileExists("Work/Deep/pic.png") {
+			t.Fatal("attachment did not move")
+		}
+		// Move under another folder, nested target.
+		if got, err := v.RenameFolder("Projects/Deep", "Other/Inner/Deep"); err != nil || got != "Other/Inner/Deep" {
+			t.Fatalf("nested = %q, %v", got, err)
+		}
+		if ps := paths(t, v); !slices.Contains(ps, "Other/Inner/Deep/b.md") {
+			t.Fatalf("notes = %q", ps)
+		}
+	})
+}
+
+func TestRenameFolderErrors(t *testing.T) {
+	folderVaults(t, func(t *testing.T, v *Vault) {
+		for _, p := range []string{"A/a.md", "B/b.md"} {
+			if _, _, err := v.Write(p, []byte("# x")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		cases := []struct {
+			name, from, to string
+			want           error
+		}{
+			{"missing", "Nope", "X", ErrNotFound},
+			{"exists", "A", "B", ErrExists},
+			{"case collision", "A", "b", ErrCaseCollision},
+			{"case only", "A", "a", ErrCaseCollision},
+			{"into itself", "A", "A/Sub", ErrInvalidPath},
+			{"root", "", "X", ErrInvalidPath},
+			{"hidden", "A", ".x", ErrInvalidPath},
+			{"reserved", "A", "CON", ErrInvalidPath},
+			{"note name", "A", "x.md", ErrInvalidPath},
+			{"file in the way", "A", "A.md/x", ErrInvalidPath},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				_, err := v.RenameFolder(c.from, c.to)
+				if !errors.Is(err, c.want) {
+					t.Fatalf("RenameFolder(%q, %q) = %v, want %v", c.from, c.to, err, c.want)
+				}
+			})
+		}
+		if ps := paths(t, v); !slices.Equal(ps, []string{"A/a.md", "B/b.md"}) {
+			t.Fatalf("a refused rename moved notes: %q", ps)
+		}
+	})
+}
