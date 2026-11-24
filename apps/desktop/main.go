@@ -9,6 +9,7 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -45,7 +46,13 @@ type Desktop struct {
 	source     string   // what chose the vault: "config", "env" or "default"
 	acc        *Account // signs in to sync; linked to the vault at the end of setup
 	configPath string   // the config file; "" for the default one
-	relaunch   func()   // opens the new vault; nil means mygo.App.Relaunch
+	// relaunch opens the new vault with the files to open again; nil
+	// means mygo.App.Relaunch.
+	relaunch func(files ...string)
+	op       *Opener // files opened with the app; nil in tests
+	// newMain makes the main window again after it was closed (macOS
+	// keeps running without windows); nil before the app is ready.
+	newMain func() *mygo.Window
 }
 
 // HideCapture hides the quick-capture window (after saving, or on
@@ -76,10 +83,16 @@ func (d *Desktop) ShowCapture() {
 }
 
 // ShowMain brings the main window to the front, e.g. to open a note
-// captured in the quick-capture window.
+// captured in the quick-capture window or a file opened with the app.
+// On macOS, where closing the window leaves the app running, it opens
+// the window again.
 func (d *Desktop) ShowMain() {
 	d.mu.Lock()
 	w := d.main
+	if (w == nil || w.IsDestroyed()) && d.newMain != nil {
+		w = d.newMain()
+		d.main = w
+	}
 	d.mu.Unlock()
 	if w != nil {
 		w.Restore()
@@ -109,6 +122,7 @@ func menu(d *Desktop) *mygo.Menu {
 		{Role: mygo.RoleAppMenu},
 		{Label: "File", Submenu: []*mygo.MenuItem{
 			{Label: "New Note", Accelerator: "CmdOrCtrl+N", Click: send("note.new")},
+			{Label: "Open…", Click: send("file.open")},
 			{Label: "Quick Capture", Click: func(*mygo.MenuItem, *mygo.Window) { d.ShowCapture() }},
 			mygo.Separator(),
 			{Label: "Open Inbox", Accelerator: "CmdOrCtrl+Shift+I", Click: send("inbox.open")},
@@ -176,7 +190,23 @@ func main() {
 		d.dir = loc.Dir
 	}
 	d.acc = acc
-	mygo.Bind(s, acc, d)
+	home, _ := os.UserHomeDir()
+	op := newOpener(openerEnv{
+		locate: s.locateNote,
+		imp:    s.importNote,
+		nudge:  func(seq int64) { _ = openedEvent.Broadcast(OpenedNudge{Seq: seq}) },
+		show:   d.ShowMain,
+		trash:  mygo.Shell.TrashItem,
+		reveal: mygo.Shell.ShowItemInFolder,
+		home:   home,
+	})
+	d.op = op
+	mygo.Bind(s, acc, d, op)
+	// Files opened with the app (Finder, the Dock, `open -a`, the command
+	// line, a second instance). Registered before Run: a cold start
+	// delivers them before any window exists, so Opener queues them and
+	// the page takes them when it loads.
+	mygo.App.OnOpenFile(op.receive)
 
 	// Open in the last appearance, so neither the window chrome nor the
 	// colour behind the page flashes the other mode before the page has
@@ -200,6 +230,12 @@ func main() {
 		}
 	})
 	mygo.App.OnSecondInstance(func([]string, string) { d.ShowMain() })
+	// macOS: clicking the Dock icon with no window open brings it back.
+	mygo.App.OnActivate(func(visible bool) {
+		if !visible {
+			d.ShowMain()
+		}
+	})
 	mygo.App.SetMenu(menu(d))
 	mygo.App.OnWindowAllClosed(func() {
 		if runtime.GOOS != "darwin" {
@@ -215,21 +251,28 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	mygo.App.WhenReady(func() {
-		w := mygo.NewWindow(mygo.WindowOptions{
-			Title:           "Nota",
-			Width:           1280,
-			Height:          820,
-			MinWidth:        360,
-			MinHeight:       480,
-			StateKey:        "main",
-			URL:             "/",
-			BackgroundColor: mainBackground,
-		})
-		w.OnClosed(func() {
-			if runtime.GOOS != "darwin" {
-				mygo.App.Quit()
-			}
-		})
+		newMain := func() *mygo.Window {
+			w := mygo.NewWindow(mygo.WindowOptions{
+				Title:           "Nota",
+				Width:           1280,
+				Height:          820,
+				MinWidth:        360,
+				MinHeight:       480,
+				StateKey:        "main",
+				URL:             "/",
+				BackgroundColor: mainBackground,
+			})
+			w.OnClosed(func() {
+				if runtime.GOOS != "darwin" {
+					mygo.App.Quit()
+				}
+			})
+			return w
+		}
+		w := newMain()
+		d.mu.Lock()
+		d.newMain = newMain
+		d.mu.Unlock()
 		if needsSetup {
 			// Nothing to capture into yet; the setup relaunches the app.
 			d.mu.Lock()

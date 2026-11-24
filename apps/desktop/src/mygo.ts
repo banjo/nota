@@ -95,6 +95,27 @@ export interface Device {
   current: boolean;
 }
 
+/** ExternalDoc is the content of an outside file. */
+export interface ExternalDoc {
+  id: string;
+  name: string;
+  dir: string;
+  title: string;
+  /** Content is the whole file, Body what follows its frontmatter. */
+  content: string;
+  body: string;
+  properties: Record<string, unknown>;
+  modified: string;
+  size: number;
+  /** Hash is the SHA-256 of the file as read; saves check it. */
+  hash: string;
+  /**
+   * UTF8 is false when the file is not valid UTF-8: it is shown with
+   * replacement characters and cannot be saved.
+   */
+  utf8: boolean;
+}
+
 /** FolderInfo is what InspectFolder found. */
 export interface FolderInfo {
   /** Path is the cleaned absolute path. */
@@ -202,6 +223,27 @@ export interface NoteInfo {
   snippet?: string;
 }
 
+/** Opened is a file the OS opened with the app. */
+export interface Opened {
+  /** ID names an outside file for Read, Save and the rest; "" for notes. */
+  id: string;
+  /**
+   * Kind is "note" (a note of the vault, see NotePath), "external" (a
+   * preview) or "error" (see Error).
+   */
+  kind: string;
+  notePath?: string;
+  /** Name is the file name, Dir its folder for display (~ for home). */
+  name: string;
+  dir: string;
+  error?: string;
+}
+
+/** OpenedNudge says there are opened files to take (Opener.Take). */
+export interface OpenedNudge {
+  seq: number;
+}
+
 /** PatchRequest edits frontmatter: only the touched lines change. */
 export interface PatchRequest {
   set?: Record<string, unknown>;
@@ -214,6 +256,38 @@ export interface RemoteVault {
   name: string;
   cursor: number;
   created: string;
+}
+
+/** SaveOutcome is where a saved file went. */
+export interface SaveOutcome {
+  /** Conflict says the file changed since Hash: nothing was written. */
+  conflict: boolean;
+  /** Path is the new note's vault path. */
+  path?: string;
+  /**
+   * TrashError says the note was written but the original could not
+   * go to the Trash.
+   */
+  trashError?: string;
+}
+
+/** SaveRequest saves an outside file into the vault. */
+export interface SaveRequest {
+  /** Folder is the vault folder; "" for the inbox, "/" for the root. */
+  folder: string;
+  /**
+   * Edited says Body is a draft that replaces the file's body (its
+   * frontmatter stays byte for byte). Otherwise the file's bytes are
+   * copied exactly, and only if they still have Hash.
+   */
+  edited: boolean;
+  body: string;
+  hash: string;
+  /**
+   * Move sends the original to the Trash once the note is written. It
+   * needs Hash to match the file, edited or not.
+   */
+  move: boolean;
 }
 
 /**
@@ -488,7 +562,9 @@ export const Desktop = {
   showCapture: bind<[], void>("Desktop.ShowCapture", () => []),
   /**
    * ShowMain brings the main window to the front, e.g. to open a note
-   * captured in the quick-capture window.
+   * captured in the quick-capture window or a file opened with the app.
+   * On macOS, where closing the window leaves the app running, it opens
+   * the window again.
    */
   showMain: bind<[], void>("Desktop.ShowMain", () => []),
   /**
@@ -506,6 +582,54 @@ export const Desktop = {
   vaultSource: bind<[], string>("Desktop.VaultSource", () => []),
 } as const;
 
+/**
+ * Opener receives files opened with the app and serves them to the
+ * frontend.
+ */
+export const Opener = {
+  /** Dismiss forgets an outside file. */
+  dismiss: bind<[string], void>("Opener.Dismiss", (id: string) => [id]),
+  /**
+   * Follow opens the Markdown file a relative link in an outside file
+   * names, as Finder would: a note of the vault, or another preview.
+   * Anything else (other schemes, absolute paths, other file types) is
+   * refused.
+   */
+  follow: bind<[string, string], Opened>("Opener.Follow", (id: string, href: string) => [id, href]),
+  /**
+   * OverwriteOriginal writes the draft's body back into the original file,
+   * keeping its frontmatter byte for byte. It is the one way the app
+   * writes a file outside the vault, and only when the file still has
+   * hash; otherwise nothing is written and the result is a conflict.
+   */
+  overwriteOriginal: bind<[string, string, string], SaveOutcome>("Opener.OverwriteOriginal", (id: string, body: string, hash: string) => [id, body, hash]),
+  /**
+   * PickFile shows the system's file chooser for Markdown files and opens
+   * the chosen ones as if the OS had (File ▸ Open…).
+   */
+  pickFile: bind<[], void>("Opener.PickFile", () => []),
+  /**
+   * Previews lists the outside files open now, oldest first, so a page
+   * that loads again finds them.
+   */
+  previews: bind<[], Opened[]>("Opener.Previews", () => []),
+  /** Read returns the content of an outside file as it is now. */
+  read: bind<[string], ExternalDoc>("Opener.Read", (id: string) => [id]),
+  /** Reveal shows the original file in the file manager. */
+  reveal: bind<[string], void>("Opener.Reveal", (id: string) => [id]),
+  /**
+   * Save copies an outside file (or the draft made from it) into the vault
+   * as a new note named after the file. With Move set, the original then
+   * goes to the Trash. The original is never written.
+   */
+  save: bind<[string, SaveRequest], SaveOutcome>("Opener.Save", (id: string, req: SaveRequest) => [id, req]),
+  /**
+   * Take returns the files opened since the last call, oldest first. The
+   * page calls it when it loads and on every "opened" event.
+   */
+  take: bind<[], Opened[]>("Opener.Take", () => []),
+} as const;
+
 // ---- Events ----
 
 /** Events sent by the Go side. Subscribe with `events.name.on(listener)`. */
@@ -514,6 +638,8 @@ export const events = {
   account: event<AccountState>("account"),
   /** commandEvent sends menu commands to the main window's page. */
   command: event<Command>("command"),
+  /** openedEvent nudges the main window's page: files were opened, take them. */
+  opened: event<OpenedNudge>("opened"),
   /** syncStatusEvent tells the frontend about every sync pass. */
   syncStatus: event<SyncStatus>("syncStatus"),
   /**

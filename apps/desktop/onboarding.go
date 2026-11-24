@@ -209,10 +209,17 @@ func (d *Desktop) configFile() (string, error) {
 	return vault.ConfigPath()
 }
 
+// restart relaunches the app into the new vault; files opened with the
+// app that are still open (or still waiting for the setup to finish)
+// are passed on, so the new instance opens them again.
 func (d *Desktop) restart() {
+	var files []string
+	if d.op != nil {
+		files = d.op.pending()
+	}
 	if d.relaunch != nil {
-		d.relaunch()
+		d.relaunch(files...)
 		return
 	}
-	mygo.App.Relaunch()
+	mygo.App.Relaunch(files...)
 }
