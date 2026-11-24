@@ -57,6 +57,7 @@ var Tokens = []string{
 	"ink", "ink-soft", "ink-soft-hover", "ink-strong", "ink-foreground",
 	"success", "warning", "danger",
 	"md-heading", "md-bold", "md-italic", "md-link", "md-tag", "md-code", "md-quote",
+	"md-table-border", "md-table-header",
 }
 
 // Required are the tokens every mode of a theme sets, as opaque hex

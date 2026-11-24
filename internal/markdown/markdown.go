@@ -100,7 +100,8 @@ func parseWiki(inner string) (Link, bool) {
 	l := Link{Wiki: true}
 	target := inner
 	if i := strings.IndexByte(inner, '|'); i >= 0 {
-		target, l.Alias = inner[:i], strings.TrimSpace(inner[i+1:])
+		// "\|" is the alias bar inside a table, where "|" splits cells.
+		target, l.Alias = strings.TrimSuffix(inner[:i], `\`), strings.TrimSpace(inner[i+1:])
 	}
 	if i := strings.IndexByte(target, '#'); i >= 0 {
 		target, l.Heading = target[:i], strings.TrimSpace(target[i+1:])

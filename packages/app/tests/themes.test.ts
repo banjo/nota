@@ -80,6 +80,10 @@ describe("colour themes", () => {
       }
       if (tk["--md-code"])
         expect(contrast(tk["--md-code"], tk["--code"]!)).toBeGreaterThanOrEqual(3);
+      // Table headers are body text on their own background.
+      const header = tk["--md-table-header"] ?? tk["--code"]!;
+      const headerText = tk["--foreground"]!;
+      expect(contrast(headerText, header), "table header").toBeGreaterThanOrEqual(4.5);
     },
   );
 

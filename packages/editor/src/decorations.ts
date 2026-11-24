@@ -21,6 +21,31 @@ export type DecoSpec =
   /** Replace a range with a widget. */
   | { type: "widget"; from: number; to: number; widget: WidgetKind; checked?: boolean };
 
+export type InlineSpec = Extract<DecoSpec, { type: "hide" | "mark" }>;
+
+export type TableAlign = "left" | "center" | "right" | undefined;
+
+export type TableCell = {
+  /** Where the cell's text starts, from the start of the table. */
+  offset: number;
+  text: string;
+  /** Inline formatting, with positions in the cell's text. */
+  specs: InlineSpec[];
+};
+
+/** A table rendered in place of its source lines. */
+export type TableSpec = {
+  type: "table";
+  /** Start of the table's first line. */
+  from: number;
+  /** End of the table's last line. */
+  to: number;
+  source: string;
+  align: TableAlign[];
+  header: TableCell[];
+  rows: TableCell[][];
+};
+
 export interface PreviewOptions {
   /** Lines (1-based) where markers show; usually where the cursor is. */
   activeLines: ReadonlySet<number>;
@@ -55,8 +80,102 @@ function children(node: SyntaxNode, name: string): SyntaxNode[] {
   return out;
 }
 
+/**
+ * A table renders when it is top-level (a table in a quote or list keeps
+ * its source, since its lines carry other markers) and no line of it is
+ * active. While the cursor is in it, the whole table shows as source.
+ */
+function tableRendered(state: EditorState, node: SyntaxNode, opts: PreviewOptions): boolean {
+  if (node.parent?.name !== "Document") return false;
+  const first = state.doc.lineAt(node.from).number;
+  const last = state.doc.lineAt(node.to).number;
+  for (let l = first; l <= last; l++) if (opts.activeLines.has(l)) return false;
+  return true;
+}
+
+function tableAlign(row: string): TableAlign[] {
+  return row
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((c) => {
+      const s = c.trim();
+      const left = s.startsWith(":");
+      const right = s.endsWith(":");
+      if (left && right) return "center";
+      if (right) return "right";
+      if (left) return "left";
+      return undefined;
+    });
+}
+
+function tableSpec(state: EditorState, node: SyntaxNode): TableSpec {
+  const doc = state.doc;
+  const from = doc.lineAt(node.from).from;
+  const to = doc.lineAt(node.to).to;
+  const delimiter = node.getChild("TableDelimiter");
+  const header = node.getChild("TableHeader");
+  const align = delimiter ? tableAlign(doc.sliceString(delimiter.from, delimiter.to)) : [];
+  const columns = align.length || (header ? children(header, "TableCell").length : 0);
+
+  // Empty cells have no TableCell node, so cells are placed by the pipes.
+  const cellsOf = (row: SyntaxNode): TableCell[] => {
+    const cells: TableCell[] = [];
+    let col = 0;
+    let lastPipe = row.from;
+    const empty = (at: number): TableCell => ({ offset: at - from, text: "", specs: [] });
+    for (let c = row.firstChild; c; c = c.nextSibling) {
+      if (c.name === "TableDelimiter") {
+        if (c.from > row.from) {
+          cells[col] ??= empty(lastPipe);
+          col++;
+        }
+        lastPipe = c.to;
+        continue;
+      }
+      if (c.name !== "TableCell" || col >= columns) continue;
+      const specs = collect(
+        state,
+        { activeLines: new Set(), reading: true, ranges: [{ from: c.from, to: c.to }] },
+        true,
+      )
+        .filter((s): s is InlineSpec => s.type === "hide" || s.type === "mark")
+        .filter((s) => s.from >= c.from && s.to <= c.to)
+        .map((s) => ({ ...s, from: s.from - c.from, to: s.to - c.from }));
+      cells[col] = { offset: c.from - from, text: doc.sliceString(c.from, c.to), specs };
+    }
+    const out: TableCell[] = [];
+    for (let i = 0; i < columns; i++) out.push(cells[i] ?? empty(lastPipe));
+    return out;
+  };
+
+  return {
+    type: "table",
+    from,
+    to,
+    source: doc.sliceString(from, to),
+    align: Array.from({ length: columns }, (_, i) => align[i]),
+    header: header ? cellsOf(header) : [],
+    rows: children(node, "TableRow").map(cellsOf),
+  };
+}
+
+/** The tables that render in place of their source, in the whole document. */
+export function tableSpecs(state: EditorState, opts: PreviewOptions): TableSpec[] {
+  const out: TableSpec[] = [];
+  for (let n = syntaxTree(state).topNode.firstChild; n; n = n.nextSibling)
+    if (n.name === "Table" && tableRendered(state, n, opts)) out.push(tableSpec(state, n));
+  return out;
+}
+
 /** Computes the live-preview decorations of a state. */
 export function previewSpecs(state: EditorState, opts: PreviewOptions): DecoSpec[] {
+  return collect(state, opts, false);
+}
+
+/** inTable: decorating the inside of a table's cells, for its widget. */
+function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): DecoSpec[] {
   const doc = state.doc;
   const specs: DecoSpec[] = [];
   const lineOf = (pos: number) => doc.lineAt(pos).number;
@@ -177,6 +296,26 @@ export function previewSpecs(state: EditorState, opts: PreviewOptions): DecoSpec
             if (!active(ref.from)) hide(ref.from, withSpace(ref.to));
             else mark(ref.from, ref.to, "cm-marker");
             return;
+          case "Table": {
+            if (inTable) return;
+            // Rendered tables are block widgets (tableSpecs), not decorated here.
+            if (tableRendered(state, node, opts)) return false;
+            for (let pos = ref.from; pos <= ref.to;) {
+              const l = doc.lineAt(pos);
+              line(l.from, "cm-table-source");
+              pos = l.to + 1;
+            }
+            for (let row = node.firstChild; row; row = row.nextSibling) {
+              if (row.name === "TableDelimiter") mark(row.from, row.to, "cm-marker");
+              else if (row.name === "QuoteMark") {
+                // A table in a quote holds the "> " of its later lines.
+                if (!active(row.from)) hide(row.from, withSpace(row.to));
+                else mark(row.from, row.to, "cm-marker");
+              } else
+                for (const p of children(row, "TableDelimiter")) mark(p.from, p.to, "cm-marker");
+            }
+            return false;
+          }
           case "HorizontalRule":
             line(ref.from, active(ref.from) ? "cm-hr-source" : "cm-hr");
             if (!active(ref.from)) hide(ref.from, ref.to);
