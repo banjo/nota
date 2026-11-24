@@ -11,9 +11,11 @@ import { currentPath, type Route, useUI } from "../state.ts";
 import { useList } from "../queries.ts";
 import { Onboarding } from "../onboarding/Onboarding.tsx";
 import { EmptyState } from "./EmptyState.tsx";
+import { ConfirmDialog, ExternalPage } from "./ExternalPage.tsx";
 import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
 import { NotePage } from "./NotePage.tsx";
+import { OpenedFiles } from "./OpenedFiles.tsx";
 import { Settings } from "./Settings.tsx";
 import { Palette } from "./Palette.tsx";
 import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
@@ -105,6 +107,12 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
           <NotePage path={route.path} />
         </div>
       );
+    case "external":
+      return (
+        <div className="h-full overflow-y-auto overscroll-contain">
+          <ExternalPage key={route.id} id={route.id} />
+        </div>
+      );
     case "list":
       return <NoteList key={JSON.stringify(route.list)} list={route.list} />;
     case "inbox":
@@ -121,18 +129,24 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
  * stack: the sidebar, then the page with a back button (decision 10).
  */
 
-/** A fresh window opens the most recently edited note rather than an empty page. */
+/**
+ * A fresh window opens the most recently edited note rather than an
+ * empty page, unless a file opened with the app takes the page: it waits
+ * until those have been looked at.
+ */
 function OpenRecent() {
   const route = useUI((s) => s.route);
   const navigate = useUI((s) => s.navigate);
+  const checked = useUI((s) => s.openChecked);
   const { data } = useList({ sort: "updated desc", limit: 1 }, route.kind === "home");
   const done = useRef(false);
   useEffect(() => {
+    if (!checked) return;
     if (done.current || route.kind !== "home" || !data?.length) return;
     done.current = true;
     const newest = [...data].sort((a, b) => (b.updated ?? "").localeCompare(a.updated ?? ""))[0];
     if (newest) navigate({ kind: "note", path: newest.path });
-  }, [data, route, navigate]);
+  }, [data, route, navigate, checked]);
   return null;
 }
 
@@ -175,6 +189,8 @@ export function Shell({ children }: { children?: ReactNode }) {
       >
         <Page route={route} run={run} />
       </main>
+      <OpenedFiles />
+      <ConfirmDialog />
       <OpenRecent />
       <Palette />
       <VaultDialogs />

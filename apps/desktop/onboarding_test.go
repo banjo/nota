@@ -19,7 +19,7 @@ func testDesktop(t *testing.T) (*Desktop, *int, string) {
 	t.Helper()
 	relaunched := new(int)
 	cfg := filepath.Join(t.TempDir(), "nota", "config.toml")
-	return &Desktop{onboarding: true, source: "default", configPath: cfg, relaunch: func() { *relaunched++ }}, relaunched, cfg
+	return &Desktop{onboarding: true, source: "default", configPath: cfg, relaunch: func(...string) { *relaunched++ }}, relaunched, cfg
 }
 
 func TestCreateVaultMakesTheFolderAndTheConfig(t *testing.T) {

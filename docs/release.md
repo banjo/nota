@@ -22,7 +22,30 @@ sorts before `0.1.1`.
 
 The macOS job checks the app before uploading it: Info.plist version, `codesign -dv` (ad hoc),
 `codesign --verify --deep --strict`, `hdiutil verify` and a mount of the DMG, the bundled
-CLI's `--version`, and that the app is still running 10 s after start.
+CLI's `--version`, and that the app is still running 10 s after start. It also checks the
+Markdown document type (below), and starts the app with a `.md` file outside the vault on the
+command line: the log must say `opened file kind=external`, the file must be unchanged and
+nothing may be written into the vault. The Linux job checks that the .deb's desktop entry runs
+`/opt/nota/nota %U` and lists `text/markdown`.
+
+### Markdown files (Open With)
+
+`apps/desktop/mygo.config.ts` declares the Markdown association twice, on purpose:
+`fileAssociations` (which command-line arguments reach `App.OnOpenFile`, and the Linux
+`MimeType`) and `macos.infoPlist.CFBundleDocumentTypes`, which replaces the entry MyGo makes
+because MyGo v0.10.0 hard-codes `LSHandlerRank: Default`. Ours is `Alternate`, role `Viewer`,
+with `LSItemContentTypes: net.daringfireball.markdown` and a `UTImportedTypeDeclarations`
+entry, so Nota is offered in Finder's Open With but never takes over double-click. Keep the
+extensions in both places in step; the workflow fails if the built Info.plist has another rank
+or role, misses `.markdown`, or still carries a second (MyGo's) document type. Nota never sets
+itself as the default handler; users choose that in Finder ▸ Get Info ▸ Open with ▸ Change All.
+
+Launch Services registers the document type when Finder first sees the app in `/Applications`
+or the app first starts; the cask does not run `lsregister`. If Open With doesn't list Nota
+right after `brew install`, run
+`/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Nota.app`.
+Stale entries from development builds (an extra "Nota" in Open With) go with
+`lsregister -u <path to the old Nota.app>`.
 
 A manual run (Actions → Release → Run workflow) builds everything as run artifacts and
 publishes nothing unless it runs on a tag.

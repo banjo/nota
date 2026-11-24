@@ -23,7 +23,12 @@ describe("contribution registry", () => {
   test("built-in features are contributions", () => {
     const r = createRegistry();
     const off = registerBuiltins(r);
-    expect(r.get("sidebar").map((s) => s.id)).toEqual(["nota.nav", "nota.views", "nota.folders"]);
+    expect(r.get("sidebar").map((s) => s.id)).toEqual([
+      "nota.nav",
+      "nota.opened",
+      "nota.views",
+      "nota.folders",
+    ]);
     expect(r.get("panel").map((p) => p.id)).toEqual(["nota.backlinks"]);
     expect(r.get("inboxSuggester").map((p) => p.id)).toEqual(["nota.rules"]);
     expect(r.command("note.new")?.shortcut).toBe("mod+n");

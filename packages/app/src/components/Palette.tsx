@@ -22,6 +22,7 @@ import {
   fileNote,
 } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { confirmMove, saveToVault, useOpened } from "../external.ts";
 import {
   choiceLabel,
   fold,
@@ -157,16 +158,30 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
   );
 }
 
-/** Lists folders to file a note in (mode "move") or to make a note in ("noteIn"). */
-function FolderMode({ query, path, close }: { query: string; path?: string; close: () => void }) {
+/**
+ * Lists folders to file a note in (mode "move"), to make a note in
+ * ("noteIn"), or to save an outside file in (`external`).
+ */
+function FolderMode({
+  query,
+  path,
+  external,
+  close,
+}: {
+  query: string;
+  path?: string;
+  external?: { id: string; move: boolean };
+  close: () => void;
+}) {
   const client = useClient();
   const qc = useQueryClient();
   const tree = useTree();
   const suggesters = useContributions("inboxSuggester");
   const inbox = tree.data?.inbox ?? "Inbox";
-  const note = path ? tree.data?.notes.find((n) => n.path === path) : undefined;
-  const suggestion =
-    tree.data && note && note.folder === inbox
+  const note = path && !external ? tree.data?.notes.find((n) => n.path === path) : undefined;
+  const suggestion = external
+    ? { folder: inbox, reason: "Inbox", score: 1 }
+    : tree.data && note && note.folder === inbox
       ? suggesters
           .flatMap((s) => s.suggest(note, { tree: tree.data! }))
           .sort((a, b) => b.score - a.score)[0]
@@ -174,13 +189,15 @@ function FolderMode({ query, path, close }: { query: string; path?: string; clos
   const choices = folderChoices({
     tree: tree.data ?? { inbox, folders: [] },
     query,
-    from: path ? folderOf(path) : undefined,
+    from: path && !external ? folderOf(path) : undefined,
     recent: readRecentFolders(),
     suggestion,
   });
   const pick = (folder: string) => {
     close();
-    if (path) void fileNote(client, qc, path, folder);
+    if (external?.move) confirmMove(client, qc, external.id, folder);
+    else if (external) void saveToVault(client, qc, external.id, folder);
+    else if (path) void fileNote(client, qc, path, folder);
     else void createNoteIn(client, qc, folder);
   };
   const row = (f: string, hint?: string) => (
@@ -206,7 +223,17 @@ function FolderMode({ query, path, close }: { query: string; path?: string; clos
       {choices.recent.length ? (
         <CommandGroup heading="Recent">{choices.recent.map((f) => row(f))}</CommandGroup>
       ) : null}
-      <CommandGroup heading={path ? "Add to folder" : "New note in"}>
+      <CommandGroup
+        heading={
+          external
+            ? external.move
+              ? "Move into"
+              : "Save in"
+            : path
+              ? "Add to folder"
+              : "New note in"
+        }
+      >
         {choices.rest.map((f) => row(f))}
       </CommandGroup>
       {choices.create ? (
@@ -214,6 +241,7 @@ function FolderMode({ query, path, close }: { query: string; path?: string; clos
           <CommandItem
             value="create-folder"
             onSelect={() => {
+              if (external) return pick(choices.create!);
               close();
               if (path) void createFolderAndMove(client, qc, path, choices.create!);
               else void addFolderThenNote(client, qc, choices.create!);
@@ -221,7 +249,14 @@ function FolderMode({ query, path, close }: { query: string; path?: string; clos
           >
             <Plus className="size-[15px]" strokeWidth={1.75} />
             <span className="flex-1 truncate">
-              Create “{choices.create}” and {path ? "move here" : "add a note"}
+              Create “{choices.create}” and{" "}
+              {external
+                ? external.move
+                  ? "move it there"
+                  : "save it there"
+                : path
+                  ? "move here"
+                  : "add a note"}
             </span>
           </CommandItem>
         </CommandGroup>
@@ -271,17 +306,24 @@ export function Palette() {
     : "";
   // A "move" palette without a note has nothing to move: fall back to search.
   const mode = palette.mode === "move" && !moving ? "all" : palette.mode;
+  const fileName = useOpened(
+    (s) => s.previews.find((p) => p.id === palette.path)?.name ?? "the file",
+  );
   const title = {
     all: "Search and commands",
     move: "Add note to folder",
     noteIn: "New note in folder",
     newFolder: "Add folder",
+    saveExternal: "Save to vault",
+    moveExternal: "Move into vault",
   }[mode];
   const placeholder = {
     all: "Search notes or type a command",
     move: `Add “${movingTitle}” to folder…`,
     noteIn: "New note in folder…",
     newFolder: "Folder name, e.g. Projects/Ideas",
+    saveExternal: `Save “${fileName}” in folder…`,
+    moveExternal: `Move “${fileName}” into folder…`,
   }[mode];
 
   useEffect(() => {
@@ -322,7 +364,13 @@ export function Palette() {
           />
           <CommandList className="max-[720px]:max-h-none max-[720px]:min-h-0 max-[720px]:flex-1">
             {mode === "newFolder" ? null : <CommandEmpty>Nothing found</CommandEmpty>}
-            {mode === "move" ? (
+            {mode === "saveExternal" || mode === "moveExternal" ? (
+              <FolderMode
+                query={deferred}
+                external={{ id: palette.path ?? "", move: mode === "moveExternal" }}
+                close={closePalette}
+              />
+            ) : mode === "move" ? (
               <FolderMode query={deferred} path={moving} close={closePalette} />
             ) : mode === "noteIn" ? (
               <FolderMode query={deferred} close={closePalette} />

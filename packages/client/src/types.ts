@@ -394,3 +394,90 @@ export interface AuthApi {
   /** Treats the session as gone (a 401 anywhere, or a sign-out). */
   invalidate(): void;
 }
+
+/**
+ * A file the OS opened with the app (desktop): a note of the vault, an
+ * outside file to preview (known by `id`), or one that can't open.
+ */
+export interface Opened {
+  /** Names an outside file for the OpenerApi calls; "" for notes and errors. */
+  id: string;
+  kind: "note" | "external" | "error";
+  /** The vault path, for kind "note". */
+  notePath?: string;
+  /** The file name, and its folder for display ("~" is the home folder). */
+  name: string;
+  dir: string;
+  /** Why it can't open, for kind "error". */
+  error?: string;
+}
+
+/** The content of an outside file, as it is on disk now. */
+export interface ExternalDoc {
+  id: string;
+  name: string;
+  dir: string;
+  title: string;
+  /** The whole file, and what follows its frontmatter. */
+  content: string;
+  body: string;
+  properties: Record<string, unknown>;
+  modified: string;
+  size: number;
+  /** SHA-256 of the file as read; Save and overwrite check it. */
+  hash: string;
+  /** false: not UTF-8, shown with replacement characters, can't be saved. */
+  utf8: boolean;
+}
+
+/** Saving an outside file into the vault. */
+export interface SaveExternal {
+  /** The vault folder; "" for the inbox, "/" for the root. */
+  folder: string;
+  /**
+   * A draft's body, replacing the file's body (its frontmatter stays
+   * byte for byte). Without it the file's bytes are copied exactly.
+   */
+  body?: string;
+  /** The hash the preview showed. */
+  hash: string;
+  /** Send the original to the Trash after writing the note. */
+  move?: boolean;
+}
+
+export interface SaveExternalResult {
+  /** The file changed since `hash`: nothing was written. */
+  conflict: boolean;
+  /** The new note's vault path. */
+  path?: string;
+  /** The note was written, but the original couldn't go to the Trash. */
+  trashError?: string;
+}
+
+/**
+ * Files opened with the app from the file manager, the Dock, the command
+ * line or File ▸ Open… (desktop). Nothing is written to an outside file
+ * except through `overwriteOriginal`.
+ */
+export interface OpenerApi {
+  /** The files opened since the last call, oldest first. */
+  take(): Promise<Opened[]>;
+  /** The outside files open now (a page that loads again finds them). */
+  previews(): Promise<Opened[]>;
+  read(id: string): Promise<ExternalDoc>;
+  /** Copies the file (or the draft) into the vault as a new note. */
+  save(id: string, req: SaveExternal): Promise<SaveExternalResult>;
+  /** Writes a draft's body over the original file, if it still has `hash`. */
+  overwriteOriginal(id: string, body: string, hash: string): Promise<SaveExternalResult>;
+  /** Shows the original in the file manager. */
+  reveal(id: string): Promise<void>;
+  dismiss(id: string): Promise<void>;
+  /** Opens the Markdown file a relative link in the preview names. */
+  follow(id: string, href: string): Promise<Opened>;
+  /** The system's file chooser (File ▸ Open…); chosen files arrive through take. */
+  pick(): Promise<void>;
+  /** Called when files were opened: call take. */
+  onOpened(listener: () => void): () => void;
+  /** Called with a preview's id when its file changed on disk: read it again. */
+  onChanged(listener: (id: string) => void): () => void;
+}

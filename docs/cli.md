@@ -11,6 +11,9 @@ nota ls --tag projects --where status=draft --sort "updated desc"
 nota search "meeting anna"
 nota search -- plan -draft                     # Exclude a word.
 nota cat Plan                                  # By path, title or unique prefix.
+nota open Plan                                 # In $VISUAL/$EDITOR.
+nota open --app Plan                           # In the desktop app, in Reading mode.
+nota open --app ~/Downloads/README.md          # Any .md file: a read-only preview.
 nota set Plan status=done priority=2           # Frontmatter, edited line by line.
 nota tag Plan +nota -draft                     # Flags go before the note.
 nota mv Plan Archive
@@ -43,6 +46,20 @@ wins, so the app's vault switch has no effect until it is unset.
 - The index lives in `<vault>/.nota/index.db` (SQLite: full-text search, tags, properties,
   links) and can be deleted at any time; it is rebuilt from the files.
 - Paths are NFC-normalised, so a note named `Möte.md` is the same note on macOS and Linux.
+
+## Opening files in the app
+
+`nota open --app <note|file>` (short `-a`) hands a note, or any Markdown file (`.md`,
+`.markdown`) by its path, to the desktop app. A note of the vault opens as that note in Reading
+mode (for that open only; the mode setting is unchanged). A file outside the vault opens as a
+read-only preview: nothing is copied into the vault or written to the file unless you choose
+**Save to vault…**, **Move file into vault…** or **Overwrite original file…** in the app, and
+**Edit** makes an in-memory draft. On macOS it goes through Launch Services
+(`open -b com.banjoanton.nota`), so a running app takes the file and a quit one starts; on Linux
+it runs `/opt/nota/nota` (the `.deb`/`.rpm` install). `$NOTA_APP` overrides both with a command
+that gets the file's absolute path appended, such as an AppImage. Plain `nota open` still uses
+the editor. Finder's **Open With ▸ Nota** and dropping a file on the Dock icon do the same
+without the CLI; Nota is offered there but never made the default app for `.md`.
 
 ## Notes and timestamps
 

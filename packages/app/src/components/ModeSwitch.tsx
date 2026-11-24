@@ -2,7 +2,7 @@ import { cn } from "@nota/ui/utils";
 import { BookOpen, Code2, type LucideIcon, PenLine } from "lucide-react";
 import { label } from "../lib/shortcuts.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
-import { useUI } from "../state.ts";
+import { useNoteMode, useUI } from "../state.ts";
 
 export const MODES: { id: NoteMode; name: string; icon: LucideIcon; hint: string }[] = [
   { id: "live", name: "Live", icon: PenLine, hint: "Edit with formatting" },
@@ -15,7 +15,7 @@ export const MODES: { id: NoteMode; name: string; icon: LucideIcon; hint: string
  * the note's "…" sheet instead (RowSheet), so the bar keeps its room.
  */
 export function ModeSwitch() {
-  const mode = useUI((s) => s.noteMode);
+  const mode = useNoteMode();
   const setMode = useUI((s) => s.setNoteMode);
   return (
     <div
