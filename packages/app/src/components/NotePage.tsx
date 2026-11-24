@@ -72,7 +72,7 @@ export function NotePage({ path }: { path: string }) {
               Edited {relativeTime(n.modified).replace(/^[A-Z]/, (c) => c.toLowerCase())}
             </span>
             <ModeSwitch />
-            <div className="relative size-7 pointer-coarse:size-11">
+            <div className="relative order-last size-7 pointer-coarse:size-11">
               <NoteMenu path={n.path} active title={n.title || "Untitled"} />
             </div>
           </>

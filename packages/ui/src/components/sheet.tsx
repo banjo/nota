@@ -21,12 +21,23 @@ export const SheetClose = (props: React.ComponentProps<typeof DialogPrimitive.Cl
 /** Flick speed (px/ms) that closes the sheet whatever the distance. */
 const FLICK = 0.11;
 
-/** Drag-to-dismiss on the sheet's grab area; returns pointer handlers. */
+/**
+ * Drag-to-dismiss on the sheet's grab area; returns pointer handlers.
+ * The sheet follows the finger 1:1 and the overlay lightens with it, both
+ * set straight on the elements (no state, no CSS variables).
+ */
 function useDragToClose(ref: React.RefObject<HTMLElement | null>, close: () => void) {
   const start = React.useRef<{ y: number; t: number; id: number } | null>(null);
+  const overlay = () =>
+    ref.current?.parentElement?.querySelector<HTMLElement>('[data-slot="sheet-overlay"]') ?? null;
   const reset = (el: HTMLElement) => {
     el.style.transition = "";
     el.style.transform = "";
+    const o = overlay();
+    if (o) {
+      o.style.transition = "";
+      o.style.opacity = "";
+    }
   };
   return {
     onPointerDown(e: React.PointerEvent) {
@@ -44,6 +55,11 @@ function useDragToClose(ref: React.RefObject<HTMLElement | null>, close: () => v
       const y = dy > 0 ? dy : -Math.sqrt(-dy) * 2;
       el.style.transition = "none";
       el.style.transform = `translateY(${y}px)`;
+      const o = overlay();
+      if (o) {
+        o.style.transition = "none";
+        o.style.opacity = String(1 - Math.max(0, y) / el.offsetHeight);
+      }
     },
     onPointerUp(e: React.PointerEvent) {
       const s = start.current;
@@ -65,11 +81,22 @@ function useDragToClose(ref: React.RefObject<HTMLElement | null>, close: () => v
         };
         el.style.transition = "transform 200ms var(--ease-out)";
         el.style.transform = "translateY(100%)";
+        const o = overlay();
+        if (o) {
+          o.style.transition = "opacity 200ms var(--ease-out)";
+          o.style.opacity = "0";
+          o.dataset.dragged = "";
+        }
         el.addEventListener("transitionend", finish, { once: true });
         setTimeout(finish, 240);
       } else {
         el.style.transition = "transform 300ms var(--ease-drawer)";
         el.style.transform = "";
+        const o = overlay();
+        if (o) {
+          o.style.transition = "opacity 300ms var(--ease-drawer)";
+          o.style.opacity = "";
+        }
         el.addEventListener("transitionend", () => reset(el), { once: true });
       }
     },
@@ -105,7 +132,7 @@ export function SheetContent({
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
         data-slot="sheet-overlay"
-        className="fixed inset-0 z-50 bg-overlay data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in"
+        className="fixed inset-0 z-50 bg-overlay data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in data-dragged:animate-none"
       />
       <DialogPrimitive.Content
         ref={ref}
@@ -163,7 +190,7 @@ export function SheetItem({
       data-slot="sheet-item"
       className={cn(
         "flex h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-[16px] text-foreground outline-none select-none",
-        "active:bg-hover focus-visible:bg-hover [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
+        "hover:bg-hover active:bg-hover focus-visible:bg-hover [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
         variant === "destructive" && "text-danger [&_svg]:text-danger",
         "disabled:opacity-50",
         className,

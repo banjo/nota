@@ -77,6 +77,7 @@ export function TopBar({
       </nav>
       <div className="ml-auto flex shrink-0 items-center gap-1 text-faint [--app-region:no-drag] max-[720px]:gap-0">
         {right}
+        {/* Before the page's "…" (which takes order-last), after everything else. */}
         <button
           type="button"
           aria-label="Search"

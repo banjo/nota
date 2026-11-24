@@ -129,7 +129,7 @@ function Chip({
         type="button"
         onClick={onClick}
         // Under a finger the hit area reaches past the chip to 44px.
-        className="relative h-full rounded-xs px-2 outline-none hover:text-foreground focus-visible:text-foreground active:text-foreground pointer-coarse:px-2.5 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']"
+        className="relative h-full rounded-xs px-2 outline-none hover:text-foreground focus-visible:text-foreground active:text-foreground pointer-coarse:px-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']"
       >
         {children}
       </button>
@@ -138,7 +138,7 @@ function Chip({
           type="button"
           aria-label={`Remove ${label}`}
           onClick={onRemove}
-          className="-ml-1.5 grid h-full w-0 place-items-center overflow-hidden rounded-xs text-faint opacity-0 outline-none transition-[opacity,width] duration-150 ease-out group-hover/chip:w-5 group-hover/chip:opacity-100 hover:text-foreground focus-visible:w-5 focus-visible:text-foreground focus-visible:opacity-100 pointer-coarse:relative pointer-coarse:w-9 pointer-coarse:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']"
+          className="-ml-1.5 grid h-full w-0 place-items-center overflow-hidden rounded-xs text-faint opacity-0 outline-none transition-[opacity,width] duration-150 ease-out group-hover/chip:w-5 group-hover/chip:opacity-100 hover:text-foreground focus-visible:w-5 focus-visible:text-foreground focus-visible:opacity-100 pointer-coarse:relative pointer-coarse:w-8 pointer-coarse:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']"
         >
           <X className="size-3" strokeWidth={2} />
         </button>

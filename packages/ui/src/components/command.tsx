@@ -117,7 +117,8 @@ export function CommandShortcut({ className, ...props }: React.ComponentProps<"s
   return (
     <span
       data-slot="command-shortcut"
-      className={cn("ml-auto text-micro tracking-wide text-faint", className)}
+      // No keyboard shortcuts to show on a touch screen.
+      className={cn("ml-auto text-micro tracking-wide text-faint pointer-coarse:hidden", className)}
       {...props}
     />
   );
