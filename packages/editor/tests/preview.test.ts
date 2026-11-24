@@ -16,7 +16,9 @@ import {
 function state(doc: string, cursor = doc.length) {
   const s = EditorState.create({ doc, extensions, selection: EditorSelection.cursor(cursor) });
   ensureSyntaxTree(s, s.doc.length, 5000);
-  return s;
+  // syntaxTree(s) is still the tree of the state's first, time-boxed
+  // parse (partial on a slow machine); a transaction picks up the rest.
+  return s.update({}).state;
 }
 
 /** Specs with the cursor's line active (focused) or none (blurred). */
