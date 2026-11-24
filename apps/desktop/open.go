@@ -165,6 +165,11 @@ type Opener struct {
 }
 
 func newOpener(env openerEnv) *Opener {
+	// Opened files are compared by their resolved path (check), so the
+	// home folder must be too: on macOS /var is /private/var.
+	if real, err := filepath.EvalSymlinks(env.home); env.home != "" && err == nil {
+		env.home = real
+	}
 	o := &Opener{env: env, docs: map[string]*openDoc{}, noted: map[string]string{}, in: make(chan string, 256)}
 	go func() {
 		for p := range o.in {
