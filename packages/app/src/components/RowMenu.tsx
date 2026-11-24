@@ -191,13 +191,19 @@ export function SidebarContextMenu({ children }: { children: ReactNode }) {
           {children}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent aria-label={target.kind === "empty" ? "Sidebar actions" : "Row actions"}>
+      <ContextMenuContent
+        aria-label={target.kind === "empty" ? "Sidebar actions" : "Row actions"}
+        // Focus goes on to what the action opened (a name field, the palette),
+        // not back to the list.
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         {items.map((a, i) => (
           <div key={a.id} role="none">
             {i > 0 && items[i - 1]!.group !== a.group ? <ContextMenuSeparator /> : null}
             <ContextMenuItem
               variant={a.destructive ? "destructive" : "default"}
-              onSelect={() => a.run()}
+              // After the menu has closed, so a name field it opens keeps focus.
+              onSelect={() => void setTimeout(a.run, 0)}
             >
               <a.icon /> {a.label}
             </ContextMenuItem>

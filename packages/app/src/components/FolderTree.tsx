@@ -155,8 +155,13 @@ export function FolderTree() {
               right: 0,
               height: rowHeight,
               transform: `translateY(${item.start - margin}px)`,
-              // The draft row's error hangs over the rows below it.
-              zIndex: row.kind === "draft" ? 1 : undefined,
+              // The error of a draft or rename row hangs over the rows below it.
+              zIndex:
+                row.kind === "draft" ||
+                (renaming?.kind === row.kind &&
+                  renaming.path === (row.kind === "folder" ? row.node.path : row.note.path))
+                  ? 1
+                  : undefined,
             }}
           >
             {row.kind === "draft" ? (
