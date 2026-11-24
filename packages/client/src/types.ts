@@ -478,4 +478,6 @@ export interface OpenerApi {
   pick(): Promise<void>;
   /** Called when files were opened: call take. */
   onOpened(listener: () => void): () => void;
+  /** Called with a preview's id when its file changed on disk: read it again. */
+  onChanged(listener: (id: string) => void): () => void;
 }

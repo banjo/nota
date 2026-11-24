@@ -121,6 +121,7 @@ export interface MygoBindings {
     account: MygoEvent<AccountState>;
     command: MygoEvent<{ id: string }>;
     opened?: MygoEvent<{ seq: number }>;
+    externalChanged?: MygoEvent<{ id: string }>;
   };
 }
 
@@ -161,6 +162,7 @@ function openerApi(b: MygoBindings): OpenerApi | undefined {
     follow: async (id, href) => opened(await o.follow(id, href)),
     pick: () => o.pickFile(),
     onOpened: (listener) => ev.on(() => listener()),
+    onChanged: (listener) => b.events.externalChanged?.on((p) => listener(p.id)) ?? (() => {}),
   };
 }
 

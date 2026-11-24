@@ -76,10 +76,13 @@ export function PreviewBanner({
   doc,
   editing,
   dirty,
+  gone = false,
 }: {
   doc: ExternalDoc;
   editing: boolean;
   dirty: boolean;
+  /** The file went away (or can't be read) since it was shown. */
+  gone?: boolean;
 }) {
   const client = useClient();
   const qc = useQueryClient();
@@ -95,6 +98,35 @@ export function PreviewBanner({
       {revealLabel(client)}
     </Button>
   );
+  if (gone)
+    return (
+      <OpenStrip
+        tone="warn"
+        icon={<FileQuestion strokeWidth={1.75} />}
+        actions={
+          editing ? (
+            <>
+              {save}
+              <Button size="sm" variant="ghost" onClick={() => discardDraft(qc, doc.id)}>
+                Discard
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={() => closePreview(client, qc, doc.id)}>
+              Close
+            </Button>
+          )
+        }
+      >
+        <span className="font-medium">{where} is gone.</span>
+        <span className="opacity-80">
+          {" "}
+          {editing
+            ? "It was moved or deleted. Your draft is still here: save it to the vault to keep it."
+            : "It was moved or deleted. This is the text it had."}
+        </span>
+      </OpenStrip>
+    );
   if (!doc.utf8)
     return (
       <OpenStrip
@@ -283,7 +315,8 @@ export function ExternalPage({ id }: { id: string }) {
   const editing = draft !== undefined;
   const dirty = editing && !!doc.data && draft !== doc.data.body;
 
-  if (doc.isError || !client.opener)
+  // A failed re-read keeps the text it had: the file went away.
+  if ((doc.isError && !doc.data) || !client.opener)
     return (
       <>
         <TopBar crumbs={[{ label: "Outside vault" }]} />
@@ -313,7 +346,7 @@ export function ExternalPage({ id }: { id: string }) {
           </span>
         }
       />
-      <PreviewBanner doc={d} editing={editing} dirty={dirty} />
+      <PreviewBanner doc={d} editing={editing} dirty={dirty} gone={doc.isError} />
       <article className="mx-auto w-full max-w-[740px] px-14 pt-10 pb-[140px] max-[720px]:px-5 max-[720px]:pt-5">
         <Properties props={d.properties} />
         <PreviewEditor key={d.id} doc={d} draft={draft} />

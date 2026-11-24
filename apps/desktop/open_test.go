@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -43,6 +44,21 @@ func newOpenerRig(t *testing.T, files map[string]string) *openerRig {
 		home: filepath.Dir(r.out),
 	})
 	return r
+}
+
+// counts waits until the page was shown and nudged n times (or a
+// second passed) and returns how often.
+func (r *openerRig) counts(n int) (shows, nudges int) {
+	deadline := time.Now().Add(time.Second)
+	for {
+		r.mu.Lock()
+		shows, nudges = r.shows, r.nudges
+		r.mu.Unlock()
+		if (shows >= n && nudges >= n) || time.Now().After(deadline) {
+			return shows, nudges
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
 }
 
 func (r *openerRig) write(t *testing.T, name, content string) string {
@@ -107,8 +123,8 @@ func TestOpenerClassifies(t *testing.T) {
 			t.Errorf("file %d: %+v, want an error with %q", i, got[i], want)
 		}
 	}
-	if r.shows != 7 || r.nudges != 7 {
-		t.Errorf("shows %d nudges %d, want 7 each", r.shows, r.nudges)
+	if shows, nudges := r.counts(7); shows != 7 || nudges != 7 {
+		t.Errorf("shows %d nudges %d, want 7 each", shows, nudges)
 	}
 	if len(r.o.Take()) != 0 {
 		t.Error("Take did not drain the queue")
@@ -339,5 +355,71 @@ func TestRestartPassesOpenFiles(t *testing.T) {
 	d.restart()
 	if len(args) != 1 || filepath.Base(args[0]) != "x.md" {
 		t.Fatalf("relaunch args %v", args)
+	}
+}
+
+func TestOpenerWatchesPreviews(t *testing.T) {
+	var mu sync.Mutex
+	var changed []string
+	watching := map[string]context.Context{}
+	o := newOpener(openerEnv{
+		watch: func(ctx context.Context, file string, fn func()) {
+			mu.Lock()
+			watching[filepath.Base(file)] = ctx
+			mu.Unlock()
+			fn() // as if the file changed once
+		},
+		changed: func(id string) { mu.Lock(); changed = append(changed, id); mu.Unlock() },
+	})
+	f := filepath.Join(t.TempDir(), "w.md")
+	if err := os.WriteFile(f, []byte("w"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	o.add(f)
+	id := o.Take()[0].ID
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		mu.Lock()
+		n := len(changed)
+		mu.Unlock()
+		if n > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	mu.Lock()
+	ctx := watching["w.md"]
+	got := append([]string{}, changed...)
+	mu.Unlock()
+	if len(got) != 1 || got[0] != id || ctx == nil {
+		t.Fatalf("changed %v, watching %v", got, watching)
+	}
+	o.Dismiss(id)
+	if ctx.Err() == nil {
+		t.Fatal("the watch still runs after Dismiss")
+	}
+}
+
+func TestOpenerSaveDraftOfAGoneFile(t *testing.T) {
+	r := newOpenerRig(t, nil)
+	file := r.write(t, "gone.md", "---\na: 1\n---\nold\n")
+	id := r.open(t, file)[0].ID
+	doc, _ := r.o.Read(id)
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.o.Save(id, SaveRequest{Hash: doc.Hash}); err == nil {
+		t.Fatal("saved a gone file without a draft")
+	}
+	if _, err := r.o.Save(id, SaveRequest{Edited: true, Body: "x", Hash: doc.Hash, Move: true}); err == nil {
+		t.Fatal("moved a gone file")
+	}
+	out, err := r.o.Save(id, SaveRequest{Edited: true, Body: "new\n", Hash: doc.Hash})
+	if err != nil || out.Path != "Inbox/gone.md" {
+		t.Fatalf("draft of a gone file: %+v %v", out, err)
+	}
+	got, _ := os.ReadFile(filepath.Join(r.vault, "Inbox", "gone.md"))
+	if string(got) != "---\na: 1\n---\nnew\n" {
+		t.Fatalf("saved %q", got)
 	}
 }

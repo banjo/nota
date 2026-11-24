@@ -6,6 +6,7 @@ type OpenerBindings = NonNullable<MygoBindings["Opener"]>;
 
 function bindings(withOpener = true) {
   let fire = () => {};
+  let change = (_id: string) => {};
   const Opener = {
     take: vi.fn(async (): Promise<Awaited<ReturnType<OpenerBindings["take"]>>> => [
       { id: "", kind: "note", notePath: "A.md", name: "A.md", dir: "~/Notes" },
@@ -48,14 +49,20 @@ function bindings(withOpener = true) {
           return () => {};
         },
       },
+      externalChanged: {
+        on: (l: (p: { id: string }) => void) => {
+          change = (id) => l({ id });
+          return () => {};
+        },
+      },
     },
   };
-  return { b, Opener, fire: () => fire() };
+  return { b, Opener, fire: () => fire(), change: (id: string) => change(id) };
 }
 
 describe("the desktop client's opener", () => {
   test("maps the Go calls", async () => {
-    const { b, Opener, fire } = bindings();
+    const { b, Opener, fire, change } = bindings();
     const o = createMygoClient(b).opener!;
     const q = await o.take();
     expect(q.map((x) => x.kind)).toEqual(["note", "external", "error"]);
@@ -90,6 +97,11 @@ describe("the desktop client's opener", () => {
     o.onOpened(seen);
     fire();
     expect(seen).toHaveBeenCalledTimes(1);
+
+    const changed = vi.fn();
+    o.onChanged(changed);
+    change("x1");
+    expect(changed).toHaveBeenCalledWith("x1");
   });
 
   test("is absent without the Opener service, and on the web", () => {

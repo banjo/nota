@@ -198,7 +198,11 @@ func main() {
 		show:   d.ShowMain,
 		trash:  mygo.Shell.TrashItem,
 		reveal: mygo.Shell.ShowItemInFolder,
-		home:   home,
+		watch:  watchFile,
+		changed: func(id string) {
+			_ = externalChangedEvent.Broadcast(ExternalChanged{ID: id})
+		},
+		home: home,
 	})
 	d.op = op
 	mygo.Bind(s, acc, d, op)

@@ -47,6 +47,14 @@ const sniffSize = 8 << 10
 // openedEvent nudges the main window's page: files were opened, take them.
 var openedEvent = mygo.NewEvent[OpenedNudge]("opened")
 
+// externalChangedEvent says an outside file changed on disk: read it again.
+var externalChangedEvent = mygo.NewEvent[ExternalChanged]("externalChanged")
+
+// ExternalChanged names the outside file that changed on disk.
+type ExternalChanged struct {
+	ID string `json:"id"`
+}
+
 // OpenedNudge says there are opened files to take (Opener.Take).
 type OpenedNudge struct {
 	Seq int64 `json:"seq"`
@@ -118,6 +126,7 @@ type openDoc struct {
 	name string
 	dir  string
 	raw  []byte // as last read
+	stop func() // ends the watch on the file
 }
 
 // openerEnv is what Opener needs from the app; tests replace it.
@@ -131,7 +140,11 @@ type openerEnv struct {
 	show   func()
 	trash  func(file string) error
 	reveal func(file string)
-	home   string
+	// watch calls changed whenever file changes on disk, until ctx ends.
+	watch func(ctx context.Context, file string, changed func())
+	// changed tells the page an outside file changed (externalChanged).
+	changed func(id string)
+	home    string
 }
 
 // Opener receives files opened with the app and serves them to the
@@ -281,7 +294,13 @@ func (o *Opener) classify(file string) Opened {
 			return Opened{ID: d.id, Kind: "external", Name: d.name, Dir: d.dir}
 		}
 	}
-	d := &openDoc{id: newID(), path: real, name: name, dir: o.display(filepath.Dir(real))}
+	d := &openDoc{id: newID(), path: real, name: name, dir: o.display(filepath.Dir(real)), stop: func() {}}
+	if o.env.watch != nil && o.env.changed != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		d.stop = cancel
+		id := d.id
+		go o.env.watch(ctx, real, func() { o.env.changed(id) })
+	}
 	o.docs[d.id] = d
 	o.order = append(o.order, d.id)
 	return Opened{ID: d.id, Kind: "external", Name: d.name, Dir: d.dir}
@@ -392,7 +411,15 @@ func (o *Opener) Save(id string, req SaveRequest) (SaveOutcome, error) {
 	}
 	raw, err := readLimited(d.path)
 	if err != nil {
-		return SaveOutcome{}, err
+		// The original is gone (or unreadable) but the draft made from it
+		// is here: it can still be saved, just not moved.
+		o.mu.Lock()
+		base := d.raw
+		o.mu.Unlock()
+		if !req.Edited || req.Move || base == nil {
+			return SaveOutcome{}, err
+		}
+		raw = base
 	}
 	changed := req.Hash != "" && protocol.Hash(raw) != req.Hash
 	if (!req.Edited || req.Move) && (changed || (req.Move && req.Hash == "")) {
@@ -499,6 +526,9 @@ func (o *Opener) Reveal(id string) error {
 func (o *Opener) Dismiss(id string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if d, ok := o.docs[id]; ok {
+		d.stop()
+	}
 	delete(o.docs, id)
 	for i, x := range o.order {
 		if x == id {
@@ -578,6 +608,27 @@ func (o *Opener) pending() []string {
 		out = append(out, f)
 	}
 	return out
+}
+
+// watchFile follows one outside file for live previews (WatchFiles
+// watches a file through its directory, so a save by rename counts).
+func watchFile(ctx context.Context, file string, changed func()) {
+	w, err := mygo.WatchFiles(ctx, file, mygo.FileWatchOptions{})
+	if err != nil {
+		slog.Debug("watching an opened file failed", "err", err)
+		return
+	}
+	defer w.Close()
+	for {
+		if _, err := w.Next(ctx); err != nil {
+			// The file's folder went away: the preview says the file is gone.
+			if ctx.Err() == nil {
+				changed()
+			}
+			return
+		}
+		changed()
+	}
 }
 
 // locateNote returns the vault path of the note at file, or "" when the

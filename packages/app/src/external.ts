@@ -161,6 +161,7 @@ export async function saveToVault(
   if (!o) return;
   try {
     const doc = await currentDoc(client, qc, id);
+    const gone = qc.getQueryState(externalKey(id))?.status === "error";
     const draft = draftOf(id);
     const r = await o.save(id, { folder, hash: doc.hash, body: draft, move });
     if (r.conflict) {
@@ -185,7 +186,9 @@ export async function saveToVault(
         ? r.trashError
           ? `Couldn't move the original to the Trash: ${r.trashError}`
           : `The original (${displayPath(doc)}) is in the Trash.`
-        : `The original file is unchanged.`,
+        : gone
+          ? "The original file was already gone."
+          : "The original file is unchanged.",
     });
   } catch (e) {
     fail("Couldn't save the file to the vault", e);
@@ -236,6 +239,37 @@ export function confirmOverwrite(client: NotesClient, qc: QueryClient, id: strin
       },
     },
   });
+}
+
+/**
+ * The file of a preview changed on disk (or went away): read it again.
+ * A draft stays as it is; only Revert brings in the new text.
+ */
+export async function fileChanged(client: NotesClient, qc: QueryClient, id: string) {
+  const o = client.opener;
+  const before = qc.getQueryData<ExternalDoc>(externalKey(id));
+  if (!o || !before) return;
+  let after: ExternalDoc | undefined;
+  try {
+    // A failed read keeps the text the query had: the page shows it as gone.
+    after = await qc.fetchQuery({
+      queryKey: externalKey(id),
+      queryFn: () => o.read(id),
+      staleTime: 0,
+      retry: false,
+    });
+  } catch {
+    after = undefined;
+  }
+  if (draftOf(id) === undefined) return;
+  if (!after)
+    toast.warning("The original file is gone", {
+      description: "Your draft is still here. Save it to the vault to keep it.",
+    });
+  else if (after.hash !== before.hash)
+    toast("The original file changed on disk", {
+      description: "Your draft is kept. Revert shows the new version.",
+    });
 }
 
 /** The preview on screen, for commands. */

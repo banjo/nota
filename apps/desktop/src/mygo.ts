@@ -95,6 +95,11 @@ export interface Device {
   current: boolean;
 }
 
+/** ExternalChanged names the outside file that changed on disk. */
+export interface ExternalChanged {
+  id: string;
+}
+
 /** ExternalDoc is the content of an outside file. */
 export interface ExternalDoc {
   id: string;
@@ -640,6 +645,8 @@ export const events = {
   command: event<Command>("command"),
   /** openedEvent nudges the main window's page: files were opened, take them. */
   opened: event<OpenedNudge>("opened"),
+  /** externalChangedEvent says an outside file changed on disk: read it again. */
+  externalChanged: event<ExternalChanged>("externalChanged"),
   /** syncStatusEvent tells the frontend about every sync pass. */
   syncStatus: event<SyncStatus>("syncStatus"),
   /**

@@ -51,6 +51,7 @@ function fakeOpener(over: Partial<OpenerApi> = {}) {
     follow: vi.fn(async () => preview("x2")),
     pick: vi.fn(async () => {}),
     onOpened: () => () => {},
+    onChanged: () => () => {},
     ...over,
   } satisfies OpenerApi;
 }
@@ -229,6 +230,42 @@ describe("draft and save", () => {
   });
 });
 
+describe("a previewed file that changes on disk", () => {
+  test("the preview reads it again", async () => {
+    const fresh = doc({ body: "new\n", hash: "h2" });
+    const { client, qc } = setup({ read: vi.fn(async () => fresh) });
+    await ext.fileChanged(client, qc, "x1");
+    expect(qc.getQueryData(ext.externalKey("x1"))).toEqual(fresh);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  test("a draft is kept and says so", async () => {
+    const { client, qc } = setup({ read: vi.fn(async () => doc({ body: "new\n", hash: "h2" })) });
+    ext.setDraft("x1", "mine");
+    await ext.fileChanged(client, qc, "x1");
+    expect(ext.draftOf("x1")).toBe("mine");
+    expect(toast).toHaveBeenCalledWith(
+      "The original file changed on disk",
+      expect.objectContaining({ description: expect.stringContaining("Revert") }),
+    );
+    ext.revertDraft(qc, "x1");
+    expect(ext.draftOf("x1")).toBe("new\n");
+  });
+
+  test("a gone file keeps its text and the draft", async () => {
+    const { client, qc } = setup({
+      read: vi.fn(async (): Promise<ExternalDoc> => {
+        throw new Error("gone");
+      }),
+    });
+    ext.setDraft("x1", "mine");
+    await ext.fileChanged(client, qc, "x1");
+    expect(qc.getQueryData(ext.externalKey("x1"))).toEqual(doc());
+    expect(ext.draftOf("x1")).toBe("mine");
+    expect(toast.warning).toHaveBeenCalledWith("The original file is gone", expect.anything());
+  });
+});
+
 describe("the banner", () => {
   function render(node: ReactNode) {
     const { client, qc } = setup();
@@ -255,6 +292,16 @@ describe("the banner", () => {
     expect(render(<PreviewBanner doc={doc()} editing dirty={false} />)).toContain(
       "Draft · no changes yet",
     );
+  });
+
+  test("gone: a draft can still be saved; a preview can only close", () => {
+    const draft = render(<PreviewBanner doc={doc()} editing dirty gone />);
+    expect(draft).toContain("~/Downloads/README.md is gone.");
+    for (const s of ["Save to vault…", "Discard"]) expect(draft).toContain(s);
+    const plain = render(<PreviewBanner doc={doc()} editing={false} dirty={false} gone />);
+    expect(plain).toContain("is gone.");
+    expect(plain).toContain("Close");
+    expect(plain).not.toContain("Save to vault");
   });
 
   test("not UTF-8: no Edit, no Save", () => {

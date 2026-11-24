@@ -1,8 +1,9 @@
 import type { NotesClient, Opened } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useClient } from "../context.ts";
-import { knowPreviews, showPreview } from "../external.ts";
+import { fileChanged, knowPreviews, showPreview } from "../external.ts";
 import { useUI } from "../state.ts";
 
 /**
@@ -44,6 +45,9 @@ export async function takeOpened(client: NotesClient) {
 /** Mounted once in the shell. */
 export function OpenedFiles() {
   const client = useClient();
+  const qc = useQueryClient();
+  // A previewed file changed on disk: the preview follows it.
+  useEffect(() => client.opener?.onChanged((id) => void fileChanged(client, qc, id)), [client, qc]);
   useEffect(() => {
     // Results are applied even after an unmount (StrictMode's second
     // mount, a reload): take() drained them, so nobody else will.
