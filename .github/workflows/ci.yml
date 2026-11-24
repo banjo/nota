@@ -37,6 +37,14 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
+      - name: bun.lock uses the public npm registry
+        # A package resolved from another registry (e.g. a company mirror set in
+        # NPM_CONFIG_REGISTRY) is written with its full tarball URL.
+        run: |
+          if grep -nE '"https?://' bun.lock; then
+            echo "::error::bun.lock has packages from another registry; run NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ bun install"
+            exit 1
+          fi
 
       - name: gofmt
         run: |

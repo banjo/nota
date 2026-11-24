@@ -18,9 +18,13 @@
     "site:build": "vp run @nota/landing#build && vp run @nota/web#build",
     "go:test": "go test ./...",
     "go:vet": "go vet ./...",
-    "go:build": "go build -o bin/nota ./cmd/nota"
+    "go:build": "go build -o bin/nota ./cmd/nota",
+    "changeset": "changeset",
+    "version-packages": "changeset version && bun install --lockfile-only"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

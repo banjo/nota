@@ -1,8 +1,41 @@
 # Cutting a release
 
-A release is a `v*` tag. `.github/workflows/release.yml` builds everything from it and
-publishes the GitHub release; the Homebrew cask and the landing page are updated by hand
-afterwards.
+The short version is in [RELEASE.md](../RELEASE.md); this is the detail.
+
+A release is a `v*` tag. [Changesets](https://changesets.dev) decides the version and writes
+the changelog, `.github/workflows/changesets.yml` creates the tag, and
+`.github/workflows/release.yml` builds everything from it and publishes the GitHub release;
+the Homebrew cask and the landing page are updated by hand afterwards.
+
+## Changesets
+
+A pull request that changes what users get adds a changeset:
+
+```sh
+bunx changeset    # pick @nota/desktop, choose patch, write one line for the release notes
+```
+
+This writes a Markdown file to `.changeset/`; commit it with the change. CI, docs and test
+changes need none. `@nota/desktop` carries the version of the whole product (app, CLI and web);
+the other workspace packages are ignored by Changesets (`.changeset/config.json`). Nothing
+checks that a pull request has one; `bunx changeset status` lists what is pending.
+
+On every push to `main`, `changesets.yml` does one of two things:
+
+- **There are changesets:** it opens or updates the **Release Nota** pull request. That runs
+  `bun run version-packages`, which bumps `apps/desktop/package.json`, adds the entries to
+  `apps/desktop/CHANGELOG.md` (with links to the PRs), deletes the changesets and updates
+  `bun.lock`.
+- **There are none** (for example, right after that pull request is merged): if
+  `v<version from apps/desktop/package.json>` isn't a tag yet, it creates it and starts
+  `release.yml` on it. Otherwise it does nothing.
+
+The release notes are the version's section of `apps/desktop/CHANGELOG.md`, followed by
+GitHub's list of merged pull requests.
+
+Setup, once: in the repository's Settings → Actions → General, allow GitHub Actions to create
+and approve pull requests. Pull requests opened by the workflow token don't start CI, so the
+Release Nota pull request shows no checks; `main` is checked again after the merge.
 
 ## What the workflow does
 
@@ -16,7 +49,8 @@ afterwards.
 
 The version is linked into every binary: `-X github.com/banjo/nota/internal/cli.Version` for
 the CLI (`nota --version`) and `NOTA_VERSION` for the app (`apps/desktop/mygo.config.ts`:
-Info.plist, the packages). Nothing in the repository needs a version bump before tagging.
+Info.plist, the packages). It comes from the tag; `apps/desktop/package.json` only decides
+which tag `changesets.yml` creates.
 MyGo writes a prerelease such as `0.1.1-rc.1` as `0.1.1~rc.1` in the .deb and .rpm, so it
 sorts before `0.1.1`.
 
@@ -52,38 +86,29 @@ publishes nothing unless it runs on a tag.
 
 ## Versions
 
-The first release is **v0.1.0**. Every release after it is a **patch bump** (v0.1.1, v0.1.2,
-…); minor and major bumps wait until they are decided. `scripts/next-version.sh` prints the
-next tag from the latest `vX.Y.Z` tag on origin (v0.1.0 when there is none), and
-`scripts/next-version.sh --rc` the next prerelease of it (`v0.1.1-rc.1`, `-rc.2`, …).
+The first release was **v0.1.0**. Every release after it is a **patch bump** (v0.1.1, v0.1.2,
+…); minor and major bumps wait until they are decided, so changesets are `patch` for now.
+`scripts/next-version.sh --rc` prints the next prerelease tag (`v0.1.2-rc.1`, `-rc.2`, …) from
+the latest `vX.Y.Z` tag on origin.
 
 ## Steps
 
-1. Make sure `main` is green (CI) and contains what should ship, then:
-
-   ```sh
-   git switch main && git pull
-   tag=$(scripts/next-version.sh)     # v0.1.0 for the first release, then v0.1.1, …
-   ```
-
+1. Make sure `main` is green (CI) and the **Release Nota** pull request lists what should ship.
 2. Optionally try the pipeline with a prerelease first. The landing page never shows it, but
    delete it afterwards anyway:
 
    ```sh
-   rc=$(scripts/next-version.sh --rc) # e.g. v0.1.0-rc.1
+   git switch main && git pull
+   rc=$(scripts/next-version.sh --rc) # e.g. v0.1.2-rc.1
    git tag "$rc" && git push origin "$rc"
    gh run watch "$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
    gh release delete "$rc" --cleanup-tag --yes
    ```
 
-3. Tag the release and push the tag:
-
-   ```sh
-   git tag -a "$tag" -m "Nota ${tag#v}" && git push origin "$tag"
-   ```
-
+3. Merge the **Release Nota** pull request. `changesets.yml` tags `v<version>` and starts
+   `release.yml`.
 4. Wait for the workflow (about 10 minutes) and check the release page: 10 files plus
-   `checksums.txt`. Edit the generated notes if needed.
+   `checksums.txt`. Edit the notes if needed.
 5. Bump the Homebrew cask (needs your own push access to `banjo/homebrew-tap`):
 
    ```sh
@@ -109,7 +134,10 @@ next tag from the latest `vX.Y.Z` tag on origin (v0.1.0 when there is none), and
 
 - Re-running failed jobs is safe: the publish job uploads with `--clobber` into a release
   that already exists.
-- A broken tag: `gh release delete vX --cleanup-tag --yes`, fix on `main`, tag again.
+- A broken tag: `gh release delete vX --cleanup-tag --yes`, fix on `main` with a new
+  changeset, and merge the next Release Nota pull request.
+- The tag exists but no release started (the dispatch failed):
+  `gh workflow run release.yml --ref vX`.
 - No Developer ID yet: when there is one, set `macos.signingIdentity` and `macos.notarize` in
   `apps/desktop/mygo.config.ts` and import the certificate in the macOS job
   ([MyGo's GitHub Actions guide](https://mygo.run/docs/github-actions)); then drop the

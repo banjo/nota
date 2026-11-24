@@ -1,0 +1,76 @@
+# Turns the changesets on main into releases (see docs/release.md).
+#
+# While main has changesets, this keeps a "Release Nota" pull request open that
+# bumps apps/desktop/package.json and writes apps/desktop/CHANGELOG.md. Merging
+# it leaves main without changesets, and the run for that push tags
+# v<version> and starts release.yml on the tag. A tag pushed with the
+# workflow's own token starts no workflows, hence the explicit dispatch.
+name: Changesets
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changesets
+  cancel-in-progress: false
+
+jobs:
+  changesets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the version commit and the tag
+      pull-requests: write # the version pull request
+      actions: write # dispatching release.yml
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The changelog links each entry to the commit and PR that added it.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.5"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+
+      - id: mode
+        uses: changesets/action/select-mode@v2.1.2
+
+      - name: Open or update the version pull request
+        if: steps.mode.outputs.mode == 'version'
+        uses: changesets/action/version@v2.1.2
+        with:
+          script: bun run version-packages
+          commit-message: "chore: release Nota"
+          pr-title: "Release Nota"
+        env:
+          # @changesets/changelog-github looks up the PR and commit of each changeset.
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Tag the version and start the release
+        if: steps.mode.outputs.mode != 'version'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./apps/desktop/package.json').version")"
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists, nothing to release"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Nota $version"
+          git push origin "$tag"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag"
+          echo "Tagged $tag and started the release" >> "$GITHUB_STEP_SUMMARY"
