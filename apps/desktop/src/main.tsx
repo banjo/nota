@@ -2,10 +2,10 @@ import { CaptureApp, NotaApp, NotaProviders } from "@nota/app";
 import { createMygoClient } from "@nota/client";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Account, Desktop, events, Opener, Vault } from "./mygo.ts";
+import { Account, Desktop, events, Opener, Settings, Vault } from "./mygo.ts";
 import "./style.css";
 
-const client = createMygoClient({ Vault, Account, Desktop, Opener, events });
+const client = createMygoClient({ Vault, Account, Desktop, Opener, Settings, events });
 
 // The quick-capture panel is a second window of the same app (/?window=capture).
 const capture = new URLSearchParams(location.search).get("window") === "capture";

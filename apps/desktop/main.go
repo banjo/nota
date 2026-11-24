@@ -17,6 +17,7 @@ import (
 
 	"github.com/egoist/mygo"
 
+	"github.com/banjo/nota/internal/settings"
 	"github.com/banjo/nota/internal/vault"
 )
 
@@ -186,10 +187,20 @@ func main() {
 		s.syn.Store(startSync(s, loc.Dir, loc.Config.Inbox))
 		defer func() { s.syn.Load().stop() }()
 		acc = newAccount(s)
-		acc.refreshEmail()
 		d.dir = loc.Dir
 	}
 	d.acc = acc
+	settingsPath, err := settings.Path()
+	if err != nil {
+		log.Fatal(err)
+	}
+	set := newSettings(settingsPath, acc.client)
+	publish := acc.publish
+	acc.publish = func(st AccountState) {
+		publish(st)
+		set.accountChanged(st.State)
+	}
+	acc.refreshEmail()
 	home, _ := os.UserHomeDir()
 	op := newOpener(openerEnv{
 		locate: s.locateNote,
@@ -205,7 +216,7 @@ func main() {
 		home: home,
 	})
 	d.op = op
-	mygo.Bind(s, acc, d, op)
+	mygo.Bind(s, acc, d, op, set)
 	// Files opened with the app (Finder, the Dock, `open -a`, the command
 	// line, a second instance). Registered before Run: a cold start
 	// delivers them before any window exists, so Opener queues them and
@@ -277,6 +288,7 @@ func main() {
 		d.mu.Lock()
 		d.newMain = newMain
 		d.mu.Unlock()
+		set.run(ctx)
 		if needsSetup {
 			// Nothing to capture into yet; the setup relaunches the app.
 			d.mu.Lock()
