@@ -15,6 +15,8 @@ import type {
   OpenerApi,
   PluginInfo,
   PropertyPatch,
+  SettingsApi,
+  SettingsLayers,
   SyncStatus,
   TagCount,
   Tree,
@@ -118,6 +120,11 @@ export interface MygoBindings {
     follow(id: string, href: string): Promise<RawOpened>;
     pickFile(): Promise<void>;
   };
+  /** settings.toml and the account's settings; absent in builds before they existed. */
+  Settings?: {
+    state(): Promise<RawSettings>;
+    update(p: { set: Record<string, string>; unset: string[] }): Promise<RawSettings>;
+  };
   events: {
     changed: MygoEvent<{ paths: string[] | null; seq: number }>;
     syncStatus: MygoEvent<SyncStatus>;
@@ -125,6 +132,35 @@ export interface MygoBindings {
     command: MygoEvent<{ id: string }>;
     opened?: MygoEvent<{ seq: number }>;
     externalChanged?: MygoEvent<{ id: string }>;
+    settings?: MygoEvent<RawSettings>;
+  };
+}
+
+/** SettingsLayers as Go sends them: nil maps and slices come as null. */
+interface RawSettings {
+  file: Record<string, string> | null;
+  account: Record<string, string> | null;
+  signedIn: boolean;
+  path: string;
+  warnings: string[] | null;
+}
+
+const layers = (r: RawSettings): SettingsLayers => ({
+  file: r.file ?? {},
+  account: r.account ?? null,
+  signedIn: r.signedIn,
+  path: r.path,
+  warnings: r.warnings ?? [],
+});
+
+function settingsApi(b: MygoBindings): SettingsApi | undefined {
+  const s = b.Settings;
+  const ev = b.events.settings;
+  if (!s || !ev) return undefined;
+  return {
+    get: async () => layers(await s.state()),
+    update: async (p) => layers(await s.update({ set: p.set ?? {}, unset: p.unset ?? [] })),
+    subscribe: (listener) => ev.on((r) => listener(layers(r))),
   };
 }
 
@@ -247,5 +283,6 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       onCommand: (listener) => b.events.command.on((c) => listener(c.id)),
     },
     opener: openerApi(b),
+    settings: settingsApi(b),
   };
 }

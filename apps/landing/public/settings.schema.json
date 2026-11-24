@@ -1,0 +1,44 @@
+{
+  "$id": "https://nota.banjoanton.com/settings.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "~/.config/nota/settings.toml. A key set here wins over the app and the account, and the app does not change it.",
+  "properties": {
+    "note_mode": {
+      "default": "live",
+      "description": "How notes open: live (editing with formatting), reading or source.",
+      "enum": [
+        "live",
+        "reading",
+        "source"
+      ],
+      "type": "string"
+    },
+    "palette": {
+      "default": "nota",
+      "description": "The colour theme, by id (nota, paper, …; a plugin can add more).",
+      "pattern": "^[a-z0-9][a-z0-9.-]*$",
+      "type": "string"
+    },
+    "properties": {
+      "default": "hide",
+      "description": "Whether a note's properties (frontmatter) show above it.",
+      "enum": [
+        "hide",
+        "show"
+      ],
+      "type": "string"
+    },
+    "theme": {
+      "default": "system",
+      "description": "Light or dark mode: system follows the operating system.",
+      "enum": [
+        "system",
+        "light",
+        "dark"
+      ],
+      "type": "string"
+    }
+  },
+  "title": "Nota settings",
+  "type": "object"
+}

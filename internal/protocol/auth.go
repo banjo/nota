@@ -121,3 +121,19 @@ type Me struct {
 	Via    string `json:"via"`
 	Device string `json:"device,omitempty"`
 }
+
+// AccountSettings is the body of GET and PATCH /v1/account/settings:
+// the settings the account layer sets (internal/settings), and a
+// revision that grows with every change.
+type AccountSettings struct {
+	Rev      int64             `json:"rev"`
+	Settings map[string]string `json:"settings"`
+}
+
+// SettingsPatch is the body of PATCH /v1/account/settings. Keys change
+// one by one, so two devices that change different keys never collide;
+// for the same key the last write wins.
+type SettingsPatch struct {
+	Set   map[string]string `json:"set,omitempty"`
+	Unset []string          `json:"unset,omitempty"`
+}

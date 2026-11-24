@@ -168,4 +168,21 @@ describe("theme store", () => {
     s.setMode("dark");
     expect(s.get().resolved).toBe("dark");
   });
+
+  test("a locked key changes for this page only; others go to onChange", () => {
+    const f = fakeEnv({ [PALETTE_KEY]: "paper" });
+    const onChange = vi.fn();
+    const s = createThemeStore({ ...f.env, locked: (k) => k === "palette", onChange });
+    s.setPalette("forest");
+    expect(s.get().palette).toBe("forest");
+    expect(f.data.get(PALETTE_KEY)).toBe("paper");
+    s.setMode("dark");
+    s.setMode("dark"); // the same again is not a change
+    expect(f.data.get(THEME_KEY)).toBe("dark");
+    expect(onChange.mock.calls).toEqual([["theme", "dark"]]);
+    // The settings layers rewrote the storage: reload picks it up.
+    f.data.set(THEME_KEY, "light");
+    s.reload();
+    expect(s.get()).toEqual({ mode: "light", palette: "paper", resolved: "light" });
+  });
 });

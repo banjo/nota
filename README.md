@@ -132,6 +132,7 @@ Both sync with the vault. Details and examples: [docs/hooks.md](docs/hooks.md).
 - [Agents](docs/agents.md): MCP over stdio and HTTP, the tools and resources.
 - [Views and hooks](docs/hooks.md): saved queries and scripts on note events.
 - [Themes](docs/themes.md): the built-in themes and how to make your own.
+- [Settings](docs/settings.md): `settings.toml` for your dotfiles, and settings synced with your account.
 - [Sync](docs/sync.md): remotes, conflicts, history and restore.
 - [Self-hosting](docs/deploy.md): the server, its configuration and the static web app.
 - [Web API](docs/api.md) and [sync protocol](docs/sync-protocol.md): for clients.

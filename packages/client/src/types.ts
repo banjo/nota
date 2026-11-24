@@ -310,6 +310,42 @@ export interface ShellAppearance {
   captureBackground: string;
 }
 
+/** One layer's settings by key (internal/settings), e.g. `{ theme: "dark" }`. */
+export type SettingValues = Record<string, string>;
+
+/**
+ * The layers of the user's settings that live outside the page. The
+ * device layer is the page's own localStorage; the app merges them:
+ * file over account over device over the defaults.
+ */
+export interface SettingsLayers {
+  /** What settings.toml sets (desktop). These keys are locked. */
+  file: SettingValues;
+  /** What the account sets; null when signed out or not loaded (offline). */
+  account: SettingValues | null;
+  /** Whether changes go to the account. */
+  signedIn: boolean;
+  /** Where settings.toml is (desktop); "" where there is none. */
+  path: string;
+  /** Problems with the file or the account, to show in Settings. */
+  warnings: string[];
+}
+
+/** Changes the account's settings key by key; the last write of a key wins. */
+export interface SettingsPatch {
+  set?: SettingValues;
+  unset?: string[];
+}
+
+/** The user's settings outside this device: settings.toml and the account. */
+export interface SettingsApi {
+  get(): Promise<SettingsLayers>;
+  /** Changes the account's settings. Rejects when signed out. */
+  update(patch: SettingsPatch): Promise<SettingsLayers>;
+  /** Calls listener whenever a layer changes (the file, another device). */
+  subscribe(listener: (layers: SettingsLayers) => void): () => void;
+}
+
 // The web app's account (docs/api.md, "Accounts"): passkeys, recovery
 // codes, devices and the approvals behind /app/connect.
 

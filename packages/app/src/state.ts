@@ -15,6 +15,7 @@ import {
   toggledNoteMode,
   watchNoteMode,
 } from "./lib/noteMode.ts";
+import { settingsSync } from "./settings/index.ts";
 
 // UI state: what is on screen. Data lives in TanStack Query.
 
@@ -110,7 +111,10 @@ export const useUI = create<UIState>()(
       openVaultFlow: (mode) => set({ vaultFlow: { mode } }),
       closeVaultFlow: () => set({ vaultFlow: null }),
       setNoteMode: (mode) => {
-        saveNoteMode(deviceStorage(), mode);
+        // settings.toml sets it: the change lasts this window.
+        const keep = !settingsSync.locked("note_mode");
+        if (keep) saveNoteMode(deviceStorage(), mode);
+        if (keep && mode !== get().noteMode) settingsSync.changed("note_mode", mode);
         const r = get().route;
         set(
           r.kind === "note" && r.via
@@ -121,7 +125,10 @@ export const useUI = create<UIState>()(
       toggleNoteMode: () =>
         get().setNoteMode(toggledNoteMode(noteModeFor(get().route, get().noteMode))),
       setProperties: (pref) => {
-        savePropertiesPref(deviceStorage(), pref);
+        if (!settingsSync.locked("properties")) {
+          savePropertiesPref(deviceStorage(), pref);
+          if (pref !== get().properties) settingsSync.changed("properties", pref);
+        }
         set({ properties: pref });
       },
       toggleProperties: () => get().setProperties(toggledPropertiesPref(get().properties)),
@@ -190,4 +197,11 @@ watchNoteMode(typeof window === "undefined" ? null : window, deviceStorage(), (n
 );
 watchPropertiesPref(typeof window === "undefined" ? null : window, deviceStorage(), (properties) =>
   useUI.setState({ properties }),
+);
+// The settings layers (settings.toml, the account) changed them.
+settingsSync.onReload(() =>
+  useUI.setState({
+    noteMode: loadNoteMode(deviceStorage()),
+    properties: loadPropertiesPref(deviceStorage()),
+  }),
 );

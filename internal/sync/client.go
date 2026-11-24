@@ -241,11 +241,23 @@ func (c *Client) History(ctx context.Context, p string) (protocol.History, error
 // cursor of each one, until ctx is done or the stream breaks. It returns
 // nil only when ctx was cancelled.
 func (c *Client) Events(ctx context.Context, fn func(cursor int64)) error {
+	return c.stream(ctx, protocol.EventsPath(c.Vault), protocol.EventChange, func(data []byte) {
+		var ce protocol.ChangeEvent
+		if json.Unmarshal(data, &ce) == nil {
+			fn(ce.Cursor)
+		}
+	})
+}
+
+// stream reads the SSE stream at path and calls fn with the data of
+// each event named name, until ctx is done or the stream breaks. It
+// returns nil only when ctx was cancelled.
+func (c *Client) stream(ctx context.Context, path, name string, fn func(data []byte)) error {
 	hdr := http.Header{}
 	hdr.Set("Accept", "text/event-stream")
 	// The stream has no response deadline beyond the headers; use a
 	// client without the overall timeout callers may set on HTTP.
-	res, err := c.do(ctx, "GET", protocol.EventsPath(c.Vault), hdr, nil)
+	res, err := c.do(ctx, "GET", path, hdr, nil)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil
@@ -260,11 +272,8 @@ func (c *Client) Events(ctx context.Context, fn func(cursor int64)) error {
 		switch {
 		case strings.HasPrefix(line, "event:"):
 			event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
-		case strings.HasPrefix(line, "data:") && event == protocol.EventChange:
-			var ce protocol.ChangeEvent
-			if json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data:"))), &ce) == nil {
-				fn(ce.Cursor)
-			}
+		case strings.HasPrefix(line, "data:") && event == name:
+			fn([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data:"))))
 		case line == "":
 			event = ""
 		}
