@@ -32,7 +32,7 @@ import {
 } from "../lib/folders.ts";
 import { folderLabel, folderOf } from "../lib/notes.ts";
 import { label } from "../lib/shortcuts.ts";
-import { useList, useSearch, useTree } from "../queries.ts";
+import { useList, useSearch, useTree, useTreeValue } from "../queries.ts";
 import {
   type Command as RegisteredCommand,
   type CommandContext,
@@ -310,11 +310,12 @@ function NewFolderMode({ query, base, close }: { query: string; base: string; cl
 export function Palette() {
   const palette = useUI((s) => s.palette);
   const closePalette = useUI((s) => s.closePalette);
-  const tree = useTree();
   const moving = palette.mode === "move" && palette.path ? palette.path : undefined;
-  const movingTitle = moving
-    ? (tree.data?.notes.find((n) => n.path === moving)?.title ?? moving)
-    : "";
+  // Only the moved note's title: the closed palette ignores tree refetches.
+  const movingTitle =
+    useTreeValue((t) => (moving ? t.notes.find((n) => n.path === moving)?.title : undefined)) ??
+    moving ??
+    "";
   // A "move" palette without a note has nothing to move: fall back to search.
   const mode = palette.mode === "move" && !moving ? "all" : palette.mode;
   const fileName = useOpened(

@@ -236,6 +236,27 @@ const CHECKS = {
       document.querySelector('[role="tree"] button[data-ctx-path="Archive/Standup.md"]'),
     );
   },
+  // The sidebar's New note goes to the inbox (from the tree's inbox name).
+  async "sidebar new note"(page) {
+    await page
+      .getByRole("button", { name: /^New note/ })
+      .first()
+      .click();
+    await page.waitForFunction(async () => {
+      const t = await window.__notaClient.tree();
+      return t.notes.some((n) => n.path.startsWith("Inbox/Untitled"));
+    });
+  },
+  // Right-click on a folder: its actions, Rename included (not the inbox).
+  async "folder context menu"(page) {
+    await folderRow(page, "Archive").click({ button: "right" });
+    const menu = page.getByRole("menu");
+    await menu.waitFor();
+    for (const name of ["New note here", "New subfolder", "Rename folder"])
+      await menu.getByRole("menuitem", { name }).waitFor();
+    await shot(page, "folder-context-menu");
+    await page.keyboard.press("Escape");
+  },
 };
 
 let failed = 0;
