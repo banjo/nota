@@ -9,6 +9,7 @@ import {
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, FolderInput, MoreHorizontal, Trash2 } from "lucide-react";
+import { memo } from "react";
 import { deleteNote } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { useLongPress } from "../lib/longPress.ts";
@@ -24,7 +25,7 @@ import { openRowSheet } from "./RowSheet.tsx";
  * focus; under a finger a long press opens the same actions as a sheet,
  * so the tree doesn't carry a "…" on every row.
  */
-export function NoteRow({
+export const NoteRow = memo(function NoteRow({
   note,
   depth,
   className,
@@ -33,9 +34,10 @@ export function NoteRow({
   depth: number;
   className?: string;
 }) {
-  const route = useUI((s) => s.route);
+  // Only whether this row is the open note: a navigation re-renders the
+  // two rows it changes, not the whole tree.
+  const active = useUI((s) => s.route.kind === "note" && s.route.path === note.path);
   const navigate = useUI((s) => s.navigate);
-  const active = route.kind === "note" && route.path === note.path;
   const decorators = useContributions("treeDecorator");
   const decos = decorators
     .map((d) => d.decorate({ kind: "note", path: note.path, note }))
@@ -84,7 +86,7 @@ export function NoteRow({
       <NoteMenu path={note.path} active={active} />
     </div>
   );
-}
+});
 
 /**
  * A note's actions. In the tree (`title` absent) it is the row's hover

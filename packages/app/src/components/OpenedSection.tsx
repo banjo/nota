@@ -12,7 +12,8 @@ export function OpenedSection() {
   const qc = useQueryClient();
   const previews = useOpened((s) => s.previews);
   const drafts = useOpened((s) => s.drafts);
-  const route = useUI((s) => s.route);
+  // The preview on screen, if any: opening a note leaves this section alone.
+  const openId = useUI((s) => (s.route.kind === "external" ? s.route.id : null));
   const navigate = useUI((s) => s.navigate);
   if (!previews.length) return null;
   return (
@@ -24,7 +25,7 @@ export function OpenedSection() {
             icon={<FileText strokeWidth={1.75} />}
             label={p.name}
             title={displayPath(p)}
-            active={route.kind === "external" && route.id === p.id}
+            active={openId === p.id}
             className="pr-8 pointer-coarse:pr-12"
             onClick={() => navigate({ kind: "external", id: p.id })}
             trailing={

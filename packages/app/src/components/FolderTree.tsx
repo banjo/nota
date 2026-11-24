@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder, FolderOpen } from "lucide-react";
 import {
   createContext,
+  memo,
   type ReactNode,
   useContext,
   useEffect,
@@ -23,21 +24,20 @@ import { RenameRow, useRename, useRenaming } from "./Rename.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
 
 /** A folder row, its hover buttons, and a long press for its sheet under a finger. */
-function FolderRow({
+const FolderRow = memo(function FolderRow({
   path,
   name,
   open,
   depth,
   count,
-  onToggle,
 }: {
   path: string;
   name: string;
   open: boolean;
   depth: number;
   count?: ReactNode;
-  onToggle: () => void;
 }) {
+  const toggle = useUI((s) => s.toggle);
   const longPress = useLongPress(() => openRowSheet({ kind: "folder", path, name }));
   const renaming = useRenaming("folder", path);
   // Lines up with the row it replaces: its chevron, then the icon.
@@ -54,14 +54,14 @@ function FolderRow({
         // Room for the row's "…", which is always shown under a finger.
         className="pointer-coarse:pr-12"
         depth={depth}
-        onClick={onToggle}
+        onClick={() => toggle(`folder:${path}`)}
         count={count}
         {...longPress}
       />
       <FolderActions path={path} name={name} />
     </>
   );
-}
+});
 
 /** The sidebar's scrolling element, which the tree virtualizes against. */
 export const SidebarScroll = createContext<HTMLElement | null>(null);
@@ -72,7 +72,6 @@ const coarse = () => typeof matchMedia !== "undefined" && matchMedia("(pointer: 
 export function FolderTree() {
   const tree = useTree();
   const expanded = useUI((s) => s.expanded);
-  const toggle = useUI((s) => s.toggle);
   const decorators = useContributions("treeDecorator");
   const scrollEl = useContext(SidebarScroll);
   const listRef = useRef<HTMLDivElement>(null);
@@ -129,10 +128,14 @@ export function FolderTree() {
   }, [renamingAt]);
   // A note opened from the file manager: once its folders are open,
   // scroll its row into view (once per open).
-  const route = useUI((s) => s.route);
+  // Only that route: other navigations leave the tree alone.
+  const route = useUI((s) => {
+    const r = s.route;
+    return r.kind === "note" && r.via === "open" ? r : null;
+  });
   const scrolled = useRef<Route | null>(null);
   useEffect(() => {
-    if (!scrollEl || route.kind !== "note" || route.via !== "open") return;
+    if (!scrollEl || !route) return;
     if (scrolled.current === route) return;
     const i = rows.findIndex((r) => r.kind === "note" && r.note.path === route.path);
     if (i < 0) return;
@@ -192,7 +195,6 @@ export function FolderTree() {
                 name={row.node.name}
                 open={row.open}
                 depth={row.depth}
-                onToggle={() => toggle(`folder:${row.node.path}`)}
                 count={
                   decorators
                     .map((d) =>
