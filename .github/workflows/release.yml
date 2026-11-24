@@ -1,9 +1,10 @@
 # Builds Nota for a version tag and publishes the GitHub release.
 #
-#   git tag v0.1.0 && git push origin v0.1.0            a release
-#   git tag v0.1.1-rc.1 && git push origin v0.1.1-rc.1  a prerelease
+# Releases are tagged by changesets.yml, which dispatches this workflow on the
+# new tag when the "Release Nota" pull request is merged. Prereleases are
+# pushed by hand:
 #
-# Releases are patch bumps for now; scripts/next-version.sh prints the next tag.
+#   git tag v0.1.1-rc.1 && git push origin v0.1.1-rc.1  (scripts/next-version.sh --rc)
 #
 # The version comes from the tag and is linked into every binary:
 # `nota --version`, the app's Info.plist and the Linux packages. A manual
@@ -274,6 +275,19 @@ jobs:
       PRERELEASE: ${{ needs.version.outputs.prerelease }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: apps/desktop
+      - name: Release notes from the changelog
+        run: |
+          # The "## <version>" section of apps/desktop/CHANGELOG.md (written by
+          # changesets). Prereleases have none and get GitHub's notes only.
+          touch notes.md
+          if [[ -f apps/desktop/CHANGELOG.md ]]; then
+            awk -v v="$VERSION" '$0 == "## " v { f = 1; next } f && /^## / { exit } f' \
+              apps/desktop/CHANGELOG.md > notes.md
+          fi
+          cat notes.md
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -291,6 +305,8 @@ jobs:
           tag="$GITHUB_REF_NAME"
           flags=()
           if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); else flags+=(--latest); fi
+          # Changelog entries first; --generate-notes appends the merged PRs.
+          if grep -q '[^[:space:]]' notes.md; then flags+=(--notes-file notes.md); fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             # A re-run: replace the files of the existing release.
             gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber

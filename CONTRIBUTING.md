@@ -50,6 +50,10 @@ review the diff before you commit it.
 - One logical change per commit, with a message in the imperative ("Add …", "Fix …") and a body
   that says why.
 - Add or update tests with the change, and docs when behaviour changes.
+- Add a changeset (`bunx changeset`, pick `@nota/desktop`, patch) when the change reaches users;
+  its line goes into the release notes. See [RELEASE.md](RELEASE.md).
+- `bun.lock` resolves everything from the public npm registry. If your machine points npm at
+  another registry, add dependencies with `NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ bun install`.
 - Keep pull requests focused; describe how you tested them.
 
 By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).
