@@ -35,6 +35,38 @@ export const sourceHighlight = HighlightStyle.define([
   { tag: [t.processingInstruction, t.meta, t.contentSeparator], color: v("faint", "#9ca0a8") },
 ]);
 
+/**
+ * Colours for code in fenced blocks, in every mode. Only tags that
+ * Markdown itself doesn't use, so the rest of the note is untouched.
+ */
+export const codeHighlight = HighlightStyle.define([
+  {
+    tag: [t.keyword, t.modifier, t.self, t.tagName],
+    color: md("syntax-keyword", "ink-strong", "#175c4f"),
+  },
+  {
+    tag: [t.string, t.regexp, t.attributeValue, t.special(t.string)],
+    color: "var(--md-syntax-string, #2b7a3d)",
+  },
+  {
+    tag: [t.number, t.bool, t.null, t.atom, t.unit],
+    color: "var(--md-syntax-number, #a0540a)",
+  },
+  {
+    tag: t.comment,
+    fontStyle: "italic",
+    color: md("syntax-comment", "muted-foreground", "#6b6f78"),
+  },
+  {
+    tag: [t.function(t.variableName), t.function(t.propertyName), t.attributeName, t.macroName],
+    color: md("syntax-function", "ink", "#1e7363"),
+  },
+  {
+    tag: [t.typeName, t.className, t.namespace],
+    color: `var(--md-syntax-type, ${md("tag", "ink-strong", "#175c4f")})`,
+  },
+]);
+
 /** The extensions that make up one mode. */
 export function modeExtensions(mode: EditorMode, handlers: PreviewHandlers = {}): Extension {
   switch (mode) {
