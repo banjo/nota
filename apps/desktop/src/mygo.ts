@@ -431,8 +431,12 @@ export const Vault = {
    */
   patch: bind<[string, PatchRequest, string], SaveResult>("Vault.Patch", (path: string, req: PatchRequest, baseHash: string) => [path, req, baseHash]),
   /** Rename gives a note a new path (a new name, a new folder, or both). */
-  renameFolder: bind<[string, string], MoveResult>("Vault.RenameFolder", (path: string, to: string) => [path, to]),
   rename: bind<[string, string], MoveResult>("Vault.Rename", (path: string, to: string) => [path, to]),
+  /**
+   * RenameFolder renames a folder, or moves it, to a new vault path: every
+   * file in it moves with it, one note.moved event per note.
+   */
+  renameFolder: bind<[string, string], MoveResult>("Vault.RenameFolder", (path: string, to: string) => [path, to]),
   /**
    * Restore makes an old server version of a note its newest one; the
    * background sync brings it to this vault (the server nudges it).
