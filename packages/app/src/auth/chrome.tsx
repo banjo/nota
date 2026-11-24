@@ -39,7 +39,10 @@ export function AuthShell({
         ) : null}
         <p className="mt-8 text-small text-faint">
           Local-first notes in plain Markdown ·{" "}
-          <a className="underline-offset-2 hover:text-muted-foreground hover:underline" href="/">
+          <a
+            className="underline-offset-2 hover:text-muted-foreground hover:underline pointer-coarse:inline-block pointer-coarse:py-3"
+            href="/"
+          >
             About Nota
           </a>
         </p>

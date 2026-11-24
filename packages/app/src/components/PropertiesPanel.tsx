@@ -161,9 +161,11 @@ function AddInline({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="inline-flex h-[22px] items-center gap-1 rounded-xs px-1.5 text-small text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover active:bg-hover pointer-coarse:h-11 pointer-coarse:px-2.5 pointer-coarse:text-[14px]"
+        className="inline-flex h-[22px] items-center gap-1 rounded-xs px-1.5 text-small text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover active:bg-hover pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:justify-center pointer-coarse:px-0"
       >
-        <Plus className="size-3" strokeWidth={2} /> Add
+        {/* Under a finger just the "+", so it stays on the chips' line. */}
+        <Plus className="size-3 pointer-coarse:size-4" strokeWidth={2} />
+        <span className="pointer-coarse:sr-only">Add</span>
       </button>
     );
   const commit = () => {

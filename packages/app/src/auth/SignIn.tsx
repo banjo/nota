@@ -180,7 +180,7 @@ export function SignInFlow({
             Already have an account?{" "}
             <button
               type="button"
-              className="font-medium text-ink underline-offset-2 hover:underline"
+              className="font-medium text-ink underline-offset-2 hover:underline pointer-coarse:inline-block pointer-coarse:py-3"
               onClick={() => {
                 setError(null);
                 setMode("signin");
@@ -243,7 +243,7 @@ export function SignInFlow({
         footer={
           <button
             type="button"
-            className="font-medium text-ink underline-offset-2 hover:underline"
+            className="font-medium text-ink underline-offset-2 hover:underline pointer-coarse:inline-block pointer-coarse:py-3"
             onClick={() => {
               setError(null);
               setMode("signin");
@@ -294,7 +294,7 @@ export function SignInFlow({
             New to Nota?{" "}
             <a
               href="/app/signup"
-              className="font-medium text-ink underline-offset-2 hover:underline"
+              className="font-medium text-ink underline-offset-2 hover:underline pointer-coarse:inline-block pointer-coarse:py-3"
               onClick={(e) => {
                 e.preventDefault();
                 setError(null);

@@ -34,7 +34,7 @@ export function ModeSwitch() {
             title={`${m.name}: ${m.hint}${m.id === "reading" ? ` (${label("mod+e")})` : ""}`}
             onClick={() => setMode(m.id)}
             className={cn(
-              "flex h-6 items-center gap-1 rounded-[5px] px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 pointer-coarse:h-9 pointer-coarse:px-2.5",
+              "flex h-6 items-center gap-1 rounded-[5px] px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ink/40 pointer-coarse:h-10 pointer-coarse:px-2.5",
               on ? "bg-background text-foreground shadow-xs" : "text-faint hover:text-foreground",
             )}
           >
