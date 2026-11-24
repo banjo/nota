@@ -13,6 +13,7 @@ import type {
   PluginInfo,
   PropertyPatch,
   ServerVaultApi,
+  SettingsApi,
   ShellApi,
   SyncStatus,
   TagCount,
@@ -88,6 +89,8 @@ export interface NotesClient {
   shell?: ShellApi;
   /** Files opened with the app from the file manager or the Dock (desktop). */
   opener?: OpenerApi;
+  /** The user's settings from settings.toml (desktop) and the account. */
+  settings?: SettingsApi;
 }
 
 /** An error from a backend, with the API's stable code when there is one. */
