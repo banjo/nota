@@ -171,9 +171,17 @@ type ChangeEvent struct {
 	Cursor int64 `json:"cursor"`
 }
 
+// SettingsEvent is the data of an SSE "settings" event on
+// /v1/account/events: the account's settings revision. Like a change
+// event it is a nudge: fetch GET /v1/account/settings.
+type SettingsEvent struct {
+	Rev int64 `json:"rev"`
+}
+
 // SSE event names.
 const (
-	EventChange = "change"
+	EventChange   = "change"
+	EventSettings = "settings"
 )
 
 // Error is the JSON body of every error response.

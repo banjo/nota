@@ -118,6 +118,33 @@ func (c *Client) RevokeDevice(ctx context.Context, id int64) error {
 	return res.Body.Close()
 }
 
+// Settings returns the settings the account sets.
+func (c *Client) Settings(ctx context.Context) (protocol.AccountSettings, error) {
+	var out protocol.AccountSettings
+	err := c.json(ctx, "GET", "/v1/account/settings", nil, nil, &out)
+	return out, err
+}
+
+// UpdateSettings changes the account's settings key by key.
+func (c *Client) UpdateSettings(ctx context.Context, p protocol.SettingsPatch) (protocol.AccountSettings, error) {
+	body, _ := json.Marshal(p)
+	var out protocol.AccountSettings
+	err := c.json(ctx, "PATCH", "/v1/account/settings", nil, body, &out)
+	return out, err
+}
+
+// SettingsEvents calls fn with the account's settings revision: once at
+// the start and after every change, until ctx is done or the stream
+// breaks. It returns nil only when ctx was cancelled.
+func (c *Client) SettingsEvents(ctx context.Context, fn func(rev int64)) error {
+	return c.stream(ctx, "/v1/account/events", protocol.EventSettings, func(data []byte) {
+		var ev protocol.SettingsEvent
+		if json.Unmarshal(data, &ev) == nil {
+			fn(ev.Rev)
+		}
+	})
+}
+
 // RevokeSelf revokes the client's own token (sign out).
 func (c *Client) RevokeSelf(ctx context.Context) error {
 	res, err := c.do(ctx, "DELETE", "/v1/devices/current", nil, nil)

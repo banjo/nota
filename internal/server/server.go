@@ -255,6 +255,7 @@ func (s *Server) routes() {
 	s.authRoutes()
 	s.flowRoutes()
 	s.apiRoutes()
+	s.settingsRoutes()
 	s.mcpRoutes()
 	s.mux.Handle("/v1/", s.v1(func(http.ResponseWriter, *http.Request, Principal) error {
 		return &apiErr{http.StatusNotFound, protocol.Error{Code: protocol.CodeNotFound, Message: "no such route"}}
