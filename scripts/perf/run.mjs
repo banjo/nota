@@ -389,3 +389,20 @@ server.close();
 const json = JSON.stringify(out, null, 2) + "\n";
 if (OUT) writeFileSync(OUT, json);
 else process.stdout.write(json);
+
+// --budget perf/budget.json: the render-count regression test. Fails when
+// a scenario's median commits or renders go over its budget.
+if (args.budget) {
+  const budget = JSON.parse(readFileSync(resolve(args.budget), "utf8")).scenarios;
+  const over = [];
+  for (const [id, r] of Object.entries(results)) {
+    const b = budget[id];
+    if (!b) continue;
+    for (const k of ["commits", "renders"])
+      if (r.median[k] > b[k]) over.push(`${id}: ${k} ${r.median[k]} > budget ${b[k]}`);
+  }
+  if (over.length) {
+    console.error(`render budget exceeded:\n  ${over.join("\n  ")}`);
+    process.exitCode = 1;
+  } else console.error(`render budget: ${Object.keys(results).length} scenarios within budget`);
+}

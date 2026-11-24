@@ -39,7 +39,11 @@ const expect = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 async function open(url = "", storage = {}) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    // Screenshots at 2x, so regions can be zoomed into.
+    deviceScaleFactor: SHOTS ? 2 : 1,
+  });
   await context.addInitScript((kv) => {
     for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
   }, storage);
@@ -171,7 +175,7 @@ const CHECKS = {
     await hit.click();
     await page.locator("[cmdk-input]").waitFor({ state: "detached" });
     await page.waitForFunction(
-      () => document.querySelector('textarea[aria-label="Title"]').value === "Note 05",
+      () => document.querySelector('textarea[aria-label="Title"]')?.value === "Note 05",
     );
   },
   // Each open starts empty, also after a query was left in it.
@@ -278,6 +282,113 @@ const CHECKS = {
     await page.waitForTimeout(350);
     await page.keyboard.press("Control+Comma");
     await page.getByText("Appearance", { exact: true }).first().waitFor();
+  },
+  // The properties panel: shown from its chip, a tag chip and a status
+  // change reach the file.
+  async properties(page) {
+    await page.getByRole("button", { name: /^Show properties/ }).click();
+    const add = page.locator("dd").filter({ has: page.getByRole("button", { name: "Add" }) });
+    await add.first().getByRole("button", { name: "Add" }).click();
+    await page.keyboard.type("perfcheck", { delay: 20 });
+    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "#perfcheck", exact: true }).waitFor();
+    await page.getByRole("button", { name: "In progress" }).click();
+    await page.getByRole("menuitem", { name: "Done" }).click();
+    await page.getByRole("button", { name: "Done" }).waitFor();
+    const note = await page.evaluate(() => window.__notaClient.get("Meetings/Standup.md"));
+    expect(note.properties.status === "done", `status ${note.properties.status}`);
+    expect(note.properties.tags.includes("perfcheck"), `tags ${note.properties.tags}`);
+    await shot(page, "properties");
+    // A tag chip opens that tag's list.
+    await page.getByRole("button", { name: "#perfcheck", exact: true }).click();
+    await page.waitForFunction(
+      () => JSON.parse(localStorage.getItem("nota:ui")).state.route.list?.tag === "perfcheck",
+    );
+    await page.getByRole("button", { name: "Hide properties" }).waitFor({ state: "detached" });
+  },
+  // Live / Reading / Source from the top bar and ⌘E; a click in Reading edits there.
+  async modes(page) {
+    const editor = page.locator(".cm-editor");
+    await page.getByRole("button", { name: "Reading mode" }).click();
+    await page.locator(".cm-editor.cm-reading").waitFor();
+    expect(
+      await page.locator('textarea[aria-label="Title"]').evaluate((t) => t.readOnly),
+      "title editable in Reading",
+    );
+    await shot(page, "mode-reading");
+    await page.getByRole("button", { name: "Source mode" }).click();
+    await page.locator(".cm-editor.cm-source").waitFor();
+    const src = await page.locator(".cm-content").textContent();
+    expect(src.startsWith("# Standup"), `source starts ${JSON.stringify(src.slice(0, 20))}`);
+    expect(src.includes("> [!NOTE]") && src.includes("| Key | Value |"), "source lacks markers");
+    await shot(page, "mode-source");
+    await page.getByRole("button", { name: "Live mode" }).click();
+    await page.waitForFunction(
+      () => !document.querySelector(".cm-editor.cm-source, .cm-editor.cm-reading"),
+    );
+    expect(
+      !(await page.locator(".cm-content").textContent()).startsWith("# Standup"),
+      "title in live body",
+    );
+    // ⌘E: Live → Reading → Live.
+    await page.locator(".cm-content").click();
+    await page.keyboard.press("Control+e");
+    await page.locator(".cm-editor.cm-reading").waitFor();
+    await page.waitForTimeout(350);
+    await page.keyboard.press("Control+e");
+    await page.waitForFunction(() => !document.querySelector(".cm-editor.cm-reading"));
+    // A click on text in Reading switches to Live.
+    await page.getByRole("button", { name: "Reading mode" }).click();
+    await page.locator(".cm-editor.cm-reading").waitFor();
+    await page.locator(".cm-line", { hasText: "Draft read test" }).click();
+    await page.waitForFunction(() => !document.querySelector(".cm-editor.cm-reading"));
+    expect(await editor.isVisible(), "editor gone");
+  },
+  // Rendered Markdown: callout, table, code block, task boxes, links.
+  async "rendered markdown"(page) {
+    await page.locator(".cm-callout-head .cm-callout-icon").first().waitFor();
+    const table = page.locator(".cm-table-widget table");
+    await table.waitFor();
+    expect((await table.locator("th").allTextContents()).join("|") === "Key|Value", "table head");
+    expect((await page.locator(".cm-codeblock").count()) >= 3, "code block lines");
+    expect((await page.locator(".cm-task-checkbox").count()) === 2, "task boxes");
+    const box = await page.locator(".nota-editor").boundingBox();
+    await shot(page, "rendered-markdown", {
+      x: box.x - 20,
+      y: box.y - 140,
+      width: box.width + 40,
+      height: Math.min(box.height + 160, 900 - box.y + 140),
+    });
+    // A task box toggles the source.
+    await page.locator(".cm-task-checkbox").first().click();
+    await page.waitForFunction(
+      () => document.querySelectorAll('.cm-task-checkbox[data-checked="true"]').length === 2,
+    );
+  },
+  // A wikilink opens its note; a #tag opens the tag's list.
+  async "wikilink and tag clicks"(page) {
+    await page.locator("[data-wikilink]").first().click();
+    await page.waitForFunction(
+      () => document.querySelector('textarea[aria-label="Title"]')?.value === "Note 17",
+    );
+    await page.locator("[data-tag]").first().click();
+    await page.waitForFunction(
+      () => JSON.parse(localStorage.getItem("nota:ui")).state.route.list?.type === "tag",
+    );
+    await shot(page, "tag-list");
+  },
+  // The inbox page: its notes, and a captured thought lands in it.
+  async inbox(page) {
+    await page
+      .getByRole("button", { name: /^Inbox/ })
+      .first()
+      .click();
+    await page.getByRole("heading", { name: "Inbox" }).waitFor();
+    await page.getByText("4 to sort").waitFor();
+    await page.getByRole("textbox", { name: "Capture a thought" }).fill("perf capture");
+    await page.keyboard.press("Enter");
+    await page.getByText("5 to sort").waitFor();
+    await shot(page, "inbox");
   },
 };
 

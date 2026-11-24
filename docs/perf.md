@@ -68,6 +68,11 @@ bun scripts/perf/report.mjs perf/baseline.json perf/after.json
 sh scripts/perf/bundle.sh   # apps/web build sizes
 ```
 
+`--budget perf/budget.json` is the render-count regression test: it fails
+(exit 1) when a scenario's median commits or renders exceed
+`perf/budget.json` (the numbers after the perf work plus headroom; scenario
+h stays at 0). Raise a budget only with a reason in the commit.
+
 `--trace` prints every commit with what rendered in it (top 8 names), for
 finding what drives a scenario; it does not change the numbers. Results
 are plain `JSON.stringify` output: run `bunx vp check --fix` before
