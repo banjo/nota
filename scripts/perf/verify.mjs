@@ -49,6 +49,7 @@ async function open(url = "", storage = {}) {
   await page.goto(BASE + url);
   await page.locator(".cm-content").first().waitFor();
   await page.waitForFunction(() => document.querySelector('textarea[aria-label="Title"]')?.value);
+  await page.waitForTimeout(500); // the first queries settle
   return { context, page, errors };
 }
 const shot = async (page, name, clip) => {
@@ -155,6 +156,84 @@ const CHECKS = {
     await btn.click();
     await page.waitForFunction(() =>
       document.querySelector('[role="tree"] button[data-ctx-path^="Reading/Untitled"]'),
+    );
+  },
+  // ⌘K: title search, Enter opens the note.
+  async "palette search and open"(page) {
+    await page.keyboard.press("Control+k");
+    await page.locator("[cmdk-input]").waitFor();
+    await page.keyboard.type("Note 05", { delay: 30 });
+    const hit = page.locator("[cmdk-item]", { hasText: "Note 05" }).first();
+    await hit.waitFor();
+    await shot(page, "palette-search");
+    // (Enter right after typing selects nothing, before and after the perf
+    // work: the deferred list replaces the item cmdk had selected.)
+    await hit.click();
+    await page.locator("[cmdk-input]").waitFor({ state: "detached" });
+    await page.waitForFunction(
+      () => document.querySelector('textarea[aria-label="Title"]').value === "Note 05",
+    );
+  },
+  // Each open starts empty, also after a query was left in it.
+  async "palette query resets"(page) {
+    await page.keyboard.press("Control+k");
+    await page.locator("[cmdk-input]").waitFor();
+    await page.keyboard.type("zzz", { delay: 20 });
+    await page.keyboard.press("Escape");
+    await page.locator("[cmdk-input]").waitFor({ state: "detached" });
+    // The command runner ignores the same command again within 300 ms.
+    await page.waitForTimeout(350);
+    await page.keyboard.press("Control+k");
+    await page.locator("[cmdk-input]").waitFor();
+    const v = await page.locator("[cmdk-input]").inputValue();
+    expect(v === "", `query kept: ${JSON.stringify(v)}`);
+    // Recent notes and commands show with no query.
+    await page.getByRole("option", { name: "Toggle dark mode" }).waitFor();
+    expect(
+      await page.locator("[cmdk-group-heading]", { hasText: "Recent" }).isVisible(),
+      "no Recent group",
+    );
+  },
+  // Arrow keys move the selection; Enter runs the selected command.
+  async "palette arrows and commands"(page) {
+    await page.keyboard.press("Control+k");
+    await page.keyboard.type("dark mode", { delay: 20 });
+    await page.getByRole("option", { name: "Toggle dark mode" }).waitFor();
+    const sel = () =>
+      page.evaluate(() => document.querySelector('[cmdk-item][aria-selected="true"]')?.textContent);
+    const first = await sel();
+    await page.keyboard.press("ArrowDown");
+    const second = await sel();
+    expect(first !== second, `ArrowDown kept ${first}`);
+    await page.keyboard.press("ArrowUp");
+    expect((await sel()) === first, "ArrowUp did not go back");
+    const before = await page.evaluate(() => document.documentElement.dataset.mode);
+    await page.getByRole("option", { name: "Toggle dark mode" }).click();
+    await page.waitForFunction((b) => document.documentElement.dataset.mode !== b, before);
+    await shot(page, "dark");
+  },
+  // A mode switch while open (Add to folder… from ⌘K) starts that mode fresh.
+  async "palette folder mode"(page) {
+    await page.keyboard.press("Control+k");
+    await page.keyboard.type("Add to folder", { delay: 20 });
+    await page.getByRole("option", { name: "Add to folder… Ctrl+Shift+M" }).click();
+    const input = page.locator("[cmdk-input]");
+    await page.waitForFunction(() =>
+      document.querySelector("[cmdk-input]")?.placeholder?.startsWith("Add “Standup”"),
+    );
+    expect((await input.inputValue()) === "", "query not reset on mode change");
+    await page
+      .getByRole("option", { name: /Archive/ })
+      .first()
+      .waitFor();
+    await shot(page, "palette-folders");
+    await page.keyboard.type("Arch", { delay: 20 });
+    await page
+      .getByRole("option", { name: /Archive/ })
+      .first()
+      .click();
+    await page.waitForFunction(() =>
+      document.querySelector('[role="tree"] button[data-ctx-path="Archive/Standup.md"]'),
     );
   },
 };
