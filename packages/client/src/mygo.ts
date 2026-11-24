@@ -4,12 +4,15 @@ import type {
   ChangeEvent,
   CreateInput,
   Device,
+  ExternalDoc,
   FolderInfo,
   HistoryEntry,
   ListQuery,
   MoveResult,
   Note,
   NoteInfo,
+  Opened,
+  OpenerApi,
   PropertyPatch,
   SyncStatus,
   TagCount,
@@ -23,6 +26,12 @@ import type {
 /** A MyGo event: `events.name.on(listener)` returns an unsubscribe. */
 export interface MygoEvent<T> {
   on(listener: (payload: T) => void): () => void;
+}
+
+interface OpenerSaveOutcome {
+  conflict: boolean;
+  path?: string;
+  trashError?: string;
 }
 
 interface SaveResult {
@@ -91,11 +100,67 @@ export interface MygoBindings {
       captureBackground?: string;
     }): Promise<void>;
   };
+  /** Files opened with the app; absent in builds before it existed. */
+  Opener?: {
+    take(): Promise<RawOpened[] | null>;
+    previews(): Promise<RawOpened[] | null>;
+    read(id: string): Promise<ExternalDoc>;
+    save(
+      id: string,
+      req: { folder: string; edited: boolean; body: string; hash: string; move: boolean },
+    ): Promise<OpenerSaveOutcome>;
+    overwriteOriginal(id: string, body: string, hash: string): Promise<OpenerSaveOutcome>;
+    reveal(id: string): Promise<void>;
+    dismiss(id: string): Promise<void>;
+    follow(id: string, href: string): Promise<RawOpened>;
+    pickFile(): Promise<void>;
+  };
   events: {
     changed: MygoEvent<{ paths: string[] | null; seq: number }>;
     syncStatus: MygoEvent<SyncStatus>;
     account: MygoEvent<AccountState>;
     command: MygoEvent<{ id: string }>;
+    opened?: MygoEvent<{ seq: number }>;
+  };
+}
+
+/** Opened as Go sends it: kind is a plain string. */
+type RawOpened = Omit<Opened, "kind"> & { kind: string };
+
+const opened = (o: RawOpened): Opened => ({
+  ...o,
+  kind: o.kind === "note" || o.kind === "external" ? o.kind : "error",
+});
+
+function openerApi(b: MygoBindings): OpenerApi | undefined {
+  const o = b.Opener;
+  const ev = b.events.opened;
+  if (!o || !ev) return undefined;
+  const outcome = (r: OpenerSaveOutcome) => ({
+    conflict: r.conflict,
+    path: r.path || undefined,
+    trashError: r.trashError || undefined,
+  });
+  return {
+    take: async () => list(await o.take()).map(opened),
+    previews: async () => list(await o.previews()).map(opened),
+    read: (id) => o.read(id),
+    save: async (id, req) =>
+      outcome(
+        await o.save(id, {
+          folder: req.folder,
+          edited: req.body !== undefined,
+          body: req.body ?? "",
+          hash: req.hash,
+          move: !!req.move,
+        }),
+      ),
+    overwriteOriginal: async (id, body, hash) => outcome(await o.overwriteOriginal(id, body, hash)),
+    reveal: (id) => o.reveal(id),
+    dismiss: (id) => o.dismiss(id),
+    follow: async (id, href) => opened(await o.follow(id, href)),
+    pick: () => o.pickFile(),
+    onOpened: (listener) => ev.on(() => listener()),
   };
 }
 
@@ -174,5 +239,6 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       },
       onCommand: (listener) => b.events.command.on((c) => listener(c.id)),
     },
+    opener: openerApi(b),
   };
 }
