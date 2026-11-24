@@ -18,6 +18,20 @@ export function ModeSwitch() {
   const mode = useUI((s) => s.noteMode);
   const setMode = useUI((s) => s.setNoteMode);
   return (
+    <div className="flex items-center gap-2 max-[720px]:hidden">
+      <ModeGroup mode={mode} setMode={setMode} />
+      <kbd
+        title="Toggle between editing and reading"
+        className="rounded border border-border px-1 font-sans text-[11px] leading-4 text-faint"
+      >
+        {label("mod+e")}
+      </kbd>
+    </div>
+  );
+}
+
+function ModeGroup({ mode, setMode }: { mode: NoteMode; setMode: (m: NoteMode) => void }) {
+  return (
     <div
       role="group"
       aria-label="View mode"
