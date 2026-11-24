@@ -22,14 +22,18 @@ export type Route =
   /** `via: "open"`: opened from the file manager, shown in Reading for this open. */
   | { kind: "note"; path: string; via?: "open" }
   | { kind: "inbox" }
+  /** A Markdown file from outside the vault (desktop), by its opener id. */
+  | { kind: "external"; id: string }
   | { kind: "list"; list: ListSpec }
   | { kind: "settings" };
 
 /**
  * "move" files the note at `path` in a folder; "noteIn" picks a folder for a
- * new note; "newFolder" asks for a folder name, relative to the folder `path`.
+ * new note; "newFolder" asks for a folder name, relative to the folder `path`;
+ * "saveExternal" and "moveExternal" pick the folder for the outside file
+ * whose preview id is `path`.
  */
-export type PaletteMode = "all" | "move" | "noteIn" | "newFolder";
+export type PaletteMode = "all" | "move" | "noteIn" | "newFolder" | "saveExternal" | "moveExternal";
 
 interface UIState {
   route: Route;
@@ -148,10 +152,12 @@ export const useUI = create<UIState>()(
 
 /**
  * The route as kept between runs: an open-in-Reading override is for
- * that one open.
+ * that one open, and previews of outside files do not come back.
  */
 export function persistedRoute(r: Route): Route {
   if (r.kind === "note" && r.via) return { kind: "note", path: r.path };
+  // Preview ids die with the process.
+  if (r.kind === "external") return { kind: "home" };
   return r;
 }
 

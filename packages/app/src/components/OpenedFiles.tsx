@@ -2,14 +2,16 @@ import type { NotesClient, Opened } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import { useEffect } from "react";
 import { useClient } from "../context.ts";
+import { knowPreviews, showPreview } from "../external.ts";
 import { useUI } from "../state.ts";
 
 /**
- * Shows what the OS opened with the app: the last file opened gets the
- * page, notes of the vault in Reading mode (for this open only), files
- * that can't open a toast each.
+ * Shows what the OS opened with the app: every outside file becomes a
+ * preview in the sidebar, the last file opened gets the page (notes of
+ * the vault in Reading mode, for this open only), files that can't open
+ * get a toast each.
  */
-export function showOpened(files: Opened[]) {
+export function showOpened(files: Opened[], client?: NotesClient) {
   const ui = useUI.getState();
   let last: Opened | undefined;
   for (const f of files) {
@@ -17,10 +19,13 @@ export function showOpened(files: Opened[]) {
       toast.error(`Couldn't open “${f.name}”`, { description: f.error });
       continue;
     }
+    if (f.kind === "external" && client) knowPreviews(client, [f]);
     last = f;
   }
   if (last?.kind === "note" && last.notePath) {
     ui.navigate({ kind: "note", path: last.notePath, via: "open" });
+  } else if (last?.kind === "external" && client) {
+    showPreview(client, last);
   }
 }
 
@@ -28,7 +33,7 @@ export function showOpened(files: Opened[]) {
 export async function takeOpened(client: NotesClient) {
   const o = client.opener;
   try {
-    if (o) showOpened(await o.take());
+    if (o) showOpened(await o.take(), client);
   } catch (e) {
     toast.error("Couldn't open the file", { description: String(e) });
   } finally {
@@ -42,7 +47,14 @@ export function OpenedFiles() {
   useEffect(() => {
     // Results are applied even after an unmount (StrictMode's second
     // mount, a reload): take() drained them, so nobody else will.
-    void takeOpened(client);
+    // Previews already open in Go (the page reloaded, or the main
+    // window was closed and made again) come back to the sidebar first.
+    void client.opener
+      ?.previews()
+      .then((list) => knowPreviews(client, list))
+      .catch(() => {})
+      .finally(() => void takeOpened(client));
+    if (!client.opener) void takeOpened(client);
     return client.opener?.onOpened(() => void takeOpened(client));
   }, [client]);
   return null;

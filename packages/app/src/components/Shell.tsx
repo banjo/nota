@@ -11,6 +11,7 @@ import { currentPath, type Route, useUI } from "../state.ts";
 import { useList } from "../queries.ts";
 import { Onboarding } from "../onboarding/Onboarding.tsx";
 import { EmptyState } from "./EmptyState.tsx";
+import { ConfirmDialog, ExternalPage } from "./ExternalPage.tsx";
 import { InboxView } from "./Inbox.tsx";
 import { NoteList } from "./NoteList.tsx";
 import { NotePage } from "./NotePage.tsx";
@@ -106,6 +107,12 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
           <NotePage path={route.path} />
         </div>
       );
+    case "external":
+      return (
+        <div className="h-full overflow-y-auto overscroll-contain">
+          <ExternalPage key={route.id} id={route.id} />
+        </div>
+      );
     case "list":
       return <NoteList key={JSON.stringify(route.list)} list={route.list} />;
     case "inbox":
@@ -183,6 +190,7 @@ export function Shell({ children }: { children?: ReactNode }) {
         <Page route={route} run={run} />
       </main>
       <OpenedFiles />
+      <ConfirmDialog />
       <OpenRecent />
       <Palette />
       <VaultDialogs />
