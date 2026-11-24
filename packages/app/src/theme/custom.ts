@@ -53,6 +53,11 @@ export const THEME_TOKENS = [
   "md-syntax-comment",
   "md-syntax-function",
   "md-syntax-type",
+  "md-callout-note",
+  "md-callout-tip",
+  "md-callout-important",
+  "md-callout-warning",
+  "md-callout-caution",
 ] as const;
 
 export type ThemeToken = (typeof THEME_TOKENS)[number];
@@ -135,6 +140,7 @@ function legible(color: string, toward: string, bg: string, min: number): string
 // The status colours of tokens.css, for themes that don't set their own.
 const SUCCESS = "#37b26c";
 const WARNING = "#e2a93b";
+const DANGER = "#d4483b";
 
 /** Every token of one mode: what the theme sets, and the rest derived. */
 export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, string>> {
@@ -190,6 +196,16 @@ export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, stri
       3,
     ),
   };
+  // Callouts are accents on an 8% tint of their own colour over the page:
+  // ≥ 3:1 there, which 3.4:1 on the page leaves room for.
+  const callout = (c: string) => legible(c, extreme, bg, 3.4);
+  Object.assign(derived, {
+    "md-callout-note": callout(ink),
+    "md-callout-tip": callout(hex(input["md-syntax-string"], derived["md-syntax-string"]!)),
+    "md-callout-important": callout(hex(input["ink-strong"], inkStrong)),
+    "md-callout-warning": callout(hex(input["md-syntax-number"], derived["md-syntax-number"]!)),
+    "md-callout-caution": callout(hex(input.danger, DANGER)),
+  });
   const out: Partial<Record<ThemeToken, string>> = { ...derived };
   for (const k of THEME_TOKENS) {
     const v = input[k];

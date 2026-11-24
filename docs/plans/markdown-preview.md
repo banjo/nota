@@ -103,9 +103,11 @@ it only looks at `Table` nodes, so it stays cheap.
   types fall back to note.
 * The marker line renders an icon and the title (or the type's name). The other lines keep the
   quote line style, with a coloured border and a soft background.
-* Tokens: `md-callout-note` (→ `ink`), `md-callout-tip` (→ `success`), `md-callout-important`
-  (→ `ink-strong`), `md-callout-warning` (→ `warning`), `md-callout-caution` (→ `danger`).
-  Backgrounds are `color-mix()` of the same colour.
+* Tokens: `md-callout-note` (→ `ink`), `md-callout-tip` (→ `md-syntax-string`),
+  `md-callout-important` (→ `ink-strong`), `md-callout-warning` (→ `md-syntax-number`),
+  `md-callout-caution` (→ `danger`). Tip and warning borrow the code colours because `success` and
+  `warning` are too light for a title. Backgrounds are an 8% `color-mix()` of the same colour.
+  Token themes derive all five, ≥ 3.4:1 on the page, so they stay ≥ 3:1 on the tint.
 * Folding (`[!note]-`) is out of scope.
 
 ### 4. Footnotes
