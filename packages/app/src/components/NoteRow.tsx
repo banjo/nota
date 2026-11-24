@@ -12,6 +12,7 @@ import { FileText, FolderInput, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo } from "react";
 import { deleteNote } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { useArmed } from "../lib/armed.ts";
 import { useLongPress } from "../lib/longPress.ts";
 import { useNarrow } from "../lib/viewport.ts";
 import { useContributions } from "../registry.ts";
@@ -108,6 +109,28 @@ export function NoteMenu({
   const openPalette = useUI((s) => s.openPalette);
   const narrow = useNarrow();
   const inBar = title !== undefined;
+  // In the tree every row has one: the menu mounts on first use (lib/armed.ts).
+  const { armed, ref, standIn } = useArmed();
+  const triggerClass = cn(
+    "absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-xs text-faint opacity-0 outline-none hover:bg-selected hover:text-foreground focus-visible:opacity-100 data-[state=open]:opacity-100",
+    "group-hover/note:opacity-100",
+    inBar ? "pointer-coarse:size-11 pointer-coarse:opacity-100" : "pointer-coarse:hidden",
+    active && "opacity-100",
+  );
+  if (!inBar && !armed)
+    return (
+      <button
+        type="button"
+        aria-label="Note actions"
+        aria-haspopup="menu"
+        aria-expanded={false}
+        data-state="closed"
+        className={triggerClass}
+        {...standIn}
+      >
+        <MoreHorizontal className="size-4" />
+      </button>
+    );
   if (inBar && narrow)
     return (
       <button
@@ -121,15 +144,7 @@ export function NoteMenu({
     );
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label="Note actions"
-        className={cn(
-          "absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-xs text-faint opacity-0 outline-none hover:bg-selected hover:text-foreground focus-visible:opacity-100 data-[state=open]:opacity-100",
-          "group-hover/note:opacity-100",
-          inBar ? "pointer-coarse:size-11 pointer-coarse:opacity-100" : "pointer-coarse:hidden",
-          active && "opacity-100",
-        )}
-      >
+      <DropdownMenuTrigger ref={ref} aria-label="Note actions" className={triggerClass}>
         <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="right">

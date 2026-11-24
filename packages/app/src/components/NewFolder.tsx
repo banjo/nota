@@ -14,6 +14,7 @@ import {
 import { create } from "zustand";
 import { addFolder, createNoteIn } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { useArmed } from "../lib/armed.ts";
 import { checkNewFolder, type FolderDraft } from "../lib/newFolder.ts";
 import { useTree } from "../queries.ts";
 import { useUI } from "../state.ts";
@@ -42,21 +43,27 @@ export function IconButton({
   className,
   ...props
 }: Omit<ComponentProps<"button">, "aria-label"> & { label: string; children: ReactNode }) {
+  // Every folder row has two of these: the tooltip mounts on first use (lib/armed.ts).
+  const { armed, ref, standIn } = useArmed();
+  const button = (
+    <button
+      ref={ref}
+      type="button"
+      aria-label={label}
+      className={cn(
+        "grid shrink-0 place-items-center rounded-sm text-faint outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground [&_svg]:size-[15px]",
+        className,
+      )}
+      {...props}
+      {...(armed ? {} : standIn)}
+    >
+      {children}
+    </button>
+  );
+  if (!armed) return button;
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          className={cn(
-            "grid shrink-0 place-items-center rounded-sm text-faint outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground [&_svg]:size-[15px]",
-            className,
-          )}
-          {...props}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
