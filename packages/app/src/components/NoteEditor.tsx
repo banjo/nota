@@ -10,7 +10,7 @@ import { label } from "../lib/shortcuts.ts";
 import { filename, joinTitle, splitTitle, stem, type TitleParts } from "../lib/notes.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
 import { keys, noteBase, noteWritten, setNoteBase } from "../queries.ts";
-import { useUI } from "../state.ts";
+import { useNoteMode, useUI } from "../state.ts";
 
 // The note's body: a title field (the first line) and the live-preview
 // editor (the rest). Edits save themselves after a short pause; a save
@@ -58,7 +58,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
   const queued = useRef(false);
   const inConflict = useRef(false);
   const path = note.path;
-  const mode = useUI((s) => s.noteMode);
+  const mode = useNoteMode();
   const modeRef = useRef(mode);
   const loadedTitle = useRef(splitTitle(note.body).title);
 

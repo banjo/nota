@@ -321,14 +321,25 @@ func (a *app) catCmd() *cobra.Command {
 }
 
 func (a *app) openCmd() *cobra.Command {
-	return &cobra.Command{
+	var inApp bool
+	cmd := &cobra.Command{
 		Use:   "open <note>",
-		Short: "Open a note in $VISUAL or $EDITOR",
+		Short: "Open a note in $VISUAL or $EDITOR, or in the Nota app",
 		Long: `Open a note in $VISUAL, else $EDITOR, else vi (notepad on Windows).
-The editor value is split on spaces, so "code --wait" works.`,
+The editor value is split on spaces, so "code --wait" works.
+
+With --app, open it in the Nota desktop app instead: a note of the vault
+opens as that note, in Reading mode. --app also takes any Markdown file
+(.md, .markdown) by its path, in the vault or not; a file outside the
+vault opens as a read-only preview and is never changed or copied unless
+you choose to in the app. On macOS this goes through Launch Services
+(open -b ` + appBundleID + `), on Linux through ` + linuxApp + `; $` + EnvApp + ` overrides it.`,
 		Args:              exactArgs(1, "a note"),
 		ValidArgsFunction: a.completeNotes,
 		RunE: func(_ *cobra.Command, args []string) error {
+			if inApp {
+				return a.openInApp(args[0])
+			}
 			p, err := a.resolve(args[0])
 			if err != nil {
 				return err
@@ -358,6 +369,8 @@ The editor value is split on spaces, so "code --wait" works.`,
 			return nil
 		},
 	}
+	cmd.Flags().BoolVarP(&inApp, "app", "a", false, "open in the Nota desktop app (a note, or any Markdown file by path)")
+	return cmd
 }
 
 func defaultEditor() string {

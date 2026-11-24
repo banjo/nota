@@ -15,7 +15,7 @@ import { withDraft } from "../lib/newFolder.ts";
 import { buildTree, flattenTree } from "../lib/notes.ts";
 import { useTree } from "../queries.ts";
 import { useContributions } from "../registry.ts";
-import { useUI } from "../state.ts";
+import { type Route, useUI } from "../state.ts";
 import { FolderActions, NewFolderRow, useFolderDraft } from "./NewFolder.tsx";
 import { NoteRow } from "./NoteRow.tsx";
 import { Row } from "./Row.tsx";
@@ -127,6 +127,26 @@ export function FolderTree() {
     if (renamingAt >= 0) v.scrollToIndex(renamingAt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renamingAt]);
+  // A note opened from the file manager: once its folders are open,
+  // scroll its row into view (once per open).
+  const route = useUI((s) => s.route);
+  const scrolled = useRef<Route | null>(null);
+  useEffect(() => {
+    if (!scrollEl || route.kind !== "note" || route.via !== "open") return;
+    if (scrolled.current === route) return;
+    const i = rows.findIndex((r) => r.kind === "note" && r.note.path === route.path);
+    if (i < 0) return;
+    // Rows have a fixed height, so the offset is known without measuring;
+    // after a frame, once the expanded folders have laid out.
+    const frame = requestAnimationFrame(() => {
+      scrolled.current = route;
+      const top = margin + i * rowHeight;
+      const view = scrollEl.clientHeight;
+      if (top < scrollEl.scrollTop || top + rowHeight > scrollEl.scrollTop + view)
+        scrollEl.scrollTo({ top: Math.max(0, top - view / 2 + rowHeight / 2) });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [route, rows, scrollEl, margin, rowHeight]);
 
   if (!root) return null;
   if (rows.length === 0) return <p className="px-2 py-1 text-small text-faint">No folders yet</p>;

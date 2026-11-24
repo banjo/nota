@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetItem, SheetSeparator } from "@nota/ui/sheet";
 import { cn } from "@nota/ui/utils";
 import { Fragment, useRef } from "react";
 import { create } from "zustand";
-import { useUI } from "../state.ts";
+import { useNoteMode, useUI } from "../state.ts";
 import { MODES } from "./ModeSwitch.tsx";
 import { type MenuTarget, useRowActions } from "./RowMenu.tsx";
 
@@ -24,7 +24,7 @@ const close = () => useRowSheet.setState({ target: null });
 
 /** Live / Reading / Source as one segmented control, sized for a thumb. */
 function ModeSegments() {
-  const mode = useUI((s) => s.noteMode);
+  const mode = useNoteMode();
   const setMode = useUI((s) => s.setNoteMode);
   return (
     <div role="group" aria-label="View mode" className="mx-1 mb-2 flex rounded-lg bg-hover p-1">

@@ -145,6 +145,17 @@ jobs:
           app="$dir/Nota.app"
           plist="$app/Contents/Info.plist"
           plutil -p "$plist"
+          # Markdown files: offered in Open With, never made the default
+          # (mygo.config.ts replaces MyGo's CFBundleDocumentTypes entry).
+          docs=CFBundleDocumentTypes.0
+          [[ "$(plutil -extract $docs.LSHandlerRank raw "$plist")" == Alternate ]]
+          [[ "$(plutil -extract $docs.CFBundleTypeRole raw "$plist")" == Viewer ]]
+          plutil -extract $docs.CFBundleTypeExtensions json -o - "$plist" | grep -q '"markdown"'
+          plutil -extract $docs.LSItemContentTypes json -o - "$plist" | grep -q '"net.daringfireball.markdown"'
+          if plutil -extract CFBundleDocumentTypes.1 json -o - "$plist" > /dev/null 2>&1; then
+            echo "::error::MyGo's own document type is still in Info.plist"; exit 1
+          fi
+          plutil -extract UTImportedTypeDeclarations.0.UTTypeIdentifier raw "$plist" | grep -qx net.daringfireball.markdown
           short="$(plutil -extract CFBundleShortVersionString raw "$plist")"
           [[ "$short" == "$VERSION" || "$short" == "${VERSION%%-*}" ]]
           codesign -dv --verbose=2 "$app" 2>&1 | tee codesign.txt
@@ -166,20 +177,30 @@ jobs:
           cp "$dmg" "out/Nota-${VERSION}-arm64.dmg"
           ditto -c -k --sequesterRsrc --keepParent "$app" "out/Nota-${VERSION}-arm64.zip"
           ls -la out
-      - name: Smoke test (start the app for 10 s)
+      - name: Smoke test (start the app for 10 s with a Markdown file)
         run: |
           app=apps/desktop/build/darwin-arm64/Nota.app
           export NOTA_VAULT="$RUNNER_TEMP/vault"
           mkdir -p "$NOTA_VAULT"
-          "$app/Contents/MacOS/Nota" > app.log 2>&1 &
+          # A file outside the vault on the command line reaches
+          # App.OnOpenFile (open.go logs "opened file kind=external").
+          printf '# Outside\n\nA file from outside the vault.\n' > "$RUNNER_TEMP/outside.md"
+          sum="$(shasum -a 256 "$RUNNER_TEMP/outside.md")"
+          "$app/Contents/MacOS/Nota" "$RUNNER_TEMP/outside.md" > app.log 2>&1 &
           pid=$!
           sleep 10
-          if kill -0 "$pid" 2>/dev/null; then
-            echo "Nota is running after 10 s"; kill "$pid"
-          else
+          if ! kill -0 "$pid" 2>/dev/null; then
             echo "::error::Nota exited early"; cat app.log; exit 1
           fi
+          echo "Nota is running after 10 s"
+          # The file arrives once the app is ready; give a slow runner time.
+          for _ in $(seq 1 20); do grep -q 'opened file kind=external' app.log && break; sleep 1; done
+          kill "$pid"
           cat app.log
+          grep -q 'opened file kind=external' app.log || { echo "::error::the file argument did not reach the app"; exit 1; }
+          [[ "$(shasum -a 256 "$RUNNER_TEMP/outside.md")" == "$sum" ]]
+          written="$(find "$NOTA_VAULT" -mindepth 1 -maxdepth 1 ! -name .nota)"
+          [[ -z "$written" ]] || { echo "::error::opening a file wrote into the vault: $written"; exit 1; }
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-macos
@@ -224,6 +245,10 @@ jobs:
           ls -la "$dir"
           dpkg-deb --info "$dir"/*.deb
           dpkg-deb --contents "$dir"/*.deb
+          # Markdown files open with the app (%U passes them to OnOpenFile).
+          dpkg-deb --fsys-tarfile "$dir"/*.deb | tar -xO ./usr/share/applications/nota.desktop | tee "$RUNNER_TEMP/nota.desktop"
+          grep -qx 'Exec=/opt/nota/nota %U' "$RUNNER_TEMP/nota.desktop"
+          grep -q '^MimeType=.*text/markdown;' "$RUNNER_TEMP/nota.desktop"
           cp "$dir"/*.deb "$dir"/*.rpm out/
           # MyGo's archive (app + install.sh), renamed so it is not
           # mistaken for the CLI's nota_<version>_linux_amd64.tar.gz.

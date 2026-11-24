@@ -1,7 +1,13 @@
 import {
+  ArchiveRestore,
   BookOpen,
   Code2,
+  FileDown,
+  FileInput,
+  FileOutput,
   FilePlus2,
+  FileText,
+  FileWarning,
   FolderInput,
   FolderOpen,
   FolderPlus,
@@ -14,7 +20,19 @@ import {
   Settings,
   SunMoon,
   Trash2,
+  Undo2,
+  X,
 } from "lucide-react";
+import {
+  closePreview,
+  confirmOverwrite,
+  currentPreview,
+  discardDraft,
+  draftOf,
+  editPreview,
+  isDirty,
+  revertDraft,
+} from "../external.ts";
 import { createNote, deleteNote, newNoteFolder, openVaultFlow } from "../actions.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
@@ -31,6 +49,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { onlineVaults, useVaultDialog } from "../vaults/online.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
 import { FoldersSection, NavSection, ViewsSection } from "./sections.tsx";
+import { OpenedSection } from "../components/OpenedSection.tsx";
 
 /** The folder on screen (a note's, or the list's) that can be renamed, else "". */
 function currentFolder(ctx: { route: Route; client: unknown; queryClient: QueryClient }): string {
@@ -46,6 +65,7 @@ function currentFolder(ctx: { route: Route; client: unknown; queryClient: QueryC
 export function registerBuiltins(r: Registry): () => void {
   const off = [
     r.register("sidebar", { id: "nota.nav", order: 0, component: NavSection }),
+    r.register("sidebar", { id: "nota.opened", order: 5, component: OpenedSection }),
     r.register("sidebar", { id: "nota.views", order: 10, component: ViewsSection }),
     r.register("sidebar", { id: "nota.folders", order: 20, component: FoldersSection }),
 
@@ -135,6 +155,101 @@ export function registerBuiltins(r: Registry): () => void {
       icon: Trash2,
       when: (ctx) => !!ctx.notePath,
       run: (ctx) => deleteNote(ctx.client, ctx.queryClient, ctx.notePath!),
+    }),
+    // Markdown files from outside the vault (desktop): every banner
+    // button is here too, and none has a shortcut.
+    r.register("command", {
+      id: "file.open",
+      title: "Open Markdown file…",
+      group: "Files",
+      keywords: ["open", "import", "markdown", "file", "finder", "preview"],
+      icon: FileText,
+      when: (ctx) => !!ctx.client.opener,
+      run: (ctx) => ctx.client.opener?.pick(),
+    }),
+    r.register("command", {
+      id: "file.edit",
+      title: "Edit file (a draft, nothing is saved)",
+      group: "Files",
+      keywords: ["edit", "draft", "write", "change"],
+      icon: PenLine,
+      when: (ctx) => {
+        const id = currentPreview();
+        return ctx.route.kind === "external" && !!id && draftOf(id) === undefined;
+      },
+      run: (ctx) => editPreview(ctx.queryClient, currentPreview()!),
+    }),
+    r.register("command", {
+      id: "file.revert",
+      title: "Revert draft to the file",
+      group: "Files",
+      keywords: ["undo", "reset", "draft"],
+      icon: Undo2,
+      when: (ctx) => {
+        const id = currentPreview();
+        return ctx.route.kind === "external" && !!id && isDirty(ctx.queryClient, id);
+      },
+      run: (ctx) => revertDraft(ctx.queryClient, currentPreview()!),
+    }),
+    r.register("command", {
+      id: "file.discard",
+      title: "Discard draft",
+      group: "Files",
+      keywords: ["cancel", "preview", "draft", "stop editing"],
+      icon: ArchiveRestore,
+      when: (ctx) => {
+        const id = currentPreview();
+        return ctx.route.kind === "external" && !!id && draftOf(id) !== undefined;
+      },
+      run: (ctx) => discardDraft(ctx.queryClient, currentPreview()!),
+    }),
+    r.register("command", {
+      id: "file.saveToVault",
+      title: "Save file to vault…",
+      group: "Files",
+      keywords: ["import", "copy", "save", "vault", "keep"],
+      icon: FileDown,
+      when: (ctx) => ctx.route.kind === "external",
+      run: () => useUI.getState().openPalette("saveExternal", currentPreview()),
+    }),
+    r.register("command", {
+      id: "file.moveToVault",
+      title: "Move file into vault… (original to the Trash)",
+      group: "Files",
+      keywords: ["import", "move", "vault", "trash"],
+      icon: FileInput,
+      when: (ctx) => ctx.route.kind === "external",
+      run: () => useUI.getState().openPalette("moveExternal", currentPreview()),
+    }),
+    r.register("command", {
+      id: "file.overwriteOriginal",
+      title: "Overwrite original file with the draft…",
+      group: "Files",
+      keywords: ["write", "save in place", "original", "overwrite"],
+      icon: FileWarning,
+      when: (ctx) => {
+        const id = currentPreview();
+        return ctx.route.kind === "external" && !!id && draftOf(id) !== undefined;
+      },
+      run: (ctx) => confirmOverwrite(ctx.client, ctx.queryClient, currentPreview()!),
+    }),
+    r.register("command", {
+      id: "file.reveal",
+      title: "Reveal original file",
+      group: "Files",
+      keywords: ["finder", "show", "folder", "explorer"],
+      icon: FileOutput,
+      when: (ctx) => ctx.route.kind === "external",
+      run: (ctx) => ctx.client.opener?.reveal(currentPreview()!),
+    }),
+    r.register("command", {
+      id: "file.dismiss",
+      title: "Close preview",
+      group: "Files",
+      keywords: ["close", "dismiss", "preview"],
+      icon: X,
+      when: (ctx) => ctx.route.kind === "external",
+      run: (ctx) => closePreview(ctx.client, ctx.queryClient, currentPreview()!),
     }),
     r.register("command", {
       id: "inbox.open",

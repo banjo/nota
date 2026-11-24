@@ -9,6 +9,7 @@ import type {
   MoveResult,
   Note,
   NoteInfo,
+  OpenerApi,
   PropertyPatch,
   ServerVaultApi,
   ShellApi,
@@ -82,6 +83,8 @@ export interface NotesClient {
   serverVault?: ServerVaultApi;
   /** Windows, the file manager and menu commands (desktop). */
   shell?: ShellApi;
+  /** Files opened with the app from the file manager or the Dock (desktop). */
+  opener?: OpenerApi;
 }
 
 /** An error from a backend, with the API's stable code when there is one. */
