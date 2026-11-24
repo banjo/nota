@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@nota/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@nota/ui/popover";
+import { Sheet, SheetContent, SheetTrigger } from "@nota/ui/sheet";
 import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,6 +29,7 @@ import { type ReactNode, useState } from "react";
 import { fail } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { formatDate, relativeTime } from "../lib/format.ts";
+import { useNarrow } from "../lib/viewport.ts";
 import {
   display,
   emptyValue,
@@ -84,9 +86,23 @@ function usePatch(note: Note) {
   };
 }
 
-function Label({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+/** A property's name. `still` rows (dates) hold nothing to tap: no 44px row for them. */
+function Label({
+  icon: Icon,
+  children,
+  still,
+}: {
+  icon: LucideIcon;
+  children: ReactNode;
+  still?: boolean;
+}) {
   return (
-    <dt className="flex h-7 min-w-0 items-center gap-1.5 text-faint pointer-coarse:h-11">
+    <dt
+      className={cn(
+        "flex h-7 min-w-0 items-center gap-1.5 text-faint",
+        still ? "pointer-coarse:h-9" : "pointer-coarse:h-11",
+      )}
+    >
       <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
       <span className="truncate">{children}</span>
     </dt>
@@ -108,11 +124,12 @@ function Chip({
   label: string;
 }) {
   return (
-    <span className="inline-flex h-[22px] items-center rounded-xs bg-chip text-small text-chip-foreground pointer-coarse:h-8">
+    <span className="inline-flex h-[22px] items-center rounded-xs bg-chip text-small text-chip-foreground pointer-coarse:h-9 pointer-coarse:text-[14px]">
       <button
         type="button"
         onClick={onClick}
-        className="h-full rounded-xs px-2 outline-none hover:text-foreground focus-visible:text-foreground"
+        // Under a finger the hit area reaches past the chip to 44px.
+        className="relative h-full rounded-xs px-2 outline-none hover:text-foreground focus-visible:text-foreground active:text-foreground pointer-coarse:px-2.5 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']"
       >
         {children}
       </button>
@@ -121,7 +138,7 @@ function Chip({
           type="button"
           aria-label={`Remove ${label}`}
           onClick={onRemove}
-          className="-ml-1.5 grid h-full w-0 place-items-center overflow-hidden rounded-xs text-faint opacity-0 outline-none transition-[opacity,width] duration-150 ease-out group-hover/chip:w-5 group-hover/chip:opacity-100 hover:text-foreground focus-visible:w-5 focus-visible:text-foreground focus-visible:opacity-100 pointer-coarse:w-8 pointer-coarse:opacity-100"
+          className="-ml-1.5 grid h-full w-0 place-items-center overflow-hidden rounded-xs text-faint opacity-0 outline-none transition-[opacity,width] duration-150 ease-out group-hover/chip:w-5 group-hover/chip:opacity-100 hover:text-foreground focus-visible:w-5 focus-visible:text-foreground focus-visible:opacity-100 pointer-coarse:relative pointer-coarse:w-9 pointer-coarse:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']"
         >
           <X className="size-3" strokeWidth={2} />
         </button>
@@ -144,7 +161,7 @@ function AddInline({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="inline-flex h-[22px] items-center gap-1 rounded-xs px-1.5 text-small text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover pointer-coarse:h-8"
+        className="inline-flex h-[22px] items-center gap-1 rounded-xs px-1.5 text-small text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover active:bg-hover pointer-coarse:h-11 pointer-coarse:px-2.5 pointer-coarse:text-[14px]"
       >
         <Plus className="size-3" strokeWidth={2} /> Add
       </button>
@@ -169,7 +186,9 @@ function AddInline({
           setEditing(false);
         }
       }}
-      className="h-[22px] w-28 rounded-xs bg-surface px-1.5 text-small shadow-[0_0_0_1px_var(--ink),0_0_0_3px_var(--ink-soft)] outline-none pointer-coarse:h-8"
+      enterKeyHint="done"
+      autoCapitalize="none"
+      className="h-[22px] w-28 rounded-xs bg-surface px-1.5 text-small shadow-[0_0_0_1px_var(--ink),0_0_0_3px_var(--ink-soft)] outline-none pointer-coarse:h-9 pointer-coarse:w-36"
     />
   );
 }
@@ -284,6 +303,7 @@ function AddProperty({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<PropType>("text");
+  const narrow = useNarrow();
   const key = name.trim();
   const valid = validKey(key) && !existing.includes(key);
   const submit = () => {
@@ -293,59 +313,74 @@ function AddProperty({
     setType("text");
     setOpen(false);
   };
+  const trigger = (
+    <button
+      type="button"
+      className="col-span-2 -mx-1.5 flex h-7 w-fit items-center gap-1.5 rounded-xs px-1.5 text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover active:bg-hover pointer-coarse:h-11"
+    >
+      <Plus className="size-3.5" strokeWidth={1.75} /> Add property
+    </button>
+  );
+  const form = (
+    <form
+      className={cn("flex flex-col gap-2.5", narrow && "gap-3 px-2 pb-2")}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <input
+        autoFocus
+        aria-label="Property name"
+        placeholder="Name, e.g. priority"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        enterKeyHint="done"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="h-8 rounded-md bg-surface px-2.5 text-ui shadow-card outline-none focus:shadow-[0_0_0_1px_var(--ink),0_0_0_4px_var(--ink-soft)] pointer-coarse:h-11"
+      />
+      <div role="radiogroup" aria-label="Type" className="grid grid-cols-5 gap-0.5">
+        {(Object.keys(TYPE_LABEL) as PropType[]).map((t) => {
+          const Icon = TYPE_ICON[t];
+          return (
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={type === t}
+              title={TYPE_LABEL[t]}
+              onClick={() => setType(t)}
+              className={cn(
+                "flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[10.5px] text-muted-foreground outline-none hover:bg-hover focus-visible:bg-hover pointer-coarse:h-14 pointer-coarse:text-[12px]",
+                type === t && "bg-ink-soft text-ink-strong hover:bg-ink-soft",
+              )}
+            >
+              <Icon className="size-4" strokeWidth={1.75} />
+              {TYPE_LABEL[t]}
+            </button>
+          );
+        })}
+      </div>
+      <Button type="submit" size="sm" disabled={!valid} className={narrow ? "w-full" : "self-end"}>
+        Add property
+      </Button>
+    </form>
+  );
+  // A phone: the form rises from the bottom, above the keyboard, instead
+  // of a popover the keyboard would cover.
+  if (narrow)
+    return (
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>{trigger}</SheetTrigger>
+        <SheetContent title="Add property">{form}</SheetContent>
+      </Sheet>
+    );
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="col-span-2 -mx-1.5 flex h-7 w-fit items-center gap-1.5 rounded-xs px-1.5 text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover pointer-coarse:h-11"
-        >
-          <Plus className="size-3.5" strokeWidth={1.75} /> Add property
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-3">
-        <form
-          className="flex flex-col gap-2.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <input
-            autoFocus
-            aria-label="Property name"
-            placeholder="Name, e.g. priority"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="h-8 rounded-md bg-surface px-2.5 text-ui shadow-card outline-none focus:shadow-[0_0_0_1px_var(--ink),0_0_0_4px_var(--ink-soft)]"
-          />
-          <div role="radiogroup" aria-label="Type" className="grid grid-cols-5 gap-0.5">
-            {(Object.keys(TYPE_LABEL) as PropType[]).map((t) => {
-              const Icon = TYPE_ICON[t];
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  role="radio"
-                  aria-checked={type === t}
-                  title={TYPE_LABEL[t]}
-                  onClick={() => setType(t)}
-                  className={cn(
-                    "flex h-12 flex-col items-center justify-center gap-1 rounded-md text-[10.5px] text-muted-foreground outline-none hover:bg-hover focus-visible:bg-hover",
-                    type === t && "bg-ink-soft text-ink-strong hover:bg-ink-soft",
-                  )}
-                >
-                  <Icon className="size-4" strokeWidth={1.75} />
-                  {TYPE_LABEL[t]}
-                </button>
-              );
-            })}
-          </div>
-          <Button type="submit" size="sm" disabled={!valid} className="self-end">
-            Add property
-          </Button>
-        </form>
-      </PopoverContent>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className="w-80 p-3">{form}</PopoverContent>
     </Popover>
   );
 }
@@ -413,14 +448,18 @@ export function PropertiesPanel({ note }: { note: Note }) {
         </DropdownMenu>
       </dd>
 
-      <Label icon={Calendar}>Created</Label>
-      <dd className="flex h-7 items-center text-text-soft pointer-coarse:h-11">
+      <Label icon={Calendar} still>
+        Created
+      </Label>
+      <dd className="flex h-7 items-center text-text-soft pointer-coarse:h-9">
         {note.created ? formatDate(note.created) : "—"}
       </dd>
       {note.updated && note.updated !== note.created ? (
         <>
-          <Label icon={CalendarClock}>Updated</Label>
-          <dd className="flex h-7 items-center text-text-soft pointer-coarse:h-11">
+          <Label icon={CalendarClock} still>
+            Updated
+          </Label>
+          <dd className="flex h-7 items-center text-text-soft pointer-coarse:h-9">
             {relativeTime(note.updated)}
           </dd>
         </>
@@ -433,7 +472,7 @@ export function PropertiesPanel({ note }: { note: Note }) {
           <div key={k} className="contents">
             <dt className="flex h-7 min-w-0 items-center pointer-coarse:h-11">
               <DropdownMenu>
-                <DropdownMenuTrigger className="-mx-1.5 flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-xs px-1.5 text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover data-[state=open]:bg-hover">
+                <DropdownMenuTrigger className="-mx-1.5 flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-xs px-1.5 text-faint outline-none hover:bg-hover hover:text-muted-foreground focus-visible:bg-hover data-[state=open]:bg-hover pointer-coarse:h-11">
                   <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
                   <span className="truncate">{k}</span>
                 </DropdownMenuTrigger>

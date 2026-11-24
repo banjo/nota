@@ -8,8 +8,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@nota/ui/dropdown-menu";
-import { ChevronsUpDown, PenLine, Plus, Settings2 } from "lucide-react";
+import { Sheet, SheetContent, SheetItem, SheetSeparator, SheetTrigger } from "@nota/ui/sheet";
+import { Check, ChevronsUpDown, PenLine, Plus, Settings2 } from "lucide-react";
+import { useState } from "react";
 import { useClient } from "../context.ts";
+import { useNarrow } from "../lib/viewport.ts";
 import { useUI } from "../state.ts";
 import { onlineVaults, switchVault, useVaultDialog } from "./online.ts";
 import { useVaults } from "./useVaults.ts";
@@ -30,6 +33,8 @@ function Switcher() {
   const { current, list } = useVaults();
   const open = useVaultDialog((s) => s.open);
   const navigate = useUI((s) => s.navigate);
+  const narrow = useNarrow();
+  if (narrow) return <SwitcherSheet />;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -65,5 +70,60 @@ function Switcher() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+const trigger =
+  "-mr-1.5 ml-auto grid size-11 shrink-0 place-items-center rounded-sm text-faint outline-none active:bg-hover data-[state=open]:bg-hover data-[state=open]:text-foreground";
+
+/** The same switcher on a phone: a sheet with the vaults and what to do with them. */
+function SwitcherSheet() {
+  const client = useClient();
+  const { current, list } = useVaults();
+  const open = useVaultDialog((s) => s.open);
+  const navigate = useUI((s) => s.navigate);
+  const [shown, setShown] = useState(false);
+  const then = (fn: () => void) => () => {
+    setShown(false);
+    fn();
+  };
+  return (
+    <Sheet open={shown} onOpenChange={setShown}>
+      <SheetTrigger aria-label="Switch vault" className={trigger}>
+        <ChevronsUpDown className="size-[18px]" strokeWidth={1.75} />
+      </SheetTrigger>
+      <SheetContent
+        title="Vaults"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <div role="radiogroup" aria-label="Vaults">
+          {(list.data ?? [{ name: current }]).map((v) => {
+            const on = v.name === current;
+            return (
+              <SheetItem
+                key={v.name}
+                role="radio"
+                aria-checked={on}
+                onClick={then(() => (on ? undefined : switchVault(client, v.name)))}
+              >
+                <span className="min-w-0 flex-1 truncate">{v.name}</span>
+                {on ? <Check className="!text-ink" strokeWidth={2} /> : null}
+              </SheetItem>
+            );
+          })}
+        </div>
+        <SheetSeparator />
+        <SheetItem onClick={then(() => open({ kind: "create" }))}>
+          <Plus strokeWidth={1.75} /> New vault…
+        </SheetItem>
+        <SheetItem onClick={then(() => open({ kind: "rename", name: current }))}>
+          <PenLine strokeWidth={1.75} /> <span className="truncate">Rename {current}…</span>
+        </SheetItem>
+        <SheetItem onClick={then(() => navigate({ kind: "settings" }))}>
+          <Settings2 strokeWidth={1.75} /> Manage vaults…
+        </SheetItem>
+      </SheetContent>
+    </Sheet>
   );
 }

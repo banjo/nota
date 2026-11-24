@@ -86,7 +86,7 @@ function Appearance() {
                 aria-checked={on}
                 onClick={() => store.setMode(m.id)}
                 className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150",
+                  "flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150 pointer-coarse:h-10 pointer-coarse:px-3.5 pointer-coarse:text-[14px]",
                   on
                     ? "bg-surface text-foreground shadow-card dark:bg-foreground/12"
                     : "text-muted-foreground hover:text-foreground",
