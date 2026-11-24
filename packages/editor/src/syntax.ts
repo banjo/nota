@@ -21,7 +21,8 @@ export interface Wikilink {
 /** Splits the inside of a wikilink ("Plan#Mål|planen"). */
 export function parseWikilink(inner: string, embed = false): Wikilink {
   const bar = inner.indexOf("|");
-  const ref = bar < 0 ? inner : inner.slice(0, bar);
+  // "\|" is the alias bar inside a table, where "|" splits cells.
+  const ref = bar < 0 ? inner : inner.slice(0, bar).replace(/\\$/, "");
   const alias = bar < 0 ? undefined : inner.slice(bar + 1).trim() || undefined;
   const hash = ref.indexOf("#");
   const target = (hash < 0 ? ref : ref.slice(0, hash)).trim();

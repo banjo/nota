@@ -17,9 +17,11 @@ import { notaTheme } from "./theme.ts";
 export {
   activeLines,
   previewSpecs,
+  tableSpecs,
   toggleTaskAt,
   type DecoSpec,
   type PreviewOptions,
+  type TableSpec,
 } from "./decorations.ts";
 export {
   EDITOR_MODES,

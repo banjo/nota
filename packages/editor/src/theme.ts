@@ -119,6 +119,46 @@ export const notaTheme = EditorView.theme({
   },
   ".cm-fence": { color: v("faint", "#9ca0a8") },
 
+  // Tables: rendered while the cursor is elsewhere, source (monospace, so
+  // the pipes line up) while it is in them. Wide tables scroll sideways.
+  ".cm-table-widget": {
+    // Its width comes from the column, not the table, so a wide table
+    // scrolls here instead of widening the editor.
+    contain: "inline-size",
+    overflowX: "auto",
+    padding: "0.35em 0 0.6em",
+    lineHeight: "1.5",
+  },
+  // The editor breaks words anywhere (lineWrapping); a table scrolls instead.
+  ".cm-table-widget table": {
+    overflowWrap: "normal",
+    wordBreak: "normal",
+    borderCollapse: "collapse",
+    fontSize: "0.95em",
+    fontVariantNumeric: "tabular-nums",
+  },
+  ".cm-table-widget th, .cm-table-widget td": {
+    border: `1px solid ${md("table-border", "hairline", "#e7e7e4")}`,
+    padding: "5px 12px",
+    textAlign: "left",
+    verticalAlign: "top",
+    minWidth: "3em",
+  },
+  ".cm-table-widget th": {
+    fontWeight: "650",
+    color: v("foreground", "#1d1f24"),
+    backgroundColor: md("table-header", "code", "#f1f1ee"),
+  },
+  ".cm-table-widget tbody tr:nth-child(even) td": {
+    backgroundColor: `color-mix(in srgb, ${md("table-header", "code", "#f1f1ee")} 45%, transparent)`,
+  },
+  ".cm-table-widget td:hover": { cursor: "text" },
+  "&.cm-reading .cm-table-widget td:hover": { cursor: "auto" },
+  ".cm-table-source": {
+    fontFamily: mono,
+    fontSize: "13.5px",
+  },
+
   // Lists: a hanging indent so wrapped lines align with the text.
   ".cm-list": { paddingLeft: "var(--hang) !important", textIndent: "calc(-1 * var(--hang))" },
   ".cm-list-mark": { color: v("muted-foreground", "#6b6f78"), fontVariantNumeric: "tabular-nums" },

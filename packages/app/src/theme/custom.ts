@@ -45,6 +45,8 @@ export const THEME_TOKENS = [
   "md-tag",
   "md-code",
   "md-quote",
+  "md-table-border",
+  "md-table-header",
 ] as const;
 
 export type ThemeToken = (typeof THEME_TOKENS)[number];

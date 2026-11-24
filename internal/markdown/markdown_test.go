@@ -42,3 +42,12 @@ func TestCleanTag(t *testing.T) {
 		}
 	}
 }
+
+func TestParseWikilinkInTable(t *testing.T) {
+	body := "| Note | Link |\n|---|---|\n| a | [[projekt/Plan\\|planen]] |\n"
+	got := Parse([]byte(body), "").Links
+	want := []Link{{Target: "projekt/Plan", Alias: "planen", Wiki: true}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("links =\n%#v\nwant\n%#v", got, want)
+	}
+}
