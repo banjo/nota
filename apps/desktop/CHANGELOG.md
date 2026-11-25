@@ -1,5 +1,13 @@
 # @nota/desktop
 
+## 0.1.3
+
+### Patch Changes
+
+- [#30](https://github.com/banjo/nota/pull/30) [`27f6be8`](https://github.com/banjo/nota/commit/27f6be829195f6726734f9e79f436ae56a17e823) - Callouts: GitHub alerts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) and Obsidian callouts (`> [!info] Title`) show with an icon, a title and their own colour in every theme. Themes can set the colours with the `md-callout-*` tokens.
+
+- [#32](https://github.com/banjo/nota/pull/32) [`7f44a9e`](https://github.com/banjo/nota/commit/7f44a9e50fba079a173793fc84163a47bdf609e2) - Snappier UI: opening notes, folders and ⌘K re-render far less (sidebar rows update only when their own state changes, row menus and tooltips mount on first use, palette keystrokes no longer redraw the dialog), and Settings and the vault wizard load as their own chunks.
+
 ## 0.1.2
 
 ### Patch Changes
