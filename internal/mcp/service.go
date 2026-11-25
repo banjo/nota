@@ -493,6 +493,66 @@ func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 	return MoveOutput{From: p, Path: to, URI: URI(to), Links: links}, nil
 }
 
+// TrashOutput is the result of list_trash.
+type TrashOutput struct {
+	Items []vault.TrashItem `json:"items" jsonschema:"what's in the vault's .trash/, most recently deleted first: path is where it is in the trash, from where it was deleted from"`
+}
+
+// Trash lists the deleted notes.
+func (s *Service) Trash() (TrashOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items, err := s.v.Trash()
+	if err != nil {
+		return TrashOutput{}, err
+	}
+	if items == nil {
+		items = []vault.TrashItem{}
+	}
+	return TrashOutput{Items: items}, nil
+}
+
+// RestoreInput are the arguments of restore_note.
+type RestoreInput struct {
+	Note   string `json:"note" jsonschema:"the deleted note: its path in the trash from list_trash, or the path it was deleted from (the newest delete)"`
+	Folder string `json:"folder,omitempty" jsonschema:"restore into this folder instead of where it was deleted from; '/' for the vault root"`
+}
+
+// RestoreOutput is the result of restore_note.
+type RestoreOutput struct {
+	Path string `json:"path"`
+	URI  string `json:"uri"`
+}
+
+// Restore moves a deleted note out of the trash.
+func (s *Service) Restore(in RestoreInput) (RestoreOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	it, err := s.v.FindTrash(in.Note)
+	if err != nil {
+		return RestoreOutput{}, err
+	}
+	to := ""
+	if in.Folder != "" {
+		folder, err := vault.CleanPath(in.Folder)
+		if err != nil {
+			return RestoreOutput{}, err
+		}
+		to = path.Join(folder, path.Base(it.From))
+	}
+	where, stop := s.v.Bus().Follow()
+	defer stop()
+	p, err := s.v.RestoreTrash(it.Path, to)
+	if err != nil {
+		return RestoreOutput{}, err
+	}
+	p = where(p)
+	if err := s.sync(); err != nil {
+		return RestoreOutput{}, err
+	}
+	return RestoreOutput{Path: p, URI: URI(p)}, nil
+}
+
 // FolderInput are the arguments of create_folder.
 type FolderInput struct {
 	Path string `json:"path" jsonschema:"vault-relative folder path; a/b makes a and b. Fails if it exists"`

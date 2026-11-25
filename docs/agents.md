@@ -45,6 +45,8 @@ args to pick a vault other than the default.
 | `list_tags` | every tag with its count |
 | `list_views` | the saved views in `.nota/views` |
 | `get_backlinks` | the notes that link to a note |
+| `list_trash` | the deleted notes in `.trash/`, with where each came from and when |
+| `restore_note` | puts a deleted note back where it was, or into another folder |
 
 Results are structured JSON; failures come back as tool errors. Each note is also a resource at
 `nota://note/<path>` (percent-encode non-ASCII names, e.g. `nota://note/M%C3%B6ten/Plan.md`).

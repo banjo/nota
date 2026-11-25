@@ -174,6 +174,16 @@ type HistoryEntry struct {
 	MovedFrom  string    `json:"movedFrom,omitempty"`
 }
 
+// TrashItem is a deleted note in the vault's .trash/.
+type TrashItem struct {
+	// ID is its path in the trash, which the other trash calls take.
+	ID string `json:"id"`
+	// Path is where it was deleted from.
+	Path      string    `json:"path"`
+	DeletedAt time.Time `json:"deletedAt"`
+	Size      int64     `json:"size"`
+}
+
 // VaultInfo describes the open vault.
 type VaultInfo struct {
 	// Name is the folder name, Dir its full path.
@@ -756,6 +766,82 @@ func (s *Vault) Delete(path string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.v.Delete(path)
+}
+
+// Trash lists the deleted notes, most recently deleted first.
+func (s *Vault) Trash() ([]TrashItem, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items, err := s.v.Trash()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TrashItem, 0, len(items))
+	for _, it := range items {
+		if vault.IsNote(it.Path) {
+			out = append(out, TrashItem{ID: it.Path, Path: it.From, DeletedAt: it.DeletedAt, Size: it.Size})
+		}
+	}
+	return out, nil
+}
+
+// TrashNote reads a deleted note.
+func (s *Vault) TrashNote(id string) (string, error) {
+	if s.v == nil {
+		return "", ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := s.v.ReadTrash(id)
+	return string(data), err
+}
+
+// RestoreTrash puts a deleted note back where it was deleted from, or
+// into folder ("/" is the root), and returns its path. It refuses to
+// overwrite a note that has taken the path.
+func (s *Vault) RestoreTrash(id, folder string) (string, error) {
+	if s.v == nil {
+		return "", ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	to := ""
+	if folder != "" {
+		it, err := s.v.FindTrash(id)
+		if err != nil {
+			return "", err
+		}
+		f, err := vault.CleanPath(folder)
+		if err != nil {
+			return "", err
+		}
+		to = path.Join(f, path.Base(it.From))
+	}
+	return s.v.RestoreTrash(id, to)
+}
+
+// PurgeTrash deletes a note in the trash for good.
+func (s *Vault) PurgeTrash(id string) error {
+	if s.v == nil {
+		return ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.v.PurgeTrash(id)
+}
+
+// EmptyTrash deletes everything in the trash for good and returns how
+// many files it deleted.
+func (s *Vault) EmptyTrash() (int, error) {
+	if s.v == nil {
+		return 0, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.v.EmptyTrash(time.Time{})
 }
 
 // History lists the server versions of a note, newest first. Versions

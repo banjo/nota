@@ -54,3 +54,15 @@ see what changed from it to the note now; **Restore this version** makes it the 
 (the one it replaces stays in the history), and **Copy text** copies it without restoring. On the
 desktop the restored text arrives with the next sync pass, a moment later. A vault without sync
 has no history: the panel says so and links to Settings.
+
+## Trash
+
+A delete syncs as a delete, and every device moves the file to its own `.trash/`: a note deleted
+on another device is in this device's trash too, dated when it arrived here. The app's **Trash**
+(the sidebar's trash button, ⌘K "Open trash") and `nota trash` list it and put it back; a
+restored note syncs as a new note. Emptying the trash on one device does not empty the others,
+and the server still has every version.
+
+The web app has no `.trash/` folder: its Trash lists the notes whose newest version on the
+server is a delete, and restoring one writes its last content back as a new version. There is
+no deleting for good from the web.

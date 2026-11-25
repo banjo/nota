@@ -510,3 +510,65 @@ func TestWebAPIMoveRewritesLinks(t *testing.T) {
 		t.Fatalf("Länk.md: %d %q", res.StatusCode, body)
 	}
 }
+
+func TestWebAPITrash(t *testing.T) {
+	e, _ := authEnv(t, Config{Signup: SignupOpen})
+	b, _ := webUser(t, e, "anton@example.com")
+	for _, p := range []string{"Projekt/Plan.md", "Idé.md", "Flyttad.md"} {
+		content := "# " + p + "\n"
+		if st, m := b.callBase("PUT", notePathURL(p), 0, SaveRequest{Content: &content}, nil); st != 200 {
+			t.Fatalf("create %s: %d %v", p, st, m)
+		}
+	}
+	for _, p := range []string{"Projekt/Plan.md", "Idé.md"} {
+		if st, m := b.call("DELETE", notePathURL(p), nil, nil); st != 200 {
+			t.Fatalf("delete %s: %d %v", p, st, m)
+		}
+	}
+	// A move deletes the old path too, but that's no delete of a note.
+	if st, m := b.call("POST", api+"/move", MoveRequest{Path: "Flyttad.md", Folder: "Arkiv"}, nil); st != 200 {
+		t.Fatalf("move: %d %v", st, m)
+	}
+	var tr struct{ Items []TrashItem }
+	if st, m := b.call("GET", api+"/trash", nil, &tr); st != 200 || len(tr.Items) != 2 ||
+		tr.Items[0].ID != "Idé.md" || tr.Items[1].Path != "Projekt/Plan.md" || tr.Items[0].Size != int64(len("# Idé.md\n")) {
+		t.Fatalf("trash: %d %v %+v", st, m, tr)
+	}
+	var doc struct{ Content string }
+	if st, m := b.call("GET", api+"/trash/"+protocol.EscapePath("Idé.md"), nil, &doc); st != 200 || doc.Content != "# Idé.md\n" {
+		t.Fatalf("trash note: %d %v %+v", st, m, doc)
+	}
+	// Restore where it was, then into a folder when the path is taken.
+	var out struct{ Path string }
+	if st, m := b.call("POST", api+"/trash/restore", TrashRestoreRequest{ID: "Idé.md"}, &out); st != 200 || out.Path != "Idé.md" {
+		t.Fatalf("restore: %d %v %+v", st, m, out)
+	}
+	var n Note
+	if st, _ := b.call("GET", notePathURL("Idé.md"), nil, &n); st != 200 || n.Content != "# Idé.md\n" {
+		t.Fatalf("restored note: %+v", n)
+	}
+	content := "# New plan\n"
+	if st, m := b.callBase("PUT", notePathURL("Projekt/Plan.md"), 0, SaveRequest{Content: &content}, nil); st != 200 {
+		t.Fatalf("recreate: %d %v", st, m)
+	}
+	// Plan.md is live again, so it is no longer in the trash.
+	if st, m := b.call("POST", api+"/trash/restore", TrashRestoreRequest{ID: "Projekt/Plan.md"}, nil); st != 404 {
+		t.Fatalf("restore live: %d %v", st, m)
+	}
+	if st, m := b.call("DELETE", notePathURL("Idé.md"), nil, nil); st != 200 {
+		t.Fatalf("delete again: %d %v", st, m)
+	}
+	content = "# Other\n"
+	if st, m := b.callBase("PUT", notePathURL("Arkiv/Idé.md"), 0, SaveRequest{Content: &content}, nil); st != 200 {
+		t.Fatalf("create: %d %v", st, m)
+	}
+	if st, m := b.call("POST", api+"/trash/restore", TrashRestoreRequest{ID: "Idé.md", Folder: "Arkiv"}, nil); st != 409 || code(m) != protocol.CodeExists {
+		t.Fatalf("restore over a note: %d %v", st, m)
+	}
+	if st, m := b.call("POST", api+"/trash/restore", TrashRestoreRequest{ID: "Idé.md", Folder: "Gammalt"}, &out); st != 200 || out.Path != "Gammalt/Idé.md" {
+		t.Fatalf("restore into folder: %d %v %+v", st, m, out)
+	}
+	if st, _ := b.call("GET", api+"/trash", nil, &tr); st != 200 || len(tr.Items) != 0 {
+		t.Fatalf("trash after: %+v", tr)
+	}
+}

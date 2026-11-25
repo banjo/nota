@@ -273,6 +273,14 @@ export function registerBuiltins(r: Registry): () => void {
       run: (ctx) => ctx.navigate({ kind: "inbox" }),
     }),
     r.register("command", {
+      id: "trash.open",
+      title: "Open trash",
+      group: "Go to",
+      keywords: ["deleted", "restore", "undelete", "bin", "papperskorg"],
+      icon: Trash2,
+      run: (ctx) => ctx.navigate({ kind: "trash" }),
+    }),
+    r.register("command", {
       id: "palette.toggle",
       title: "Search notes",
       group: "Go to",

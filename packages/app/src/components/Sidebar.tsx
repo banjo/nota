@@ -1,8 +1,9 @@
 import { Kbd } from "@nota/ui/kbd";
 import { MarkTile } from "@nota/ui/logo";
 import { ScrollArea } from "@nota/ui/scroll-area";
+import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderPlus, Plus, Search, Settings } from "lucide-react";
+import { FolderPlus, Plus, Search, Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { createNote, newNoteFolder } from "../actions.ts";
 import { useClient } from "../context.ts";
@@ -22,6 +23,7 @@ export function Sidebar() {
   const sections = useContributions("sidebar");
   const openPalette = useUI((s) => s.openPalette);
   const navigate = useUI((s) => s.navigate);
+  const inTrash = useUI((s) => s.route.kind === "trash");
   const client = useClient();
   const qc = useQueryClient();
   const inbox = useInboxName();
@@ -87,6 +89,18 @@ export function Sidebar() {
         </div>
         <div className="flex items-center">
           <SyncStatusRow />
+          <button
+            type="button"
+            aria-label="Trash"
+            aria-current={inTrash ? "page" : undefined}
+            onClick={() => navigate({ kind: "trash" })}
+            className={cn(
+              "grid size-7 shrink-0 place-items-center rounded-sm text-faint outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover pointer-coarse:size-11",
+              inTrash && "bg-selected text-foreground",
+            )}
+          >
+            <Trash2 className="size-[15px]" strokeWidth={1.75} />
+          </button>
           <button
             type="button"
             aria-label="Settings"

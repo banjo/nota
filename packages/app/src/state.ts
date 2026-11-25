@@ -35,6 +35,7 @@ export type Route =
    */
   | { kind: "note"; path: string; via?: "open"; anchor?: string }
   | { kind: "inbox" }
+  | { kind: "trash" }
   /** A Markdown file from outside the vault (desktop), by its opener id. */
   | { kind: "external"; id: string }
   | { kind: "list"; list: ListSpec }

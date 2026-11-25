@@ -21,6 +21,7 @@ import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
 import { HistoryDialog } from "./History.tsx";
 import { RowSheet } from "./RowSheet.tsx";
 import { Sidebar } from "./Sidebar.tsx";
+import { TrashView } from "./Trash.tsx";
 import { TopBar } from "./TopBar.tsx";
 
 /** Runs registered commands from shortcuts and the app menu. */
@@ -117,6 +118,8 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
       return <NoteList key={JSON.stringify(route.list)} list={route.list} />;
     case "inbox":
       return <InboxView />;
+    case "trash":
+      return <TrashView />;
     case "settings":
       return <Settings />;
     default:

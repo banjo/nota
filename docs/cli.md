@@ -27,6 +27,10 @@ nota plugins                                   # .nota/plugins: themes, or why o
 nota settings                                  # Theme, palette, note mode, properties, and where each comes from.
 nota settings edit                             # ~/.config/nota/settings.toml, for your dotfiles.
 nota backlinks Plan
+nota rm Plan                                   # Into .trash/; nothing is deleted.
+nota trash ls                                  # What's in it, newest delete first.
+nota trash restore Plan                        # Back where it was (--to <folder> for elsewhere).
+nota trash empty --older 30d --yes             # Delete for good.
 nota index --rebuild
 nota completion zsh > "${fpath[1]}/_nota"
 ```
@@ -95,3 +99,20 @@ pointing at the same note:
 
 `--no-update-links` turns this off for one command. Without it, the command says on stderr how
 many links changed, and `--json` lists them under `links`.
+
+## Trash
+
+`nota rm`, deleting in the app and deletes synced from other devices move notes to `.trash/` in
+the vault, keeping their folders; nothing is deleted. Nota records where each came from and
+when in `.nota/trash.json` (local, never synced); a file put in `.trash/` by hand lists with its
+modification time.
+
+- `nota trash ls` lists them, most recently deleted first (`--json`: `path` in the trash,
+  `from`, `deletedAt`, `size`).
+- `nota trash restore <note>` puts one back where it was. The note is named by its path in the
+  trash (`Projects/Plan.md` or `.trash/Projects/Plan.md`) or by the path it was deleted from,
+  the newest delete first. It refuses (exit 5) to overwrite a note that has taken the path:
+  `--to <folder>` restores it elsewhere, `--to <name>.md` under another name.
+- `nota trash rm <note> --yes` deletes one for good; `nota trash empty --yes` deletes them all,
+  or with `--older 30d` (also `2w`, `12h`) only those deleted longer ago than that.
+

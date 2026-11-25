@@ -20,21 +20,22 @@ vault is shared by the CLI, `nota mcp`, the desktop app and, through sync, other
    `go install github.com/banjo/nota/cmd/nota@latest`. To connect MCP, see
    [references/mcp.md](references/mcp.md).
 
-| Task                 | MCP tool                                  | CLI                                         |
-| -------------------- | ----------------------------------------- | ------------------------------------------- |
-| Find by content      | `search_notes`                            | `nota search <query> --json`                |
-| Read                 | `read_note`                               | `nota cat <note> --json`                    |
-| List / filter        | `list_notes`                              | `nota ls --folder/--tag/--where/--view`     |
-| Unsorted notes       | `list_notes` with `folder: "Inbox"`       | `nota inbox --json`                         |
-| Create               | `create_note`                             | `nota add` (body on stdin with `-`)         |
-| Add to the end       | `append_to_note`                          | edit the file (see cli.md)                  |
-| Rewrite the body     | `update_note` with `expected_hash`        | edit the file (see cli.md)                  |
-| Properties           | `update_frontmatter`                      | `nota set <note> k=v --unset k`             |
-| Tags                 | `update_frontmatter` (`tags` list)        | `nota tag <note> +a -b`                     |
-| File into a folder   | `move_note`                               | `nota mv <note> <folder>`                   |
-| Folders, tags, views | `list_folders`, `list_tags`, `list_views` | `nota folder ls`, `nota tags`, `nota views` |
-| Who links here       | `get_backlinks`                           | `nota backlinks <note>`                     |
-| Delete               | none: ask the user                        | `nota rm <note>` (moves it to `.trash/`)    |
+| Task                 | MCP tool                                  | CLI                                          |
+| -------------------- | ----------------------------------------- | -------------------------------------------- |
+| Find by content      | `search_notes`                            | `nota search <query> --json`                 |
+| Read                 | `read_note`                               | `nota cat <note> --json`                     |
+| List / filter        | `list_notes`                              | `nota ls --folder/--tag/--where/--view`      |
+| Unsorted notes       | `list_notes` with `folder: "Inbox"`       | `nota inbox --json`                          |
+| Create               | `create_note`                             | `nota add` (body on stdin with `-`)          |
+| Add to the end       | `append_to_note`                          | edit the file (see cli.md)                   |
+| Rewrite the body     | `update_note` with `expected_hash`        | edit the file (see cli.md)                   |
+| Properties           | `update_frontmatter`                      | `nota set <note> k=v --unset k`              |
+| Tags                 | `update_frontmatter` (`tags` list)        | `nota tag <note> +a -b`                      |
+| File into a folder   | `move_note`                               | `nota mv <note> <folder>`                    |
+| Folders, tags, views | `list_folders`, `list_tags`, `list_views` | `nota folder ls`, `nota tags`, `nota views`  |
+| Who links here       | `get_backlinks`                           | `nota backlinks <note>`                      |
+| Delete               | none: ask the user                        | `nota rm <note>` (moves it to `.trash/`)     |
+| Undo a delete        | `list_trash`, then `restore_note`         | `nota trash ls`, `nota trash restore <note>` |
 
 ## The model
 

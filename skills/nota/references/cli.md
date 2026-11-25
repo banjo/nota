@@ -38,6 +38,9 @@ nota mv Plan Projects/Roadmap.md                        # Renames; --no-update-l
 nota folder add Projects/Ideas                          # Empty folders, parents too.
 nota folder rename Projects Work                        # Moves every note in it; links follow.
 nota rm Plan                                            # To .trash/; confirm with the user first.
+nota trash ls --json                                    # Deleted notes: path in .trash/, from, deletedAt.
+nota trash restore Plan --to Archive                    # Back where it was, or into --to; exit 5 if taken.
+nota trash empty --older 30d --yes                      # For good: only with the user's say-so.
 nota index --rebuild                                    # Only after big outside changes.
 ```
 

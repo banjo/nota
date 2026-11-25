@@ -5,6 +5,7 @@ import type {
   ChangeEvent,
   CreateInput,
   HistoryEntry,
+  TrashItem,
   ListQuery,
   MoveResult,
   Note,
@@ -276,7 +277,14 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     },
     async remove(path: string) {
       await request("DELETE", `/notes/${escapePath(path)}`);
+      // The server keeps one deleted note per path: its path is its id in the trash.
+      return path;
     },
+    trash: async () => (await request<{ items: TrashItem[] }>("GET", "/trash")).items,
+    trashNote: async (id: string) =>
+      (await request<{ content: string }>("GET", `/trash/${escapePath(id)}`)).content,
+    restoreTrash: async (id: string, folder?: string) =>
+      (await request<{ path: string }>("POST", "/trash/restore", { body: { id, folder } })).path,
     async search(query: string, filter?: ListQuery) {
       if (!query.trim()) return [];
       return (

@@ -178,6 +178,16 @@ export interface HistoryEntry {
   movedFrom?: string;
 }
 
+/** A deleted note. */
+export interface TrashItem {
+  /** What the other trash calls take: its path in .trash/ (desktop) or its path (web). */
+  id: string;
+  /** Where it was deleted from. */
+  path: string;
+  deletedAt: string;
+  size: number;
+}
+
 /** What changed; the UI refetches what it shows. */
 export interface ChangeEvent {
   /** Changed paths when known (desktop); empty means "anything". */

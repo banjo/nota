@@ -412,6 +412,16 @@ export interface Theme {
   dark?: Record<string, string>;
 }
 
+/** TrashItem is a deleted note in the vault's .trash/. */
+export interface TrashItem {
+  /** ID is its path in the trash, which the other trash calls take. */
+  id: string;
+  /** Path is where it was deleted from. */
+  path: string;
+  deletedAt: string;
+  size: number;
+}
+
 /** Tree is every folder and every note of the vault. */
 export interface Tree {
   inbox: string;
@@ -479,6 +489,11 @@ export const Vault = {
   createFolder: bind<[string], string>("Vault.CreateFolder", (path: string) => [path]),
   /** Delete moves a note to .trash/ and returns where it went. */
   delete: bind<[string], string>("Vault.Delete", (path: string) => [path]),
+  /**
+   * EmptyTrash deletes everything in the trash for good and returns how
+   * many files it deleted.
+   */
+  emptyTrash: bind<[], number>("Vault.EmptyTrash", () => []),
   /** Get returns one note with its content, hash, links and backlinks. */
   get: bind<[string], Note>("Vault.Get", (path: string) => [path]),
   /**
@@ -515,6 +530,8 @@ export const Vault = {
    * error.
    */
   plugins: bind<[], Plugin[]>("Vault.Plugins", () => []),
+  /** PurgeTrash deletes a note in the trash for good. */
+  purgeTrash: bind<[string], void>("Vault.PurgeTrash", (id: string) => [id]),
   /** Rename gives a note a new path (a new name, a new folder, or both). */
   rename: bind<[string, string], MoveResult>("Vault.Rename", (path: string, to: string) => [path, to]),
   /**
@@ -527,6 +544,12 @@ export const Vault = {
    * background sync brings it to this vault (the server nudges it).
    */
   restore: bind<[string, number], void>("Vault.Restore", (path: string, version: number) => [path, version]),
+  /**
+   * RestoreTrash puts a deleted note back where it was deleted from, or
+   * into folder ("/" is the root), and returns its path. It refuses to
+   * overwrite a note that has taken the path.
+   */
+  restoreTrash: bind<[string, string], string>("Vault.RestoreTrash", (id: string, folder: string) => [id, folder]),
   /**
    * Save writes a note's body back, keeping its frontmatter byte for byte
    * apart from "updated", which is set to now when the note has
@@ -547,6 +570,10 @@ export const Vault = {
   syncStatus: bind<[], SyncStatus>("Vault.SyncStatus", () => []),
   /** Tags returns every tag with its note count. */
   tags: bind<[], TagCount[]>("Vault.Tags", () => []),
+  /** Trash lists the deleted notes, most recently deleted first. */
+  trash: bind<[], TrashItem[]>("Vault.Trash", () => []),
+  /** TrashNote reads a deleted note. */
+  trashNote: bind<[string], string>("Vault.TrashNote", (id: string) => [id]),
   /** Tree returns every folder (empty ones too) and every note, by path. */
   tree: bind<[], Tree>("Vault.Tree", () => []),
   /** Views returns the saved views of .nota/views with their note counts. */

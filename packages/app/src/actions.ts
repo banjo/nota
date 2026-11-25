@@ -244,16 +244,75 @@ export async function createNoteIn(client: NotesClient, qc: QueryClient, folder:
 
 export async function deleteNote(client: NotesClient, qc: QueryClient, path: string) {
   try {
-    await client.remove(path);
+    const id = await client.remove(path);
     const ui = useUI.getState();
-    if (ui.route.kind === "note" && ui.route.path === path) ui.navigate({ kind: "home" });
+    const open = ui.route.kind === "note" && ui.route.path === path;
+    if (open) ui.navigate({ kind: "home" });
     qc.removeQueries({ queryKey: keys.note(path) });
     void qc.invalidateQueries();
-    toast(
-      client.kind === "desktop" ? "Moved to the trash (.trash in the vault)" : "Moved to the trash",
-    );
+    toast("Moved to the trash", {
+      action: {
+        label: "Undo",
+        onClick: () => void restoreFromTrash(client, qc, id, { reopen: open, quiet: true }),
+      },
+    });
   } catch (e) {
     fail("Couldn't delete the note", e);
+  }
+}
+
+const noteName = (path: string) => path.split("/").pop()!.replace(/\.md$/i, "");
+
+/**
+ * Puts a deleted note back where it was. `reopen` shows it again (the
+ * undo of deleting the open note); `quiet` skips the "Restored" toast.
+ */
+export async function restoreFromTrash(
+  client: NotesClient,
+  qc: QueryClient,
+  id: string,
+  opts: { reopen?: boolean; quiet?: boolean } = {},
+): Promise<string | undefined> {
+  try {
+    const path = await client.restoreTrash(id);
+    void qc.invalidateQueries();
+    const open = () => useUI.getState().navigate({ kind: "note", path });
+    if (opts.reopen) open();
+    if (!opts.quiet)
+      toast(`Restored “${noteName(path)}”`, {
+        description: path.includes("/") ? `In ${path.slice(0, path.lastIndexOf("/"))}` : undefined,
+        action: { label: "Open", onClick: open },
+      });
+    return path;
+  } catch (e) {
+    const taken = e instanceof NotaError && (e.code === "exists" || e.code === "case_collision");
+    fail(
+      "Couldn't restore the note",
+      taken ? "A note has taken its place since. Rename or move that note, then try again." : e,
+    );
+  }
+}
+
+/** Deletes a note in the trash for good. */
+export async function purgeFromTrash(client: NotesClient, qc: QueryClient, id: string) {
+  if (!client.purgeTrash) return;
+  try {
+    await client.purgeTrash(id);
+    void qc.invalidateQueries({ queryKey: keys.trash });
+  } catch (e) {
+    fail("Couldn't delete the note", e);
+  }
+}
+
+/** Deletes everything in the trash for good. */
+export async function emptyTrash(client: NotesClient, qc: QueryClient) {
+  if (!client.emptyTrash) return;
+  try {
+    await client.emptyTrash();
+    void qc.invalidateQueries({ queryKey: keys.trash });
+    toast("Emptied the trash");
+  } catch (e) {
+    fail("Couldn't empty the trash", e);
   }
 }
 

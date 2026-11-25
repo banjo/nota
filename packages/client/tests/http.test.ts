@@ -252,6 +252,25 @@ describe("createHttpClient", () => {
     expect(f.call(1).body).toEqual({ version: 4 });
   });
 
+  test("deletes into the trash and restores from it", async () => {
+    const f = mockFetch(
+      json({ path: "Plan.md", version: 5, deleted: true }),
+      json({
+        items: [{ id: "Plan.md", path: "Plan.md", deletedAt: "2026-11-22T10:00:00Z", size: 3 }],
+      }),
+      json({ path: "Plan.md", version: 4, content: "# P\n" }),
+      json({ path: "Arkiv/Plan.md" }),
+    );
+    const c = client(f);
+    expect(await c.remove("Plan.md")).toBe("Plan.md");
+    expect((await c.trash())[0]?.id).toBe("Plan.md");
+    expect(await c.trashNote("Plan.md")).toBe("# P\n");
+    expect(f.call(2).url.pathname).toBe("/v1/api/vaults/Anteckningar/trash/Plan.md");
+    expect(await c.restoreTrash("Plan.md", "Arkiv")).toBe("Arkiv/Plan.md");
+    expect(f.call(3).body).toEqual({ id: "Plan.md", folder: "Arkiv" });
+    expect("purgeTrash" in c).toBe(false);
+  });
+
   test("fetches one version's content; a delete has none", async () => {
     const f = mockFetch(
       json({ path: "Plan.md", version: 4, content: "# Plan\n" }),

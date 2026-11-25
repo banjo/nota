@@ -49,6 +49,9 @@ func (s *Server) apiRoutes() {
 	s.route("GET /v1/api/vaults/{vault}/inbox", ro, s.apiInbox)
 	s.route("GET /v1/api/vaults/{vault}/history/{path...}", ro, s.apiHistory)
 	s.route("POST /v1/api/vaults/{vault}/history/{path...}", ro, s.apiRestore)
+	s.route("GET /v1/api/vaults/{vault}/trash", ro, s.apiTrash)
+	s.route("GET /v1/api/vaults/{vault}/trash/{path...}", ro, s.apiTrashNote)
+	s.route("POST /v1/api/vaults/{vault}/trash/restore", ro, s.apiTrashRestore)
 	s.route("GET /v1/api/vaults/{vault}/files/{path...}", ro, s.apiFile)
 	s.route("POST /v1/api/vaults/{vault}/attachments", ro, s.apiAttach)
 	s.route("GET /v1/api/vaults/{vault}/changes", ro, s.changes)
@@ -685,7 +688,7 @@ func (s *Server) apiDelete(w http.ResponseWriter, r *http.Request, p Principal) 
 	if err != nil {
 		return vaultErr(err)
 	}
-	_ = ws.client.FS().Remove(trash) // the log keeps the history
+	_ = ws.client.PurgeTrash(trash) // the log keeps the history
 	cur, _, err := ws.current(ctx, np)
 	if err != nil {
 		return err
