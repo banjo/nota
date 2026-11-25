@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,6 +31,10 @@ func newEnv(t *testing.T, cfg Config) *env {
 	t.Helper()
 	if cfg.DataDir == "" {
 		cfg.DataDir = t.TempDir()
+	}
+	// NOTA_TEST_BLOBS=s3 runs every test on S3Blobs (in memory).
+	if cfg.Blobs == nil && os.Getenv("NOTA_TEST_BLOBS") == "s3" {
+		cfg.Blobs = newFakeS3(t).store(t, "")
 	}
 	buf := &lockedWriter{w: &bytes.Buffer{}}
 	cfg.Logger = slog.New(slog.NewJSONHandler(buf, nil))

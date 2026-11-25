@@ -54,6 +54,10 @@ jobs:
         run: go vet ./...
       - name: go test
         run: go test ./...
+      - name: go test (server on S3 blobs)
+        run: go test ./internal/server
+        env:
+          NOTA_TEST_BLOBS: s3
       - name: vp check
         run: bunx vp check
       - name: Frontend tests

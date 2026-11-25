@@ -42,7 +42,8 @@ type Config struct {
 	MaxFileSize int64
 	// Logger receives one wide event per request; slog.Default if nil.
 	Logger *slog.Logger
-	// Blobs is the blob store (default: DiskBlobs in DataDir/blobs).
+	// Blobs is the blob store (default: DiskBlobs in DataDir/blobs), e.g.
+	// S3Blobs.
 	Blobs BlobStore
 	// KeepAlive is the SSE keepalive interval; 25 s if 0.
 	KeepAlive time.Duration
@@ -207,6 +208,11 @@ func (s *Server) ready(ctx context.Context) error {
 	var one int
 	if err := s.store.db.QueryRowContext(ctx, `SELECT 1`).Scan(&one); err != nil {
 		return fmt.Errorf("database: %w", err)
+	}
+	if r, ok := s.blobs.(interface{ Ready(context.Context) error }); ok {
+		if err := r.Ready(ctx); err != nil {
+			return fmt.Errorf("blob store: %w", err)
+		}
 	}
 	f, err := os.CreateTemp(s.cfg.DataDir, ".ready-*")
 	if err != nil {

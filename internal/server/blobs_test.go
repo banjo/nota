@@ -6,15 +6,21 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
 // blobStores are the BlobStore implementations every store test runs
-// against.
+// against: the disk, and S3Blobs on an in-memory S3. With
+// $NOTA_TEST_S3_ENDPOINT (and $NOTA_TEST_S3_BUCKET, AWS_ACCESS_KEY_ID,
+// AWS_SECRET_ACCESS_KEY) also on a real service, e.g. MinIO:
+//
+//	docker run -d -p 9000:9000 minio/minio server /data
 func blobStores(t *testing.T) map[string]func(t *testing.T, dataDir string) BlobStore {
 	stores := map[string]func(t *testing.T, dataDir string) BlobStore{
 		"disk": func(t *testing.T, dataDir string) BlobStore {
@@ -24,6 +30,30 @@ func blobStores(t *testing.T) map[string]func(t *testing.T, dataDir string) Blob
 			}
 			return b
 		},
+		"s3": func(t *testing.T, dataDir string) BlobStore {
+			return newFakeS3(t).store(t, "nota")
+		},
+	}
+	if ep := os.Getenv("NOTA_TEST_S3_ENDPOINT"); ep != "" {
+		stores["s3-live"] = func(t *testing.T, dataDir string) BlobStore {
+			b, err := NewS3Blobs(S3Config{
+				Endpoint:  ep,
+				Region:    os.Getenv("NOTA_TEST_S3_REGION"),
+				Bucket:    os.Getenv("NOTA_TEST_S3_BUCKET"),
+				Prefix:    "test-" + strconv.FormatInt(time.Now().UnixNano(), 36),
+				AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"),
+				SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+				TmpDir:    t.TempDir(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				ctx := context.Background()
+				_ = b.Walk(ctx, func(i BlobInfo) error { return b.Delete(ctx, i.Hash) })
+			})
+			return b
+		}
 	}
 	return stores
 }
