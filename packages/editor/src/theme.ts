@@ -207,6 +207,8 @@ export const notaTheme = EditorView.theme({
     borderTop: `1px solid ${v("hairline", "#e7e7e4")}`,
   },
   ".cm-hr-source": { color: v("faint", "#9ca0a8") },
+  ".cm-comment": { color: v("faint", "#9ca0a8") },
+  ".cm-comment-hidden": { fontSize: "0", lineHeight: "0" },
   ".cm-setext-underline": { lineHeight: "0.6", fontSize: "0.6em" },
 
   ".cm-codeblock": {

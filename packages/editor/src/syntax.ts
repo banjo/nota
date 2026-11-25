@@ -2,7 +2,8 @@ import type { Element, MarkdownConfig } from "@lezer/markdown";
 import { tags as t } from "@lezer/highlight";
 
 // Nota's dialect on top of CommonMark + GFM (decision 4): Obsidian's
-// [[wikilinks]], ![[embeds]], #tags (nested #a/b) and ==highlights==, and
+// [[wikilinks]], ![[embeds]], #tags (nested #a/b), ==highlights== and
+// %%comments%%, and
 // footnotes ([^id] and [^id]: text) as on GitHub. The Go index (internal/markdown)
 // reads the same links and tags.
 
@@ -12,6 +13,7 @@ const BANG = 33; // !
 const HASH = 35; // #
 const CARET = 94; // ^
 const EQUALS = 61; // =
+const PERCENT = 37; // %
 
 const highlightDelim = { resolve: "Highlight", mark: "HighlightMark" };
 const punctuation = /[\p{P}\p{S}]/u;
@@ -75,8 +77,9 @@ export function findTags(text: string): string[] {
 
 /**
  * Lezer markdown extension: WikiLink (with WikiLinkMark), Tag, Highlight
- * (with HighlightMark), FootnoteRef, and FootnoteDefinition (a
- * FootnoteLabel, then the text's inline nodes).
+ * (with HighlightMark), Comment (inline or a block, with CommentMark),
+ * FootnoteRef, and FootnoteDefinition (a FootnoteLabel, then the text's
+ * inline nodes).
  */
 export const notaSyntax: MarkdownConfig = {
   defineNodes: [
@@ -85,11 +88,42 @@ export const notaSyntax: MarkdownConfig = {
     { name: "Tag", style: t.labelName },
     { name: "Highlight", style: t.special(t.content) },
     { name: "HighlightMark", style: t.processingInstruction },
+    { name: "Comment", style: t.comment },
+    { name: "CommentBlock", block: true, style: t.comment },
+    { name: "CommentMark", style: t.processingInstruction },
     { name: "FootnoteRef", style: t.labelName },
     { name: "FootnoteDefinition", block: true },
     { name: "FootnoteLabel", style: t.labelName },
   ],
   parseBlock: [
+    {
+      // A line starting with %% that doesn't close on it: a comment up to
+      // the next line with %%, blank lines and all.
+      name: "CommentBlock",
+      before: "LinkReference",
+      parse(cx, line) {
+        const text = line.text.slice(line.pos);
+        if (!text.startsWith("%%") || text.indexOf("%%", 2) >= 0) return false;
+        const from = cx.lineStart + line.pos;
+        const marks = [cx.elt("CommentMark", from, from + 2)];
+        let to = cx.lineStart + line.text.length;
+        while (cx.nextLine()) {
+          to = cx.lineStart + line.text.length;
+          const end = line.text.indexOf("%%");
+          if (end >= 0) {
+            marks.push(cx.elt("CommentMark", cx.lineStart + end, cx.lineStart + end + 2));
+            cx.nextLine();
+            break;
+          }
+        }
+        cx.addElement(cx.elt("CommentBlock", from, to, marks));
+        return true;
+      },
+      endLeaf: (_, line) => {
+        const text = line.text.slice(line.pos);
+        return text.startsWith("%%") && text.indexOf("%%", 2) < 0;
+      },
+    },
     {
       name: "FootnoteDefinition",
       before: "LinkReference",
@@ -118,6 +152,23 @@ export const notaSyntax: MarkdownConfig = {
     },
   ],
   parseInline: [
+    {
+      // "%%text%%", up to the next %% in the paragraph.
+      name: "Comment",
+      before: "Emphasis",
+      parse(cx, next, pos) {
+        if (next !== PERCENT || cx.char(pos + 1) !== PERCENT) return -1;
+        for (let i = pos + 2; i < cx.end - 1; i++)
+          if (cx.char(i) === PERCENT && cx.char(i + 1) === PERCENT)
+            return cx.addElement(
+              cx.elt("Comment", pos, i + 2, [
+                cx.elt("CommentMark", pos, pos + 2),
+                cx.elt("CommentMark", i, i + 2),
+              ]),
+            );
+        return -1;
+      },
+    },
     {
       // "==text==", flanked like GFM's ~~strikethrough~~; "===" is not one.
       name: "Highlight",

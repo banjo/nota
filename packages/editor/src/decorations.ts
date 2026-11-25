@@ -414,6 +414,23 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             }
             return false;
           }
+          case "Comment":
+          case "CommentBlock": {
+            // Hidden when reading; faint while writing, so it isn't lost.
+            if (opts.reading) {
+              if (name === "Comment") hide(ref.from, ref.to);
+              else
+                for (let l = lineOf(ref.from); l <= lineOf(ref.to); l++) {
+                  const ln = doc.line(l);
+                  line(ln.from, "cm-comment-hidden");
+                  hide(ln.from, ln.to);
+                }
+              return false;
+            }
+            mark(ref.from, ref.to, "cm-comment");
+            for (const m of children(node, "CommentMark")) mark(m.from, m.to, "cm-marker");
+            return false;
+          }
           case "Escape":
             // "\*" shows as "*": the backslash is a marker.
             if (active(ref.from)) mark(ref.from, ref.from + 1, "cm-marker");

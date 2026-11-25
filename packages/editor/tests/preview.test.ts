@@ -527,3 +527,35 @@ describe("nested quotes", () => {
     expect(hidden(doc, sp).filter((h) => h === "> ")).toHaveLength(7);
   });
 });
+
+describe("comments", () => {
+  const DOC = "Synlig %%dold **text**%% här.\n\n%%\nEtt block\n\nmed tomrad\n%%\n\nslut";
+  const reading = (doc: string) => {
+    const s = state(doc, 0);
+    return previewSpecs(s, { activeLines: new Set(), reading: true });
+  };
+
+  test("are hidden in Reading mode, inline and as blocks", () => {
+    const sp = reading(DOC);
+    expect(hidden(DOC, sp)).toContain("%%dold **text**%%");
+    expect(hidden(DOC, sp)).toEqual(expect.arrayContaining(["%%", "Ett block", "med tomrad"]));
+    expect(lines(sp, "cm-comment-hidden")).toHaveLength(5);
+    expect(marks(DOC, sp, "cm-strong")).toEqual([]);
+  });
+
+  test("are faint while writing", () => {
+    const { specs: sp } = specs(DOC, { cursor: DOC.length });
+    expect(marks(DOC, sp, "cm-comment").map((m) => m.text)).toEqual([
+      "%%dold **text**%%",
+      "%%\nEtt block\n\nmed tomrad\n%%",
+    ]);
+    expect(hidden(DOC, sp)).toEqual([]);
+  });
+
+  test("a lone %% or 100%% is not a comment", () => {
+    for (const doc of ["50%% rabatt", "a %% b"]) {
+      const { specs: sp } = specs(doc, { cursor: 0 });
+      expect(marks(doc, sp, "cm-comment"), doc).toEqual([]);
+    }
+  });
+});
