@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +31,10 @@ func newEnv(t *testing.T, cfg Config) *env {
 	t.Helper()
 	if cfg.DataDir == "" {
 		cfg.DataDir = t.TempDir()
+	}
+	// NOTA_TEST_BLOBS=s3 runs every test on S3Blobs (in memory).
+	if cfg.Blobs == nil && os.Getenv("NOTA_TEST_BLOBS") == "s3" {
+		cfg.Blobs = newFakeS3(t).store(t, "")
 	}
 	buf := &lockedWriter{w: &bytes.Buffer{}}
 	cfg.Logger = slog.New(slog.NewJSONHandler(buf, nil))
@@ -415,14 +418,11 @@ func TestBlobDedupeAndSizeLimit(t *testing.T) {
 		}
 	}
 	var n int
-	filepath.Walk(filepath.Join(dir, "blobs"), func(p string, fi os.FileInfo, _ error) error {
-		if !fi.IsDir() && filepath.Base(filepath.Dir(p)) != "tmp" {
-			n++
-		}
-		return nil
-	})
+	if err := e.srv.blobs.Walk(context.Background(), func(BlobInfo) error { n++; return nil }); err != nil {
+		t.Fatal(err)
+	}
 	if n != 1 {
-		t.Fatalf("%d blobs on disk, want 1", n)
+		t.Fatalf("%d blobs stored, want 1", n)
 	}
 	st, _, perr := e.put(tok, "big.png", 0, strings.Repeat("x", 1001))
 	if st != 413 || perr.Code != protocol.CodeTooLarge {

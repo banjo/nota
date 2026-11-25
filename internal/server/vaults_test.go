@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -176,7 +178,6 @@ func TestDeleteVault(t *testing.T) {
 	if _, err := os.Stat(dir); err != nil {
 		t.Fatalf("no working copy: %v", err)
 	}
-	blobDir := filepath.Join(e.srv.cfg.DataDir, "blobs")
 
 	// The typed confirmation must be the current name.
 	for _, c := range []string{"", "scratch", "scratch2"} {
@@ -209,13 +210,13 @@ func TestDeleteVault(t *testing.T) {
 	}
 	// Content only the deleted vault had is gone (row and file); content
 	// another vault has stays.
-	if _, err := os.Stat(BlobPath(blobDir, protocol.Hash([]byte(only)))); !os.IsNotExist(err) {
+	if _, err := e.srv.blobs.Stat(context.Background(), protocol.Hash([]byte(only))); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("unshared blob left: %v", err)
 	}
 	if n, _ := countRows(ctx, st.db, `SELECT count(*) FROM blobs WHERE hash = ?`, protocol.Hash([]byte(only))); n != 0 {
 		t.Fatalf("unshared blob row left: %d", n)
 	}
-	if _, err := os.Stat(BlobPath(blobDir, protocol.Hash([]byte(shared)))); err != nil {
+	if _, err := e.srv.blobs.Stat(context.Background(), protocol.Hash([]byte(shared))); err != nil {
 		t.Fatalf("shared blob gone: %v", err)
 	}
 	if res, body := e.do(tok, "GET", protocol.FilePath("main", "keep.md"), nil, ""); res.StatusCode != 200 || string(body) != shared {

@@ -1,9 +1,10 @@
 # Deploying the Nota server
 
 `nota serve` is one static binary with all its state in one directory:
-the SQLite database (`nota.db`), the content-addressed blobs (`blobs/`)
-and the per-vault working copies with their indexes (`vaults/`, a cache
-rebuilt from the database). The repository's `Dockerfile` packages it:
+the SQLite database (`nota.db`), the content-addressed blobs (`blobs/`,
+or [a bucket](#blobs-in-a-bucket)) and the per-vault working copies with
+their indexes (`vaults/`, a cache rebuilt from the database and the
+blobs). The repository's `Dockerfile` packages it:
 
 ```sh
 docker build -t nota --build-arg VERSION=$(git rev-parse --short HEAD) .
@@ -36,10 +37,14 @@ streams and gives running requests 10 s.
 | `NOTA_SERVER_TRUSTED_PROXIES` | none | reverse proxies whose `X-Forwarded-For` is believed for the client IP (rate limits): IPs, CIDRs or `private` (loopback + RFC 1918 + fc00::/7). Behind a reverse proxy on the same host or network (Traefik, Caddy, nginx) use `private`. Without it the client IP is the TCP peer. |
 | `NOTA_SERVER_HOOKS` | `off` | `on` runs each vault's `.nota/hooks.toml` on changes from clients. Hooks are shell commands that come from the synced vault and run inside the container with the server's permissions; only their timeouts limit them. Leave it off unless every account on the server is yours. |
 | `NOTA_SERVER_POLL_INTERVAL` | `5s` | minimum interval between `nota login` polls |
+| `NOTA_SERVER_BLOBS` | `/data/blobs` | `s3://bucket/prefix` keeps file contents in an S3-compatible bucket; see [Blobs in a bucket](#blobs-in-a-bucket) |
+| `NOTA_SERVER_S3_ENDPOINT` | AWS S3 | the bucket's service, e.g. `https://<account>.r2.cloudflarestorage.com` |
+| `NOTA_SERVER_S3_REGION` | `auto` with an endpoint, else `$AWS_REGION` or `us-east-1` | the region requests are signed for |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | – | the bucket's credentials |
 
 Health: `GET /healthz` answers `ok` while the process serves HTTP;
-`GET /readyz` also checks the database and that `/data` takes writes
-(`503` otherwise).
+`GET /readyz` also checks the database, that `/data` takes writes and
+that the bucket answers, if there is one (`503` otherwise).
 
 ## Behind a proxy
 
@@ -106,8 +111,8 @@ docker exec nota nota serve blobs gc             # remove it
 
 Rows of `blobs` whose hash is in no `versions` and no `files` row go
 first, in one write transaction (the same serialised path as every other
-mutation, so it is safe next to a running server). A file in `/data/blobs`
-is removed only when no version and no row references it — versions keep
+mutation, so it is safe next to a running server). A blob, on disk or
+in the bucket, is removed only when no version and no row references it — versions keep
 their content alive, so `nota history` and `nota restore` still work —
 and unreferenced files younger than `--min-age` (1h by default) are left
 alone so an upload in flight is never swept. The command prints the bytes
@@ -117,6 +122,45 @@ It is deliberately not run at startup: walking the whole blob store on
 every boot costs time proportional to its size, to reclaim nothing most
 of the time. Put it on a timer (a host cron calling `docker exec`, or your
 platform's scheduled tasks) or run it by hand after deleting accounts.
+
+## Blobs in a bucket
+
+Every version of every file is a blob, so `blobs/` is what grows, and
+it only grows while history keeps old versions. Point
+`NOTA_SERVER_BLOBS` at a bucket of any S3-compatible service (Cloudflare
+R2, AWS S3, MinIO, Backblaze B2) and `/data` keeps only the database and
+the working copies. The working copies still hold the current version
+of every file.
+
+For Cloudflare R2: create a bucket, and an API token with *Object Read &
+Write* on it, then:
+
+```sh
+NOTA_SERVER_BLOBS=s3://nota-blobs/server
+NOTA_SERVER_S3_ENDPOINT=https://<account id>.r2.cloudflarestorage.com
+AWS_ACCESS_KEY_ID=<the token's access key id>
+AWS_SECRET_ACCESS_KEY=<the token's secret access key>
+```
+
+Keys are `<prefix>/ab/abcdef…`, the same layout as `/data/blobs`, and
+an upload is signed with its SHA-256, which is its name, so the service
+checks the bytes. Keep the bucket private: the server reads it with its
+credentials and never hands out bucket URLs. `blobs gc`, `vault rm` and
+`user rm` delete in the bucket as they do on disk.
+
+Move an existing server's blobs into the bucket with
+`nota serve blobs migrate`, which copies what the bucket lacks and
+checks each blob against its hash:
+
+```sh
+# 1. with the bucket's variables set, while the server runs: the bulk
+docker exec -e NOTA_SERVER_BLOBS=… -e NOTA_SERVER_S3_ENDPOINT=… \
+  -e AWS_ACCESS_KEY_ID=… -e AWS_SECRET_ACCESS_KEY=… nota nota serve blobs migrate
+# 2. stop the server, run it again (only what came since)
+# 3. set the variables on the container and start it
+# 4. remove the local copies
+docker exec nota nota serve blobs migrate --delete
+```
 
 ## On a platform (Coolify, Dokku, Fly, …)
 
@@ -141,7 +185,9 @@ Admin commands run inside the container (`docker exec <container> nota serve …
 platform's terminal).
 
 Backups: copy `/data` (with the server stopped, or `sqlite3 nota.db ".backup"` for the database
-plus `blobs/`). `vaults/` can be left out; it is rebuilt.
+plus `blobs/`). `vaults/` can be left out; it is rebuilt. With blobs in a bucket, back up the
+database and rely on the bucket's own durability, or copy it with `rclone` or the service's tools;
+blobs are never changed, only added and removed.
 
 # Deploying the web app
 
