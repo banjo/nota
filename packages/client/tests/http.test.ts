@@ -62,6 +62,30 @@ function client(f: ReturnType<typeof mockFetch>, eventSource?: (url: string) => 
 }
 
 describe("createHttpClient", () => {
+  test("gives vault files a URL an <img> can load", () => {
+    const c = client(mockFetch());
+    expect(c.fileUrl!("Attachments/Möte 1.png")).toBe(
+      `${ROOT}/files/Attachments/M%C3%B6te%201.png?protocol=1`,
+    );
+    expect(c.fileUrl!("skiss.png", "Projekt/Plan.md")).toBe(
+      `${ROOT}/files/skiss.png?protocol=1&from=Projekt%2FPlan.md`,
+    );
+  });
+
+  test("uploads a pasted image as is", async () => {
+    const f = mockFetch(json({ path: "Attachments/Pasted image 1.png" }, 201));
+    const blob = new Blob(["PNG"], { type: "image/png" });
+    expect(await client(f).attach!("Pasted image 1.png", blob)).toBe(
+      "Attachments/Pasted image 1.png",
+    );
+    const c = f.call(0);
+    expect(c.method).toBe("POST");
+    expect(c.url.toString()).toBe(`${ROOT}/attachments?name=Pasted+image+1.png`);
+    expect(c.headers.get("Content-Type")).toBe("image/png");
+    expect(c.headers.get("Nota-Client")).toBe("web");
+    expect(f.fn.mock.calls[0]![1]!.body).toBe(blob);
+  });
+
   test("sends the protocol, CSRF and credentials on every request", async () => {
     const f = mockFetch(json({ inbox: "Inbox", folders: [], notes: [], cursor: 3 }));
     const tree = await client(f).tree();

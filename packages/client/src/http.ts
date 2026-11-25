@@ -89,6 +89,8 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     init: {
       query?: Record<string, string | number | string[] | undefined>;
       body?: unknown;
+      /** Sent as is (a file), instead of body as JSON. */
+      raw?: Blob;
       headers?: Record<string, string>;
       /** The path is under the server, not the vault (the account's routes). */
       account?: boolean;
@@ -112,7 +114,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         method,
         headers,
         credentials: "include",
-        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+        body: init.raw ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
       });
     } catch (e) {
       options.onStatus?.(false);
@@ -212,6 +214,19 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       return { name: options.vault, dir: `${root}/${options.vault}`, inbox: tree.inbox };
     },
     tree: () => request<Tree>("GET", "/tree"),
+    fileUrl: (path, from) => {
+      const q = new URLSearchParams({ protocol: PROTOCOL });
+      if (from) q.set("from", from);
+      return `${vaultRoot}/files/${escapePath(path)}?${q}`;
+    },
+    attach: async (name, data) =>
+      (
+        await request<{ path: string }>("POST", "/attachments", {
+          query: { name },
+          raw: data,
+          headers: { "Content-Type": data.type || "application/octet-stream" },
+        })
+      ).path,
     list: async (q) =>
       (await request<{ notes: NoteInfo[] }>("GET", "/notes", { query: listParams(q) })).notes,
     inbox: async () => (await request<{ notes: NoteInfo[] }>("GET", "/inbox")).notes,

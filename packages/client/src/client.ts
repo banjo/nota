@@ -72,6 +72,17 @@ export interface NotesClient {
   plugins(): Promise<PluginInfo[]>;
   history(path: string): Promise<HistoryEntry[]>;
   restore(path: string, version: number): Promise<void>;
+  /**
+   * The URL an <img> loads a vault file from. With `from` (a note's
+   * path), `path` is an embed's target (![[name]]), found from that note
+   * as Obsidian does. Absent where the vault's files can't be shown.
+   */
+  fileUrl?(path: string, from?: string): string;
+  /**
+   * Saves an image pasted or dropped into a note to the vault's
+   * Attachments folder, under a free name, and resolves to its path.
+   */
+  attach?(name: string, data: Blob): Promise<string>;
   /** Calls listener whenever notes change, from anywhere. */
   subscribe(listener: (event: ChangeEvent) => void): () => void;
   /** Background sync (desktop); absent where the server is the vault. */

@@ -1,4 +1,5 @@
-import type { NotesClient } from "./client.ts";
+import { NotaError, type NotesClient } from "./client.ts";
+import { escapePath } from "./http.ts";
 import type {
   AccountState,
   ChangeEvent,
@@ -220,6 +221,25 @@ function platform(): string {
   return "linux";
 }
 
+/**
+ * The desktop app's notafile:// scheme (apps/desktop/files.go) at host:
+ * WebView2 serves custom schemes at http://<host>.<scheme>.localhost.
+ */
+const fileBase = (host: string) =>
+  platform() === "windows" ? `http://${host}.notafile.localhost/` : `notafile://${host}/`;
+
+async function attach(name: string, data: Blob): Promise<string> {
+  const res = await fetch(fileBase("attach") + encodeURIComponent(name), {
+    method: "POST",
+    body: data,
+  });
+  if (!res.ok) {
+    const msg = (await res.text()).trim() || `${res.status} ${res.statusText}`;
+    throw new NotaError(msg, res.status === 400 ? "invalid_path" : `http_${res.status}`, res.status);
+  }
+  return ((await res.json()) as { path: string }).path;
+}
+
 /** A NotesClient over the desktop app's Go services. */
 export function createMygoClient(b: MygoBindings): NotesClient {
   const v = b.Vault;
@@ -246,6 +266,11 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     plugins: async () => list(await v.plugins()),
     history: async (path) => list(await v.history(path)),
     restore: (path, version) => v.restore(path, version),
+    fileUrl: (path, from) =>
+      fileBase("vault") +
+      escapePath(path) +
+      (from ? `?${new URLSearchParams({ from })}` : ""),
+    attach,
     subscribe: (listener: (e: ChangeEvent) => void) =>
       b.events.changed.on((c) => listener({ paths: list(c.paths) })),
     sync: {
