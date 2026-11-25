@@ -23,6 +23,7 @@ export const keys = {
   search: (q: string) => ["search", q] as const,
   sync: ["sync"] as const,
   account: ["account"] as const,
+  history: (path: string) => ["history", path] as const,
 };
 
 export const useVaultInfo = () => {
@@ -102,7 +103,15 @@ export function useChangeSubscription(client: NotesClient) {
   useEffect(
     () =>
       client.subscribe(({ paths }) => {
-        for (const k of [keys.tree, keys.inbox, keys.tags, keys.views, ["list"], ["search"]])
+        for (const k of [
+          keys.tree,
+          keys.inbox,
+          keys.tags,
+          keys.views,
+          ["list"],
+          ["search"],
+          ["history"],
+        ])
           void qc.invalidateQueries({ queryKey: k });
         if (paths.length === 0 || paths.some((p) => p.startsWith(".nota/plugins")))
           void qc.invalidateQueries({ queryKey: keys.plugins });

@@ -47,3 +47,10 @@ only when made through the web API.
 The server keeps every version: `nota history <note>` lists them (through renames,
 `--version N` prints one) and `nota restore <note> <version>` makes an old one the newest
 version and syncs it here.
+
+In the app, **History** in a note's "…" menu (or ⌘K "Show history", ⌘⇧H) lists the same
+versions, newest first, with the device and the size change of each. Pick one to read it, or to
+see what changed from it to the note now; **Restore this version** makes it the newest version
+(the one it replaces stays in the history), and **Copy text** copies it without restoring. On the
+desktop the restored text arrives with the next sync pass, a moment later. A vault without sync
+has no history: the panel says so and links to Settings.

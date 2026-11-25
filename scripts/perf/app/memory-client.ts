@@ -306,6 +306,7 @@ export function createMemoryClient(
       ),
     plugins: () => wait([]),
     history: () => wait([]),
+    historyVersion: () => wait(null),
     restore: () => wait(undefined),
     subscribe: (listener) => {
       listeners.add(listener);

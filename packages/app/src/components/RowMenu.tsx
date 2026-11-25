@@ -6,7 +6,15 @@ import {
   ContextMenuTrigger,
 } from "@nota/ui/context-menu";
 import { useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, FolderInput, FolderPlus, type LucideIcon, PenLine, Trash2 } from "lucide-react";
+import {
+  FilePlus2,
+  FolderInput,
+  FolderPlus,
+  History,
+  type LucideIcon,
+  PenLine,
+  Trash2,
+} from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { createNote, createNoteIn, deleteNote, newNoteFolder } from "../actions.ts";
 import { useClient } from "../context.ts";
@@ -14,6 +22,7 @@ import { useLongPress } from "../lib/longPress.ts";
 import { folderOf } from "../lib/notes.ts";
 import { useInboxName } from "../queries.ts";
 import { useUI } from "../state.ts";
+import { openHistory } from "./History.tsx";
 import { startNewFolder } from "./NewFolder.tsx";
 import { startRename } from "./Rename.tsx";
 import { openRowSheet, type RowTarget } from "./RowSheet.tsx";
@@ -22,7 +31,7 @@ import { openRowSheet, type RowTarget } from "./RowSheet.tsx";
 // bottom sheet under a finger (a long press): one list, two skins. Every
 // action is also a ⌘K command or shares its function (note.new,
 // folder.add, note.addToFolder, note.newInFolder, note.rename,
-// folder.rename, note.delete).
+// folder.rename, note.history, note.delete).
 
 /** Puts the cursor in the open note's title field, selected: renaming it where it is. */
 export const focusNoteTitle = (): void => {
@@ -111,6 +120,13 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
           label: "Move to…",
           icon: FolderInput,
           run: () => openPalette("move", t.path),
+          group: 1,
+        },
+        {
+          id: "history",
+          label: "History",
+          icon: History,
+          run: () => openHistory(t.path),
           group: 1,
         },
         {

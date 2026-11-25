@@ -252,6 +252,18 @@ describe("createHttpClient", () => {
     expect(f.call(1).body).toEqual({ version: 4 });
   });
 
+  test("fetches one version's content; a delete has none", async () => {
+    const f = mockFetch(
+      json({ path: "Plan.md", version: 4, content: "# Plan\n" }),
+      json({ path: "Plan.md", version: 5, deleted: true }),
+    );
+    const c = client(f);
+    expect(await c.historyVersion("Plan.md", 4)).toBe("# Plan\n");
+    expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/history/Plan.md");
+    expect(f.call(0).url.searchParams.get("version")).toBe("4");
+    expect(await c.historyVersion("Plan.md", 5)).toBeNull();
+  });
+
   test("throws NotaError with the API's code", async () => {
     const f = mockFetch(json({ code: "not_found", message: "no note Saknas.md" }, 404));
     const err = await client(f)

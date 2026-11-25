@@ -780,6 +780,20 @@ func (s *Vault) History(ctx context.Context, path string) ([]HistoryEntry, error
 	return out, nil
 }
 
+// HistoryVersion returns the content of one server version of a note;
+// nil when that version is a delete.
+func (s *Vault) HistoryVersion(ctx context.Context, path string, version int64) (*string, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
+	c := s.syn.Load().client()
+	if c == nil {
+		return nil, ErrNoHistory
+	}
+	_, content, err := c.HistoryVersion(ctx, path, version)
+	return content, err
+}
+
 // Restore makes an old server version of a note its newest one; the
 // background sync brings it to this vault (the server nudges it).
 func (s *Vault) Restore(ctx context.Context, path string, version int64) error {

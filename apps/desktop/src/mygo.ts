@@ -486,6 +486,11 @@ export const Vault = {
    * live on the sync server, so it needs sync.
    */
   history: bind<[string], HistoryEntry[]>("Vault.History", (path: string) => [path]),
+  /**
+   * HistoryVersion returns the content of one server version of a note;
+   * nil when that version is a delete.
+   */
+  historyVersion: bind<[string, number], string | null>("Vault.HistoryVersion", (path: string, version: number) => [path, version]),
   /** Inbox returns the notes in the inbox folder, newest first. */
   inbox: bind<[], NoteInfo[]>("Vault.Inbox", () => []),
   /** Info describes the open vault. */

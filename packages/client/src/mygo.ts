@@ -69,6 +69,7 @@ export interface MygoBindings {
     views(): Promise<ViewInfo[] | null>;
     plugins(): Promise<PluginInfo[] | null>;
     history(path: string): Promise<HistoryEntry[] | null>;
+    historyVersion(path: string, version: number): Promise<string | null>;
     restore(path: string, version: number): Promise<void>;
     syncStatus(): Promise<SyncStatus>;
   };
@@ -265,6 +266,7 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     views: async () => list(await v.views()),
     plugins: async () => list(await v.plugins()),
     history: async (path) => list(await v.history(path)),
+    historyVersion: async (path, version) => (await v.historyVersion(path, version)) ?? null,
     restore: (path, version) => v.restore(path, version),
     fileUrl: (path, from) =>
       fileBase("vault") +

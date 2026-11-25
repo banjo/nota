@@ -70,7 +70,11 @@ export interface NotesClient {
   views(): Promise<ViewInfo[]>;
   /** The vault's plugins (.nota/plugins), broken ones with their error. */
   plugins(): Promise<PluginInfo[]>;
+  /** The versions of a note on the sync server, newest first, through renames. */
   history(path: string): Promise<HistoryEntry[]>;
+  /** The content of one version; null when that version is a delete. */
+  historyVersion(path: string, version: number): Promise<string | null>;
+  /** Makes an old version the newest one (a new version: history is kept). */
   restore(path: string, version: number): Promise<void>;
   /**
    * The URL an <img> loads a vault file from. With `from` (a note's

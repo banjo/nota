@@ -11,6 +11,7 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  History,
   Inbox,
   Link2,
   ListTree,
@@ -36,6 +37,7 @@ import {
 import { createNote, deleteNote, newNoteFolder, openVaultFlow } from "../actions.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
+import { openHistory } from "../components/History.tsx";
 import { startRename } from "../components/Rename.tsx";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
@@ -146,6 +148,16 @@ export function registerBuiltins(r: Registry): () => void {
         });
         useUI.getState().openPalette("newFolder", baseFolder(ctx.route, tree.inbox));
       },
+    }),
+    r.register("command", {
+      id: "note.history",
+      title: "Show history",
+      group: "Notes",
+      keywords: ["versions", "restore", "undo", "older", "diff", "historik"],
+      icon: History,
+      shortcut: "mod+shift+h",
+      when: (ctx) => !!ctx.notePath,
+      run: (ctx) => openHistory(ctx.notePath!),
     }),
     r.register("command", {
       id: "note.delete",

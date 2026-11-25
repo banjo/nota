@@ -301,6 +301,12 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         movedFrom: e.moved_from,
       }));
     },
+    async historyVersion(path: string, version: number) {
+      const v = await request<{ content?: string | null }>("GET", `/history/${escapePath(path)}`, {
+        query: { version: String(version) },
+      });
+      return v.content ?? null;
+    },
     async restore(path: string, version: number) {
       await request("POST", `/history/${escapePath(path)}/restore`, { body: { version } });
     },

@@ -8,7 +8,7 @@ import {
 } from "@nota/ui/dropdown-menu";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, FolderInput, MoreHorizontal, Trash2 } from "lucide-react";
+import { FileText, FolderInput, History, MoreHorizontal, Trash2 } from "lucide-react";
 import { memo } from "react";
 import { deleteNote } from "../actions.ts";
 import { useClient } from "../context.ts";
@@ -17,6 +17,7 @@ import { useLongPress } from "../lib/longPress.ts";
 import { useNarrow } from "../lib/viewport.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
+import { openHistory } from "./History.tsx";
 import { RenameRow, useRenaming } from "./Rename.tsx";
 import { Row } from "./Row.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
@@ -150,6 +151,9 @@ export function NoteMenu({
       <DropdownMenuContent align="start" side="right">
         <DropdownMenuItem onSelect={() => openPalette("move", path)}>
           <FolderInput /> Move to…
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openHistory(path)}>
+          <History /> History
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => void deleteNote(client, qc, path)}>
