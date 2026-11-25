@@ -272,6 +272,18 @@ class TextWidget extends WidgetType {
   }
 }
 
+class BreakWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-break";
+    return el;
+  }
+}
+
+const br = Decoration.replace({ widget: new BreakWidget() });
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
 const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
@@ -296,7 +308,9 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
         );
         break;
       case "widget":
-        if (s.widget === "text") {
+        if (s.widget === "break") {
+          ranges.push(br.range(s.from, s.to));
+        } else if (s.widget === "text") {
           ranges.push(
             Decoration.replace({ widget: new TextWidget(s.label ?? "") }).range(s.from, s.to),
           );

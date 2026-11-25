@@ -592,3 +592,52 @@ describe("entities", () => {
     ]);
   });
 });
+
+describe("inline HTML", () => {
+  test("formatting tags style their text and hide", () => {
+    const doc =
+      'Tryck <kbd>⌘</kbd>+<kbd class="x">K</kbd>, H<sub>2</sub>O, x<sup>2</sup> och <u>under</u>.\n\nslut';
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["⌘", "K"]);
+    expect(marks(doc, sp, "cm-sub").map((m) => m.text)).toEqual(["2"]);
+    expect(marks(doc, sp, "cm-sup").map((m) => m.text)).toEqual(["2"]);
+    expect(marks(doc, sp, "cm-underline").map((m) => m.text)).toEqual(["under"]);
+    expect(hidden(doc, sp)).toEqual([
+      "<kbd>",
+      "</kbd>",
+      '<kbd class="x">',
+      "</kbd>",
+      "<sub>",
+      "</sub>",
+      "<sup>",
+      "</sup>",
+      "<u>",
+      "</u>",
+    ]);
+  });
+
+  test("<br> is a line break; other HTML and unclosed tags stay source", () => {
+    const doc = "a<br>b<br/>c <span>x</span> <kbd>öppen <script>y</script>\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(
+      sp
+        .filter((x) => x.type === "widget" && x.widget === "break")
+        .map((x) => text(doc, x as never)),
+    ).toEqual(["<br>", "<br/>"]);
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-kbd")).toEqual([]);
+  });
+
+  test("nested tags of the same name pair up", () => {
+    const doc = "<sup>a<sup>b</sup>c</sup>\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-sup").map((m) => m.text)).toEqual(["a<sup>b</sup>c", "b"]);
+  });
+
+  test("show their tags on the line being edited", () => {
+    const doc = "<kbd>K</kbd>";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["<kbd>", "</kbd>"]);
+    expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["K"]);
+  });
+});

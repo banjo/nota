@@ -16,7 +16,9 @@ export type WidgetKind =
   | "footnote"
   | "footnote-label"
   /** Text in place of the source: label. */
-  | "text";
+  | "text"
+  /** A line break (<br>). */
+  | "break";
 
 /** GitHub's five alert kinds; Obsidian's callout types map onto them. */
 export type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
@@ -311,6 +313,34 @@ export function decodeEntity(source: string): string | undefined {
   return String.fromCodePoint(code);
 }
 
+// Inline HTML that only formats: its tags hide and its text gets the
+// class. No HTML is ever rendered, and attributes are ignored.
+const HTML_CLASSES: Record<string, string> = {
+  kbd: "cm-kbd",
+  sup: "cm-sup",
+  sub: "cm-sub",
+  mark: "cm-highlight",
+  u: "cm-underline",
+  ins: "cm-underline",
+  s: "cm-strike",
+  del: "cm-strike",
+  strike: "cm-strike",
+  b: "cm-strong",
+  strong: "cm-strong",
+  i: "cm-em",
+  em: "cm-em",
+  small: "cm-small",
+};
+
+/** "<kbd>" → open kbd, "</kbd>" → close kbd, "<br/>" → br; anything else null. */
+function htmlTag(source: string): { name: string; close: boolean } | null {
+  const m = /^<(\/?)([a-zA-Z]+)(?:\s[^<>]*)?\/?>$/.exec(source);
+  if (!m) return null;
+  const name = m[2]!.toLowerCase();
+  if (name === "br") return m[1] ? null : { name, close: false };
+  return HTML_CLASSES[name] ? { name, close: !!m[1] } : null;
+}
+
 /** "[Some  Label]" → "some label", as CommonMark matches reference labels. */
 const refLabel = (source: string) =>
   source
@@ -397,6 +427,8 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
   const touched = (from: number, to: number) =>
     !opts.reading && state.selection.ranges.some((r) => r.from <= to && r.to >= from);
   const lineDone = new Set<string>();
+  // Closing HTML tags already handled with their opening tag.
+  const closed = new Set<number>();
   const line = (pos: number, cls: string, style?: string) => {
     const l = doc.lineAt(pos);
     const key = `${l.from}:${cls}`;
@@ -516,6 +548,34 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             if (inTable) mark(ref.from, ref.to, "cm-entity", { "data-text": ch });
             else
               specs.push({ type: "widget", from: ref.from, to: ref.to, widget: "text", label: ch });
+            return false;
+          }
+          case "HTMLTag": {
+            const tag = htmlTag(doc.sliceString(ref.from, ref.to));
+            if (!tag || closed.has(ref.from)) return false;
+            if (tag.name === "br") {
+              if (active(ref.from) || inTable) mark(ref.from, ref.to, "cm-marker");
+              else specs.push({ type: "widget", from: ref.from, to: ref.to, widget: "break" });
+              return false;
+            }
+            if (tag.close) return false; // without its opening tag: source
+            // Its closing tag: the next one of the same name at this level.
+            let depth = 0;
+            let close: SyntaxNode | null = null;
+            for (let c = node.nextSibling; c && !close; c = c.nextSibling) {
+              if (c.name !== "HTMLTag") continue;
+              const t = htmlTag(doc.sliceString(c.from, c.to));
+              if (t?.name !== tag.name) continue;
+              if (!t.close) depth++;
+              else if (depth-- === 0) close = c;
+            }
+            if (!close) return false;
+            closed.add(close.from);
+            mark(ref.to, close.from, HTML_CLASSES[tag.name]!);
+            for (const t of [ref, close]) {
+              if (active(t.from)) mark(t.from, t.to, "cm-marker");
+              else hide(t.from, t.to);
+            }
             return false;
           }
           case "Escape":
