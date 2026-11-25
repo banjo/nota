@@ -129,9 +129,11 @@ reads the latest release at build time (`apps/landing/src/data/release.ts`, GitH
 release builds before the release exists. So the publish job ends by calling a Pages deploy
 hook, and the new version's download buttons appear a minute or two after the release.
 
-Setup, once: in Cloudflare, Workers & Pages → `nota-web` → Settings → Builds → Deploy hooks,
-add one for `main`, and store its URL as the repository secret `CLOUDFLARE_DEPLOY_HOOK`.
-Without it the publish job warns, and any later push to `main` updates the page.
+The hook is `github-release` (branch `main`) under Workers & Pages → `nota-web` → Settings →
+Builds → Deploy hooks, and its URL is the repository secret `CLOUDFLARE_DEPLOY_HOOK`. To
+replace it, add a new hook there, set the secret to its URL
+(`gh secret set CLOUDFLARE_DEPLOY_HOOK --repo banjo/nota`) and delete the old one. Without the
+secret the publish job warns, and the next push to `main` updates the page.
 
 ## When something fails
 

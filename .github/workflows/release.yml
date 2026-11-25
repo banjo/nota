@@ -325,7 +325,7 @@ jobs:
           DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
         run: |
           if [[ -z "$DEPLOY_HOOK" ]]; then
-            echo "::warning::CLOUDFLARE_DEPLOY_HOOK is not set; redeploy the landing page by hand"
+            echo "::warning::CLOUDFLARE_DEPLOY_HOOK is not set; the landing page shows the new version after the next push to main"
             exit 0
           fi
           curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
