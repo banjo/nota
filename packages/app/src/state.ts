@@ -7,6 +7,8 @@ import {
   toggledPropertiesPref,
   watchPropertiesPref,
 } from "./lib/propertiesPref.ts";
+import { backlinksPref } from "./lib/backlinksPref.ts";
+import { type ShowPref, toggledShowPref } from "./lib/showPref.ts";
 import {
   loadNoteMode,
   type NoteMode,
@@ -59,6 +61,8 @@ interface UIState {
   noteMode: NoteMode;
   /** Whether properties show above a note, per device (localStorage nota:properties). */
   properties: PropertiesPref;
+  /** Whether "Linked from" shows under a note, per device (localStorage nota:backlinks). */
+  backlinks: ShowPref;
   /**
    * The files the OS opened with the app have been looked at once (or
    * there is no such thing here), so a fresh window may open the most
@@ -74,6 +78,8 @@ interface UIState {
   toggleNoteMode: () => void;
   setProperties: (pref: PropertiesPref) => void;
   toggleProperties: () => void;
+  setBacklinks: (pref: ShowPref) => void;
+  toggleBacklinks: () => void;
   navigate: (route: Route) => void;
   back: () => void;
   toggleSidebar: () => void;
@@ -104,6 +110,7 @@ export const useUI = create<UIState>()(
       expanded: { "section:folders": true, "section:views": true },
       noteMode: loadNoteMode(deviceStorage()),
       properties: loadPropertiesPref(deviceStorage()),
+      backlinks: backlinksPref.load(deviceStorage()),
       openChecked: false,
       vaultFlow: null,
 
@@ -125,6 +132,11 @@ export const useUI = create<UIState>()(
         set({ properties: pref });
       },
       toggleProperties: () => get().setProperties(toggledPropertiesPref(get().properties)),
+      setBacklinks: (pref) => {
+        backlinksPref.save(deviceStorage(), pref);
+        set({ backlinks: pref });
+      },
+      toggleBacklinks: () => get().setBacklinks(toggledShowPref(get().backlinks)),
 
       navigate: (route) => {
         set({ route, pane: "main" });
@@ -190,4 +202,7 @@ watchNoteMode(typeof window === "undefined" ? null : window, deviceStorage(), (n
 );
 watchPropertiesPref(typeof window === "undefined" ? null : window, deviceStorage(), (properties) =>
   useUI.setState({ properties }),
+);
+backlinksPref.watch(typeof window === "undefined" ? null : window, deviceStorage(), (backlinks) =>
+  useUI.setState({ backlinks }),
 );

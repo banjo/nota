@@ -24,6 +24,7 @@ import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
 import { keys, usePlugins, useVaultInfo } from "../queries.ts";
 import { useContributions } from "../registry.ts";
+import type { ShowPref } from "../lib/showPref.ts";
 import { useUI } from "../state.ts";
 import { contrastIssues, VAULT_GROUP } from "../theme/custom.ts";
 import { chooseTheme } from "../theme/register.ts";
@@ -67,14 +68,20 @@ const MODES: { id: ThemeMode; label: string; icon: LucideIcon }[] = [
   { id: "dark", label: "Dark", icon: Moon },
 ];
 
-/** Show or hide a note's properties; the same choice as the chip on the note. */
-function PropertiesSetting() {
-  const pref = useUI((s) => s.properties);
-  const set = useUI((s) => s.setProperties);
+/** Show or hide a section of a note; the same choice as its chip on the note. */
+function ShowHideSetting({
+  label,
+  pref,
+  set,
+}: {
+  label: string;
+  pref: ShowPref;
+  set: (p: ShowPref) => void;
+}) {
   return (
     <div
       role="radiogroup"
-      aria-label="Properties"
+      aria-label={label}
       className="inline-flex gap-0.5 rounded-md bg-chip p-0.5"
     >
       {(["hide", "show"] as const).map((p) => {
@@ -106,6 +113,12 @@ function Appearance() {
   const theme = useTheme();
   const themes = useContributions("theme");
   const store = themeStore();
+  const ui = {
+    properties: useUI((s) => s.properties),
+    setProperties: useUI((s) => s.setProperties),
+    backlinks: useUI((s) => s.backlinks),
+    setBacklinks: useUI((s) => s.setBacklinks),
+  };
   return (
     <Section title="Appearance" description="Applies at once, on this device only.">
       <Field label="Mode">
@@ -138,7 +151,10 @@ function Appearance() {
         </div>
       </Field>
       <Field label="Properties">
-        <PropertiesSetting />
+        <ShowHideSetting label="Properties" pref={ui.properties} set={ui.setProperties} />
+      </Field>
+      <Field label="Linked from">
+        <ShowHideSetting label="Linked from" pref={ui.backlinks} set={ui.setBacklinks} />
       </Field>
       <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-ui max-[520px]:grid-cols-1 max-[520px]:gap-1">
         <span className="pt-1 text-muted-foreground">Theme</span>
