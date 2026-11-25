@@ -18,6 +18,7 @@ import {
   activeLines,
   type CalloutKind,
   type DecoSpec,
+  footnotes,
   type InlineSpec,
   previewSpecs,
   type TableCell,
@@ -73,7 +74,12 @@ function renderInline(parent: HTMLElement, text: string, specs: InlineSpec[]) {
     const from = points[i]!;
     const to = points[i + 1]!;
     if (specs.some((s) => s.type === "hide" && s.from <= from && s.to >= to)) continue;
-    let node: Node = document.createTextNode(text.slice(from, to));
+    // A mark with data-text stands in for its whole range (a footnote's number).
+    const stand = marks.find((m) => m.attrs?.["data-text"] && m.from <= from && m.to >= to);
+    if (stand && stand.from !== from) continue;
+    let node: Node = document.createTextNode(
+      stand ? stand.attrs!["data-text"]! : text.slice(from, to),
+    );
     for (const m of marks.filter((m) => m.from <= from && m.to >= to).reverse()) {
       const span = document.createElement("span");
       span.className = m.class;
@@ -189,6 +195,67 @@ class CalloutWidget extends WidgetType {
   }
 }
 
+/** A footnote reference as its number, or a definition's number. */
+class FootnoteWidget extends WidgetType {
+  constructor(
+    readonly id: string,
+    readonly label: string,
+    readonly definition: boolean,
+  ) {
+    super();
+  }
+  eq(other: FootnoteWidget) {
+    return (
+      other.id === this.id && other.label === this.label && other.definition === this.definition
+    );
+  }
+  toDOM() {
+    if (this.definition) {
+      const el = document.createElement("span");
+      el.className = "cm-footnote-label";
+      el.dataset.footnoteDef = this.id;
+      el.textContent = `${this.label}.`;
+      return el;
+    }
+    const el = document.createElement("sup");
+    el.className = "cm-footnote-ref";
+    el.dataset.footnote = this.id;
+    el.textContent = this.label;
+    return el;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+const flashLine = StateEffect.define<number | null>();
+
+/** A line that briefly lights up after a jump to it. */
+const flash = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    for (const e of tr.effects)
+      if (e.is(flashLine))
+        return e.value === null
+          ? Decoration.none
+          : Decoration.set(
+              Decoration.line({ class: "cm-footnote-flash" }).range(
+                tr.state.doc.lineAt(e.value).from,
+              ),
+            );
+    return tr.docChanged ? deco.map(tr.changes) : deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/** Scrolls to pos and lights its line up, without moving the cursor. */
+function jumpTo(view: EditorView, pos: number) {
+  view.dispatch({ effects: [EditorView.scrollIntoView(pos, { y: "center" }), flashLine.of(pos)] });
+  setTimeout(() => {
+    if (view.dom.isConnected) view.dispatch({ effects: flashLine.of(null) });
+  }, 1200);
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
 const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
@@ -213,7 +280,14 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
         );
         break;
       case "widget":
-        if (s.widget === "callout") {
+        if (s.widget === "footnote" || s.widget === "footnote-label") {
+          const widget = new FootnoteWidget(
+            s.footnote ?? "",
+            s.label ?? "",
+            s.widget === "footnote-label",
+          );
+          ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
+        } else if (s.widget === "callout") {
           const widget = new CalloutWidget(s.callout ?? "note", s.label);
           ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
         } else {
@@ -275,6 +349,20 @@ export function livePreview(
         event.preventDefault();
         return true;
       }
+      // A footnote jumps to its definition, and a definition's number
+      // back to the first reference.
+      const note = target.closest<HTMLElement>("[data-footnote], [data-footnote-def]");
+      if (note && event.button === 0) {
+        const fn = footnotes(view.state);
+        const pos = note.dataset.footnote
+          ? fn.defs.get(note.dataset.footnote)
+          : fn.refs.get(note.dataset.footnoteDef!);
+        if (pos !== undefined) {
+          jumpTo(view, pos);
+          event.preventDefault();
+          return true;
+        }
+      }
       // Rendered links open on click; on the line being edited (where
       // the source shows) they need ⌘/Ctrl, so clicking still places
       // the cursor.
@@ -325,6 +413,7 @@ export function livePreview(
 
   return [
     focused,
+    flash,
     EditorView.focusChangeEffect.of((_, focusing) => setFocused.of(focusing)),
     tablesField(reading),
     plugin,

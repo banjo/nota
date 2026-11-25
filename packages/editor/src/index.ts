@@ -25,11 +25,13 @@ import { notaTheme } from "./theme.ts";
 export {
   activeLines,
   calloutKind,
+  footnotes,
   previewSpecs,
   tableSpecs,
   toggleTaskAt,
   type CalloutKind,
   type DecoSpec,
+  type Footnotes,
   type PreviewOptions,
   type TableSpec,
 } from "./decorations.ts";
