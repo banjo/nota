@@ -61,7 +61,7 @@ var Tokens = []string{
 	"md-syntax-keyword", "md-syntax-string", "md-syntax-number", "md-syntax-comment",
 	"md-syntax-function", "md-syntax-type",
 	"md-callout-note", "md-callout-tip", "md-callout-important", "md-callout-warning",
-	"md-callout-caution",
+	"md-callout-caution", "md-highlight",
 }
 
 // Required are the tokens every mode of a theme sets, as opaque hex

@@ -85,6 +85,7 @@ const INLINE: Record<string, { cls: string; mark: string }> = {
   Emphasis: { cls: "cm-em", mark: "EmphasisMark" },
   StrongEmphasis: { cls: "cm-strong", mark: "EmphasisMark" },
   Strikethrough: { cls: "cm-strike", mark: "StrikethroughMark" },
+  Highlight: { cls: "cm-highlight", mark: "HighlightMark" },
   InlineCode: { cls: "cm-inline-code", mark: "CodeMark" },
 };
 

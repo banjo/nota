@@ -111,6 +111,15 @@ export const notaTheme = EditorView.theme({
     cursor: "pointer",
   },
 
+  // ==Highlight==: a marker-pen tint behind the text, which keeps its colour.
+  ".cm-highlight": {
+    backgroundColor: `var(--md-highlight, color-mix(in srgb, ${v("warning", "#e2a93b")} 30%, transparent))`,
+    borderRadius: "3px",
+    padding: "0.1em 0",
+    boxDecorationBreak: "clone",
+    WebkitBoxDecorationBreak: "clone",
+  },
+
   // Footnotes: references are raised numbers in the link colour, and
   // definitions are quiet, smaller lines.
   ".cm-footnote-ref": {

@@ -76,6 +76,13 @@ function expectReadableCallouts(v: Record<string, string>) {
   }
 }
 
+/** Body text on a ==highlight==: ≥ 4.5:1 on warning at 30% over the page. */
+function expectReadableHighlight(v: Record<string, string>) {
+  const warning = v["--warning"] ?? block(tokensCss, ":root")["--warning"]!;
+  const bg = v["--md-highlight"] ?? mix(warning, v["--background"]!, 0.3);
+  expect(contrast(v["--text"]!, bg), "highlight").toBeGreaterThanOrEqual(4.5);
+}
+
 describe("colour themes", () => {
   const cases: [string, "light" | "dark"][] = BUILTIN_THEMES.flatMap((t) => [
     [t.id, "light"],
@@ -102,6 +109,7 @@ describe("colour themes", () => {
       expect(contrast(vars["--muted-foreground"], c.background)).toBeGreaterThanOrEqual(4.5);
     expectReadableCode(vars);
     expectReadableCallouts(vars);
+    expectReadableHighlight(vars);
   });
 
   test.each(CLASSIC_THEMES.flatMap((t) => [[t.id, "light"] as const, [t.id, "dark"] as const]))(
@@ -129,6 +137,7 @@ describe("colour themes", () => {
       expect(contrast(headerText, header), "table header").toBeGreaterThanOrEqual(4.5);
       expectReadableCode(tk);
       expectReadableCallouts(tk);
+      expectReadableHighlight(tk);
     },
   );
 
