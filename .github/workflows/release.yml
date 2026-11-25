@@ -316,3 +316,17 @@ jobs:
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,assets \
             --jq '.url, "prerelease: \(.isPrerelease)", (.assets[] | "\(.name)\t\(.size)")'
+      - name: Rebuild the landing page
+        # Cloudflare Pages builds main on every push, but the merge that tags
+        # a release builds before the release exists; the landing page reads
+        # the latest release at build time, so build it again now.
+        if: needs.version.outputs.prerelease != 'true'
+        env:
+          DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
+        run: |
+          if [[ -z "$DEPLOY_HOOK" ]]; then
+            echo "::warning::CLOUDFLARE_DEPLOY_HOOK is not set; redeploy the landing page by hand"
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
+          echo "asked Cloudflare Pages to rebuild the landing page"

@@ -4,8 +4,8 @@ The short version is in [RELEASE.md](../RELEASE.md); this is the detail.
 
 A release is a `v*` tag. [Changesets](https://changesets.dev) decides the version and writes
 the changelog, `.github/workflows/changesets.yml` creates the tag, and
-`.github/workflows/release.yml` builds everything from it and publishes the GitHub release;
-the Homebrew cask and the landing page are updated by hand afterwards.
+`.github/workflows/release.yml` builds everything from it, publishes the GitHub release and
+has Cloudflare rebuild the landing page; the Homebrew cask is updated by hand afterwards.
 
 ## Changesets
 
@@ -45,7 +45,7 @@ Release Nota pull request shows no checks; `main` is checked again after the mer
 | `cli` (×4) | ubuntu | `nota_<v>_{darwin,linux}_{amd64,arm64}.tar.gz` (pure Go, `CGO_ENABLED=0`, cross-compiled), each with `nota`, `LICENSE`, `README.md` |
 | `macos` | macos-latest (arm64) | `Nota-<v>-arm64.dmg` and `Nota-<v>-arm64.zip` from `mygo build -platform darwin/arm64`, signed ad hoc, with the CLI inside at `Contents/Resources/bin/nota` |
 | `linux` | ubuntu-24.04 | `nota_<v>_amd64.deb`, `nota-<v>-1.x86_64.rpm`, `Nota-<v>-linux-amd64.tar.gz` (MyGo) and `Nota-<v>-x86_64.AppImage` (`scripts/appimage.sh`) |
-| `publish` | ubuntu | the GitHub release (not a draft; `--prerelease` for `-` versions, else `--latest`) with every file and `checksums.txt` |
+| `publish` | ubuntu | the GitHub release (not a draft; `--prerelease` for `-` versions, else `--latest`) with every file and `checksums.txt`, then a rebuild of the landing page (not for prereleases) |
 
 The version is linked into every binary: `-X github.com/banjo/nota/internal/cli.Version` for
 the CLI (`nota --version`) and `NOTA_VERSION` for the app (`apps/desktop/mygo.config.ts`:
@@ -120,15 +120,18 @@ the latest `vX.Y.Z` tag on origin.
    `packaging/homebrew/nota.rb`. It refuses prereleases unless `--dry-run` or
    `--allow-prerelease`. Then `brew update && brew install --cask banjo/tap/nota` to try it.
 
-6. Redeploy the landing page. It reads the latest release at build time
-   (`apps/landing/src/data/release.ts`, GitHub's `releases/latest`, which never returns a
-   prerelease or a draft), so the download buttons only appear after a rebuild:
 
-   ```sh
-   rm -rf dist && bunx vp run site:build
-   test -f dist/app/index.html && test -f dist/index.html && test -f dist/_worker.js
-   bunx -y wrangler@4 pages deploy dist --project-name nota --branch main
-   ```
+## The landing page
+
+Cloudflare Pages (project `nota-web`) builds and deploys `main` on every push. The landing page
+reads the latest release at build time (`apps/landing/src/data/release.ts`, GitHub's
+`releases/latest`, which never returns a prerelease or a draft), and the push that tags a
+release builds before the release exists. So the publish job ends by calling a Pages deploy
+hook, and the new version's download buttons appear a minute or two after the release.
+
+Setup, once: in Cloudflare, Workers & Pages → `nota-web` → Settings → Builds → Deploy hooks,
+add one for `main`, and store its URL as the repository secret `CLOUDFLARE_DEPLOY_HOOK`.
+Without it the publish job warns, and any later push to `main` updates the page.
 
 ## When something fails
 
