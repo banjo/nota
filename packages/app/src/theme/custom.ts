@@ -58,6 +58,7 @@ export const THEME_TOKENS = [
   "md-callout-important",
   "md-callout-warning",
   "md-callout-caution",
+  "md-highlight",
 ] as const;
 
 export type ThemeToken = (typeof THEME_TOKENS)[number];
@@ -137,6 +138,21 @@ function legible(color: string, toward: string, bg: string, min: number): string
   return longHex(toward);
 }
 
+/**
+ * warning at 30%, fainter until text reads on it at 4.5:1. Over white on
+ * a light page, so a greyish page doesn't darken the marker.
+ */
+function highlight(warning: string, text: string, bg: string, dark: boolean): string {
+  const under = dark ? bg : "#ffffff";
+  for (let w = 0.3; w > 0.06; w -= 0.02) {
+    const c = mix(warning, under, w);
+    if (contrast(text, c) >= 4.5) {
+      return c;
+    }
+  }
+  return mix(warning, under, 0.06);
+}
+
 // The status colours of tokens.css, for themes that don't set their own.
 const SUCCESS = "#37b26c";
 const WARNING = "#e2a93b";
@@ -205,6 +221,7 @@ export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, stri
     "md-callout-important": callout(hex(input["ink-strong"], inkStrong)),
     "md-callout-warning": callout(hex(input["md-syntax-number"], derived["md-syntax-number"]!)),
     "md-callout-caution": callout(hex(input.danger, DANGER)),
+    "md-highlight": highlight(hex(input.warning, WARNING), text, bg, dark),
   });
   const out: Partial<Record<ThemeToken, string>> = { ...derived };
   for (const k of THEME_TOKENS) {

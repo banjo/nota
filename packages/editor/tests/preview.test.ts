@@ -1,4 +1,4 @@
-import { ensureSyntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, test } from "vite-plus/test";
 import {
@@ -406,5 +406,34 @@ describe("footnotes", () => {
     expect(rest).toEqual([]);
     expect([m!.type, cell.text.slice(m!.from, m!.to)]).toEqual(["mark", "[^n]"]);
     expect(m!.type === "mark" && m!.attrs).toEqual({ "data-footnote": "n", "data-text": "1" });
+  });
+});
+
+describe("highlight", () => {
+  test("==text== is highlighted and its markers hidden", () => {
+    const doc = "Det här är ==viktigt **nu**== och klart.\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-highlight").map((m) => m.text)).toEqual(["viktigt **nu**"]);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["nu"]);
+    expect(hidden(doc, sp).filter((h) => h === "==")).toHaveLength(2);
+  });
+
+  test("shows its markers on the line being edited", () => {
+    const doc = "a ==b== c";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-highlight").map((m) => m.text)).toEqual(["b"]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["==", "=="]);
+  });
+
+  test("is not ===, a == comparison or an unclosed ==", () => {
+    for (const doc of ["a ===b=== c", "if a == b == c", "x ==y", "a == b ==", "a=b"]) {
+      expect(marks(doc, specs(doc, { cursor: 0 }).specs, "cm-highlight"), doc).toEqual([]);
+    }
+  });
+
+  test("a setext heading's === underline stays a heading", () => {
+    const doc = "Rubrik\n===\n\ntext";
+    const { s } = specs(doc);
+    expect(syntaxTree(s).topNode.firstChild!.name).toBe("SetextHeading1");
   });
 });

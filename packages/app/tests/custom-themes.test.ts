@@ -42,7 +42,7 @@ describe("themes made of tokens", () => {
     const t = deriveTokens({ background: "#fff", text: "#2a2c31", ink: "#1e7363" });
     expect(Object.keys(t).sort()).toEqual(
       THEME_TOKENS.filter(
-        (k) => !/^(success|warning|danger|md-(?!syntax-|callout-))/.test(k),
+        (k) => !/^(success|warning|danger|md-(?!syntax-|callout-|highlight))/.test(k),
       ).sort(),
     );
     expect(t.background).toBe("#ffffff");

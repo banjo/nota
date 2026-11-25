@@ -123,6 +123,8 @@ it only looks at `Table` nodes, so it stays cheap.
 
 * A Lezer inline extension, as in Obsidian.
 * Token: `md-highlight`, which falls back to `color-mix(in srgb, var(--warning) 30%, transparent)`.
+  Token themes derive it: `warning` at 30% (over white on a light page), fainter until body text
+  reads on it at 4.5:1.
 
 ### Later, as their own issues
 

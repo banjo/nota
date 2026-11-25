@@ -2,8 +2,8 @@ import type { Element, MarkdownConfig } from "@lezer/markdown";
 import { tags as t } from "@lezer/highlight";
 
 // Nota's dialect on top of CommonMark + GFM (decision 4): Obsidian's
-// [[wikilinks]], ![[embeds]] and #tags (nested #a/b), and footnotes
-// ([^id] and [^id]: text) as on GitHub. The Go index (internal/markdown)
+// [[wikilinks]], ![[embeds]], #tags (nested #a/b) and ==highlights==, and
+// footnotes ([^id] and [^id]: text) as on GitHub. The Go index (internal/markdown)
 // reads the same links and tags.
 
 const OPEN = 91; // [
@@ -11,6 +11,10 @@ const CLOSE = 93; // ]
 const BANG = 33; // !
 const HASH = 35; // #
 const CARET = 94; // ^
+const EQUALS = 61; // =
+
+const highlightDelim = { resolve: "Highlight", mark: "HighlightMark" };
+const punctuation = /[\p{P}\p{S}]/u;
 
 /** "[^id]:" at the start of a footnote definition. */
 const FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
@@ -70,14 +74,17 @@ export function findTags(text: string): string[] {
 }
 
 /**
- * Lezer markdown extension: WikiLink (with WikiLinkMark), Tag, FootnoteRef,
- * and FootnoteDefinition (a FootnoteLabel, then the text's inline nodes).
+ * Lezer markdown extension: WikiLink (with WikiLinkMark), Tag, Highlight
+ * (with HighlightMark), FootnoteRef, and FootnoteDefinition (a
+ * FootnoteLabel, then the text's inline nodes).
  */
 export const notaSyntax: MarkdownConfig = {
   defineNodes: [
     { name: "WikiLink", style: t.link },
     { name: "WikiLinkMark", style: t.processingInstruction },
     { name: "Tag", style: t.labelName },
+    { name: "Highlight", style: t.special(t.content) },
+    { name: "HighlightMark", style: t.processingInstruction },
     { name: "FootnoteRef", style: t.labelName },
     { name: "FootnoteDefinition", block: true },
     { name: "FootnoteLabel", style: t.labelName },
@@ -111,6 +118,28 @@ export const notaSyntax: MarkdownConfig = {
     },
   ],
   parseInline: [
+    {
+      // "==text==", flanked like GFM's ~~strikethrough~~; "===" is not one.
+      name: "Highlight",
+      after: "Emphasis",
+      parse(cx, next, pos) {
+        if (next !== EQUALS || cx.char(pos + 1) !== EQUALS) return -1;
+        if (cx.char(pos + 2) === EQUALS || cx.char(pos - 1) === EQUALS) return -1;
+        const before = cx.slice(pos - 1, pos);
+        const after = cx.slice(pos + 2, pos + 3);
+        const spaceBefore = /\s|^$/.test(before);
+        const spaceAfter = /\s|^$/.test(after);
+        const punctBefore = punctuation.test(before);
+        const punctAfter = punctuation.test(after);
+        return cx.addDelimiter(
+          highlightDelim,
+          pos,
+          pos + 2,
+          !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
+          !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
+        );
+      },
+    },
     {
       name: "FootnoteRef",
       before: "Link",
