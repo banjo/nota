@@ -3,6 +3,16 @@
 AI is not built into Nota. Agents work with your notes through the CLI or MCP, on the same
 files you edit.
 
+## Skill
+
+[`skills/nota`](../skills/nota/SKILL.md) is an agent skill that teaches an agent to use Nota:
+the CLI or the MCP tools (whichever it has), views, hooks, themes, sync and the server. Install
+it into Claude Code, OpenCode, Codex, Cursor and others with:
+
+```sh
+npx skills add banjo/nota
+```
+
 ## Over stdio
 
 `nota mcp` is a Model Context Protocol server on stdio. Add it to your MCP client:
