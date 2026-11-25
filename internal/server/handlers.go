@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/banjo/nota/internal/protocol"
+	nvault "github.com/banjo/nota/internal/vault"
 )
 
 func badRequest(format string, args ...any) error {
@@ -156,9 +157,22 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request, p Principal) er
 		return err
 	}
 	defer rc.Close()
-	setEntryHeaders(w.Header(), e)
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Length", strconv.FormatInt(e.Size, 10))
+	h := w.Header()
+	setEntryHeaders(h, e)
+	if r.Header.Get("If-None-Match") == h.Get("ETag") {
+		w.WriteHeader(http.StatusNotModified)
+		return nil
+	}
+	// Images keep their type, for <img> in the web app. A file opened
+	// on its own (an SVG with a script) runs nothing on this origin.
+	ct := nvault.ImageType(path)
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	h.Set("Content-Type", ct)
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	h.Set("Content-Length", strconv.FormatInt(e.Size, 10))
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, rc)
 	return nil

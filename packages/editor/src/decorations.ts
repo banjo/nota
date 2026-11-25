@@ -18,7 +18,11 @@ export type WidgetKind =
   /** Text in place of the source: label. */
   | "text"
   /** A line break (<br>). */
-  | "break";
+  | "break"
+  /** An image of the vault: src (wiki: an embed's target), alt, width. */
+  | "image"
+  /** Another note (or a section of it) embedded read-only: src, heading. */
+  | "embed";
 
 /** GitHub's five alert kinds; Obsidian's callout types map onto them. */
 export type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
@@ -46,6 +50,19 @@ export type DecoSpec =
       footnote?: string;
       /** An inline footnote's text. */
       note?: string;
+      /** An image's path as written, or an embed's target. */
+      src?: string;
+      /** From ![[…]]: src is found by name, as Obsidian does. */
+      wiki?: boolean;
+      alt?: string;
+      /** In pixels, from "|300". */
+      width?: number;
+      /** An embed's heading or "^block". */
+      heading?: string;
+      /** The image or embed is alone on its line: shown as a block. */
+      block?: boolean;
+      /** Shown after its source (being edited), not in place of it. */
+      after?: boolean;
     };
 
 export type InlineSpec = Extract<DecoSpec, { type: "hide" | "mark" }>;
@@ -80,7 +97,18 @@ export interface PreviewOptions {
   reading?: boolean;
   /** Only these ranges are decorated (the viewport); whole doc when absent. */
   ranges?: readonly { from: number; to: number }[];
+  /** Show the vault's images (![](x.png), ![[x.png]]); links otherwise. */
+  images?: boolean;
+  /** Show embedded notes (![[Note]]); links otherwise. */
+  embeds?: boolean;
 }
+
+/** A destination with a scheme ("https:", "data:") or "//host": not a vault file. */
+const REMOTE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+/** The image types the vault serves (internal/vault.ImageType). */
+const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|bmp)$/i;
+/** "300" or "300x200" after "|": a width (Obsidian). */
+const SIZE = /^(\d+)(?:x\d+)?$/;
 
 /** The lines the selection touches, when the editor has focus. */
 export function activeLines(state: EditorState, focused: boolean): Set<number> {
@@ -445,6 +473,20 @@ export const headingSlug = (text: string) =>
  * GitHub). "Mål#Delmål" is the last part, as in Obsidian.
  */
 export function findAnchor(state: EditorState, anchor: string): number | undefined {
+  return findSection(state, anchor)?.from;
+}
+
+const headingLevel = (name: string) => Number(/^(?:ATX|Setext)Heading(\d)$/.exec(name)?.[1] ?? 0);
+
+/**
+ * The part of the document an anchor names (see findAnchor), as
+ * ![[Note#Heading]] embeds it: a heading up to the next heading of its
+ * level or higher, or a block with an id.
+ */
+export function findSection(
+  state: EditorState,
+  anchor: string,
+): { from: number; to: number } | undefined {
   let a = anchor;
   try {
     a = decodeURIComponent(anchor);
@@ -452,7 +494,7 @@ export function findAnchor(state: EditorState, anchor: string): number | undefin
   a = a.replace(/^#/, "");
   const tree = ensureSyntaxTree(state, state.doc.length, 200) ?? syntaxTree(state);
   const doc = state.doc;
-  let found: number | undefined;
+  let found = undefined as { from: number; to: number } | undefined;
   if (a.startsWith("^")) {
     const id = a.slice(1).toLowerCase();
     tree.iterate({
@@ -468,26 +510,42 @@ export function findAnchor(state: EditorState, anchor: string): number | undefin
           !["Document", "BulletList", "OrderedList"].includes(block.parent.name)
         )
           block = block.parent;
-        found = block ? block.from : n.from;
+        found = block ? { from: block.from, to: block.to } : { from: n.from, to: n.to };
       },
     });
     return found;
   }
   const want = (a.split("#").pop() ?? "").trim().toLowerCase();
   if (!want) return undefined;
+  let level = 0;
+  let ended = false;
   tree.iterate({
     enter: (n) => {
-      if (found !== undefined) return false;
-      if (!/^(ATX|Setext)Heading\d$/.test(n.name)) return;
+      if (ended) return false;
+      if (found !== undefined) {
+        // The section ends at the next heading of its level or higher.
+        if (headingLevel(n.name) && headingLevel(n.name) <= level && n.from > found.from) {
+          found.to = n.from;
+          ended = true;
+          return false;
+        }
+        return n.name === "Document" ? undefined : false;
+      }
+      if (!headingLevel(n.name)) return;
       let text = doc.sliceString(n.from, n.to);
       text = n.name.startsWith("ATX")
         ? text.replace(/^#+\s*/, "").replace(/\s+#+\s*$/, "")
         : text.replace(/\n[=-]+\s*$/, "");
       text = text.replace(/\s+\^[\w-]+$/, "").trim();
-      if (text.toLowerCase() === want || headingSlug(text) === headingSlug(want)) found = n.from;
+      if (text.toLowerCase() === want || headingSlug(text) === headingSlug(want)) {
+        found = { from: n.from, to: doc.length };
+        level = headingLevel(n.name);
+      }
       return false;
     },
   });
+  if (found)
+    while (found.to > found.from && /\s/.test(doc.sliceString(found.to - 1, found.to))) found.to--;
   return found;
 }
 
@@ -532,6 +590,28 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
   };
   // Swallow one space after a block marker ("# ", "> ").
   const withSpace = (to: number) => (doc.sliceString(to, to + 1) === " " ? to + 1 : to);
+  // An image or embed: in place of its source, or after it while edited.
+  // Alone on its line (in a list or quote too) it's a block.
+  const media = (
+    from: number,
+    to: number,
+    spec: Partial<Extract<DecoSpec, { type: "widget" }>>,
+  ) => {
+    const l = doc.lineAt(from);
+    const rest = doc.sliceString(l.from, from).replace(/^[\s>]*(?:[-*+]|\d+[.)])?\s*/, "");
+    const block = !rest && !doc.sliceString(to, l.to).trim();
+    const at = active(from);
+    specs.push({
+      widget: "image",
+      ...spec,
+      type: "widget",
+      from: at ? to : from,
+      to,
+      ...(block ? { block } : {}),
+      ...(at ? { after: true } : {}),
+    });
+    return at;
+  };
 
   const ranges = opts.ranges ?? [{ from: 0, to: doc.length }];
   const tree = syntaxTree(state);
@@ -589,6 +669,28 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             if (!open || !close) return false;
             const innerText = doc.sliceString(open.to, close.from);
             const wl = parseWikilink(innerText, doc.sliceString(ref.from, ref.from + 1) === "!");
+            if (wl.embed && wl.target && !inTable) {
+              let editing: boolean | undefined;
+              if (IMAGE_FILE.test(wl.target)) {
+                if (opts.images) {
+                  const size = SIZE.exec(wl.alias ?? "");
+                  editing = media(ref.from, ref.to, {
+                    widget: "image",
+                    src: wl.target,
+                    wiki: true,
+                    alt: size ? "" : (wl.alias ?? ""),
+                    ...(size ? { width: Number(size[1]) } : {}),
+                  });
+                }
+              } else if (opts.embeds) {
+                editing = media(ref.from, ref.to, {
+                  widget: "embed",
+                  src: wl.target,
+                  ...(wl.heading ? { heading: wl.heading } : {}),
+                });
+              }
+              if (editing === false) return false;
+            }
             const bar = innerText.indexOf("|");
             const shown = !active(ref.from) && bar >= 0 ? open.to + bar + 1 : open.to;
             mark(shown, close.from, "cm-wikilink", {
@@ -770,6 +872,52 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             } else {
               mark(textEnd.from, ref.to, "cm-marker");
             }
+            return false;
+          }
+          case "Image": {
+            if (inTable) return;
+            const lm = children(node, "LinkMark");
+            const open = lm[0];
+            const close = lm[1];
+            if (!open || !close) return;
+            const url = children(node, "URL")[0];
+            const label = node.getChild("LinkLabel");
+            let alt = doc.sliceString(open.to, close.from);
+            const href = url
+              ? destination(doc.sliceString(url.from, url.to))
+              : linkRefs(state).get(
+                  refLabel(
+                    label && label.to - label.from > 2
+                      ? doc.sliceString(label.from, label.to)
+                      : alt,
+                  ),
+                );
+            if (!href) return;
+            // Images from the web are never fetched (#38), and where the
+            // vault's can't be shown: a link, named by its alt text.
+            if (!opts.images || REMOTE.test(href)) {
+              mark(open.to, close.from, "cm-link", { "data-href": href });
+              if (!active(ref.from)) {
+                hide(open.from, open.to);
+                hide(close.from, ref.to);
+              } else mark(close.from, ref.to, "cm-marker");
+              return false;
+            }
+            let width: number | undefined;
+            const sized = /^(.*?)\|(\d+)(?:x\d+)?$/.exec(alt);
+            if (sized) {
+              alt = sized[1]!;
+              width = Number(sized[2]);
+            }
+            if (
+              media(ref.from, ref.to, {
+                widget: "image",
+                src: href,
+                alt,
+                ...(width ? { width } : {}),
+              })
+            )
+              mark(ref.from, ref.to, "cm-image-source");
             return false;
           }
           case "URL":

@@ -76,3 +76,39 @@ describe("the desktop client's setup calls", () => {
     expect(c.shell).toBeUndefined();
   });
 });
+
+describe("the desktop client's files", () => {
+  test("load from the notafile:// scheme", () => {
+    const c = createMygoClient(bindings().b);
+    expect(c.fileUrl!("Attachments/Möte 1.png")).toBe(
+      "notafile://vault/Attachments/M%C3%B6te%201.png",
+    );
+    expect(c.fileUrl!("skiss.png", "Projekt/Plan.md")).toBe(
+      "notafile://vault/skiss.png?from=Projekt%2FPlan.md",
+    );
+  });
+
+  test("upload by POST to it, and fail with the server's message", async () => {
+    const fetch = vi.fn(async (url: string) =>
+      url.endsWith("x.exe")
+        ? new Response("x.exe: not an image Nota can show\n", { status: 400 })
+        : new Response(JSON.stringify({ path: "Attachments/a b.png" }), { status: 201 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const c = createMygoClient(bindings().b);
+      const blob = new Blob(["PNG"]);
+      expect(await c.attach!("a b.png", blob)).toBe("Attachments/a b.png");
+      expect(fetch).toHaveBeenCalledWith("notafile://attach/a%20b.png", {
+        method: "POST",
+        body: blob,
+      });
+      await expect(c.attach!("x.exe", blob)).rejects.toMatchObject({
+        message: "x.exe: not an image Nota can show",
+        code: "invalid_path",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

@@ -217,6 +217,9 @@ func main() {
 	})
 	d.op = op
 	mygo.Bind(s, acc, d, op, set)
+	if err := mygo.Protocol.Handle(fileScheme, files{s}); err != nil {
+		warn("images in notes are off", "err", err)
+	}
 	// Files opened with the app (Finder, the Dock, `open -a`, the command
 	// line, a second instance). Registered before Run: a cold start
 	// delivers them before any window exists, so Opener queues them and

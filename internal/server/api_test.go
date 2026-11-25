@@ -296,6 +296,81 @@ func TestWebAPINotes(t *testing.T) {
 	}
 }
 
+// raw sends body as is, as the web app's fetch does for files.
+func (b *browser) raw(method, path, body string, hdr map[string]string) (*http.Response, string) {
+	b.t.Helper()
+	req, _ := http.NewRequest(method, b.e.ts.URL+path, strings.NewReader(body))
+	req.Header.Set(HeaderClient, "web")
+	req.Header.Set("Origin", b.origin)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	res, err := b.client.Do(req)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	data, _ := io.ReadAll(res.Body)
+	return res, string(data)
+}
+
+func TestWebAPIAttachments(t *testing.T) {
+	e, _ := authEnv(t, Config{Signup: SignupOpen, MaxFileSize: 64})
+	b, tok := webUser(t, e, "anton@example.com")
+	attach := func(name, body string) (int, string) {
+		res, data := b.raw("POST", api+"/attachments?protocol=1&name="+url.QueryEscape(name), body, nil)
+		var out AttachResult
+		_ = json.Unmarshal([]byte(data), &out)
+		return res.StatusCode, out.Path
+	}
+	// Pasted images land in Attachments/ under a free name, as versions
+	// that sync clients pull.
+	if st, p := attach("Pasted image 1.png", "PNG1"); st != 201 || p != "Attachments/Pasted image 1.png" {
+		t.Fatalf("attach: %d %q", st, p)
+	}
+	if st, p := attach("Pasted image 1.png", "PNG2"); st != 201 || p != "Attachments/Pasted image 1 2.png" {
+		t.Fatalf("attach again: %d %q", st, p)
+	}
+	if st, _ := attach("x.html", "<script>"); st != 400 {
+		t.Fatalf("not an image: %d", st)
+	}
+	if st, _ := attach("big.png", strings.Repeat("x", 65)); st != 413 {
+		t.Fatalf("too large: %d", st)
+	}
+	if res, body := e.do(tok, "GET", "/v1/vaults/main/files/Attachments/Pasted%20image%201.png", nil, ""); res.StatusCode != 200 || string(body) != "PNG1" {
+		t.Fatalf("synced: %d %q", res.StatusCode, body)
+	}
+
+	// Served with their type, safely, and kept by the browser.
+	res, body := b.raw("GET", api+"/files/Attachments/Pasted%20image%201.png?protocol=1", "", nil)
+	h := res.Header
+	if res.StatusCode != 200 || body != "PNG1" || h.Get("Content-Type") != "image/png" ||
+		h.Get("X-Content-Type-Options") != "nosniff" || !strings.Contains(h.Get("Content-Security-Policy"), "sandbox") ||
+		h.Get("Cache-Control") != "private, no-cache" {
+		t.Fatalf("file: %d %q %v", res.StatusCode, body, h)
+	}
+	if res, _ := b.raw("GET", api+"/files/Attachments/Pasted%20image%201.png?protocol=1", "", map[string]string{"If-None-Match": h.Get("ETag")}); res.StatusCode != 304 {
+		t.Fatalf("revalidate: %d", res.StatusCode)
+	}
+	if st, _, _ := e.put(tok, "notes/page.html", 0, "<script>alert(1)</script>"); st != 200 {
+		t.Fatal(st)
+	}
+	if res, _ := b.raw("GET", api+"/files/notes/page.html?protocol=1", "", nil); res.Header.Get("Content-Type") != "application/octet-stream" {
+		t.Fatalf("other files: %v", res.Header)
+	}
+
+	// ?from= finds an embed's target as Obsidian does.
+	if st, _ := b.call("POST", api+"/notes", CreateRequest{Title: "Plan", Folder: "Projekt"}, nil); st != 201 {
+		t.Fatal(st)
+	}
+	if res, body := b.raw("GET", api+"/files/Pasted%20image%201%202.png?protocol=1&from=Projekt/Plan.md", "", nil); res.StatusCode != 200 || body != "PNG2" {
+		t.Fatalf("by name: %d %q", res.StatusCode, body)
+	}
+	if res, _ := b.raw("GET", api+"/files/saknas.png?protocol=1&from=Projekt/Plan.md", "", nil); res.StatusCode != 404 {
+		t.Fatalf("missing: %d", res.StatusCode)
+	}
+}
+
 func TestWebAPIIsolationAndCSRF(t *testing.T) {
 	e, _ := authEnv(t, Config{Signup: SignupOpen})
 	a, aTok := webUser(t, e, "anton@example.com")

@@ -2,6 +2,7 @@ import type { Base, Note } from "@nota/client";
 import {
   createEditor,
   type EditorView,
+  refreshMedia,
   replaceDoc,
   revealAnchor,
   setEditorMode,
@@ -10,8 +11,9 @@ import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
-import { fail, openLink, openWikilink } from "../actions.ts";
+import { fail } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { noteHandlers } from "../editorHandlers.ts";
 import { label } from "../lib/shortcuts.ts";
 import { filename, joinTitle, splitTitle, stem, type TitleParts } from "../lib/notes.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
@@ -213,9 +215,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
         }
         schedule();
       },
-      onWikilink: (target, heading) => void openWikilink(client, qc, target, path, heading),
-      onTag: (tag) => useUI.getState().navigate({ kind: "list", list: { type: "tag", tag } }),
-      onLink: (href) => void openLink(client, qc, href, path),
+      ...noteHandlers(client, qc, path),
     });
     view.current = v;
     const flush = () => void save();
@@ -240,6 +240,21 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     };
     // The editor is keyed by path; later note updates arrive below.
   }, [path]);
+
+  // Images or embedded notes changed elsewhere (sync, another program):
+  // they load again. The web's events don't say what changed.
+  useEffect(
+    () =>
+      client.subscribe(({ paths }) => {
+        const v = view.current;
+        if (!v) return;
+        refreshMedia(v, {
+          files: paths.some((p) => /\.(?:png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(p)),
+          notes: paths.some((p) => /\.md$/i.test(p) && p !== path),
+        });
+      }),
+    [client, path],
+  );
 
   // A link asked for a heading or block of this note: scroll there once
   // the editor has it, then forget it (a reload starts at the top).
@@ -295,7 +310,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
       const t = e.target as HTMLElement | null;
       if (
         t?.closest(
-          ".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], [data-footnote], [data-footnote-def], a",
+          ".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], [data-footnote], [data-footnote-def], .cm-embed, a",
         )
       )
         return;

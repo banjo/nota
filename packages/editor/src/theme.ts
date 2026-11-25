@@ -271,6 +271,54 @@ export const notaTheme = EditorView.theme({
   },
   ".cm-fence": { color: v("faint", "#9ca0a8") },
 
+  // Images and embedded notes: alone on a line they're blocks, in text
+  // they sit on the line. Never wider than the column.
+  ".cm-image img": {
+    display: "inline-block",
+    maxWidth: "100%",
+    height: "auto",
+    verticalAlign: "bottom",
+    borderRadius: "4px",
+  },
+  // inline-block, not block: a block in a line adds a line box above
+  // and below it.
+  ".cm-image-block": {
+    display: "inline-block",
+    width: "100%",
+    padding: "0.3em 0",
+    verticalAlign: "bottom",
+  },
+  ".cm-image-block img": { display: "block" },
+  ".cm-image-block.cm-media-missing": { width: "auto" },
+  ".cm-image-source": { color: v("faint", "#9ca0a8") },
+  ".cm-media-missing": {
+    display: "inline-block",
+    padding: "2px 8px",
+    borderRadius: "4px",
+    border: `1px dashed ${md("table-border", "hairline", "#e7e7e4")}`,
+    color: v("muted-foreground", "#6b6f78"),
+    fontSize: "0.9em",
+  },
+  ".cm-embed": {
+    display: "inline-block",
+    width: "100%",
+    boxSizing: "border-box",
+    verticalAlign: "bottom",
+    margin: "0.3em 0",
+    padding: "0.4em 0 0.4em 14px",
+    borderLeft: `3px solid ${md("table-border", "hairline", "#e7e7e4")}`,
+  },
+  ".cm-embed-head": {
+    color: md("link", "ink", "#1e7363"),
+    fontSize: "0.85em",
+    fontWeight: "600",
+    cursor: "pointer",
+    marginBottom: "0.2em",
+  },
+  ".cm-embed-head:hover": { textDecoration: "underline" },
+  ".cm-embed-body .cm-editor": { backgroundColor: "transparent" },
+  ".cm-embed-body .cm-content": { padding: "0" },
+
   // Tables: rendered while the cursor is elsewhere, source (monospace, so
   // the pipes line up) while it is in them. Wide tables scroll sideways.
   ".cm-table-widget": {
