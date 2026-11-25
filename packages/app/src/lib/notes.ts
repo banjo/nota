@@ -121,6 +121,37 @@ export function flattenTree(
 }
 
 /** Finds the note a [[wikilink]] target names: by path, file name or title. */
+/**
+ * A [text](dest) link to a note: its vault path and heading, resolved
+ * against the linking note's path as the index does
+ * (internal/markdown.parseMarkdownLink). Null for web links, anchors in
+ * the same note, other files and paths outside the vault.
+ */
+export function noteLink(href: string, from: string): { target: string; heading?: string } | null {
+  let dest = href.trim().replace(/^<(.*)>$/, "$1");
+  if (/^[a-z][a-z0-9+.-]*:/i.test(dest) || dest.startsWith("#") || dest.startsWith("//"))
+    return null;
+  let heading: string | undefined;
+  const hash = dest.indexOf("#");
+  if (hash >= 0) {
+    heading = dest.slice(hash + 1) || undefined;
+    dest = dest.slice(0, hash);
+  }
+  try {
+    dest = decodeURIComponent(dest);
+  } catch {}
+  if (!/\.md$/i.test(dest)) return null;
+  const parts = dest.startsWith("/") ? [] : folderOf(from).split("/").filter(Boolean);
+  for (const p of dest.split("/")) {
+    if (p === "" || p === ".") continue;
+    if (p === "..") {
+      if (!parts.length) return null;
+      parts.pop();
+    } else parts.push(p);
+  }
+  return { target: parts.join("/"), ...(heading ? { heading } : {}) };
+}
+
 export function resolveLink(
   target: string,
   notes: NoteInfo[],

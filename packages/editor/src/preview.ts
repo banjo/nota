@@ -18,6 +18,7 @@ import {
   activeLines,
   type CalloutKind,
   type DecoSpec,
+  findAnchor,
   footnotes,
   type InlineSpec,
   previewSpecs,
@@ -27,19 +28,36 @@ import {
   toggleTaskAt,
 } from "./decorations.ts";
 
+const STATUS_LABELS: Record<string, string> = {
+  "/": "In progress",
+  "-": "Cancelled",
+  ">": "Forwarded",
+  "<": "Scheduled",
+  "!": "Important",
+  "?": "Question",
+  "*": "Star",
+};
+
 class CheckboxWidget extends WidgetType {
-  constructor(readonly checked: boolean) {
+  constructor(
+    readonly checked: boolean,
+    readonly status?: string,
+  ) {
     super();
   }
   eq(other: CheckboxWidget) {
-    return other.checked === this.checked;
+    return other.checked === this.checked && other.status === this.status;
   }
   toDOM() {
     const box = document.createElement("span");
     box.className = "cm-task-checkbox";
     box.setAttribute("role", "checkbox");
-    box.setAttribute("aria-checked", String(this.checked));
     box.dataset.checked = String(this.checked);
+    if (this.status) {
+      box.dataset.status = this.status;
+      box.setAttribute("aria-checked", this.status === "/" ? "mixed" : "false");
+      box.title = STATUS_LABELS[this.status] ?? "";
+    } else box.setAttribute("aria-checked", String(this.checked));
     return box;
   }
   ignoreEvent() {
@@ -201,12 +219,17 @@ class FootnoteWidget extends WidgetType {
     readonly id: string,
     readonly label: string,
     readonly definition: boolean,
+    /** An inline footnote's text, shown in a bubble on hover or focus. */
+    readonly note?: string,
   ) {
     super();
   }
   eq(other: FootnoteWidget) {
     return (
-      other.id === this.id && other.label === this.label && other.definition === this.definition
+      other.id === this.id &&
+      other.label === this.label &&
+      other.definition === this.definition &&
+      other.note === this.note
     );
   }
   toDOM() {
@@ -221,6 +244,15 @@ class FootnoteWidget extends WidgetType {
     el.className = "cm-footnote-ref";
     el.dataset.footnote = this.id;
     el.textContent = this.label;
+    if (this.note !== undefined) {
+      el.tabIndex = 0;
+      el.setAttribute("aria-label", `Footnote ${this.label}: ${this.note}`);
+      const pop = document.createElement("span");
+      pop.className = "cm-footnote-pop";
+      pop.setAttribute("aria-hidden", "true");
+      pop.textContent = this.note;
+      el.append(pop);
+    }
     return el;
   }
   ignoreEvent() {
@@ -256,9 +288,49 @@ function jumpTo(view: EditorView, pos: number) {
   }, 1200);
 }
 
+/** Text in place of its source, such as an entity's character. */
+class TextWidget extends WidgetType {
+  constructor(readonly text: string) {
+    super();
+  }
+  eq(other: TextWidget) {
+    return other.text === this.text;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-text-widget";
+    el.textContent = this.text;
+    return el;
+  }
+}
+
+class BreakWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-break";
+    return el;
+  }
+}
+
+const br = Decoration.replace({ widget: new BreakWidget() });
+/**
+ * Scrolls to a heading ("Mål", "mål", GitHub's "#m%C3%A5l") or block
+ * ("^id") of the note and lights it up. False when there is none.
+ */
+export function revealAnchor(view: EditorView, anchor: string): boolean {
+  const pos = findAnchor(view.state, anchor);
+  if (pos === undefined) return false;
+  jumpTo(view, pos);
+  return true;
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
-const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
+const checkbox = (checked: boolean, status?: string) =>
+  Decoration.replace({ widget: new CheckboxWidget(checked, status) });
 
 /** Turns specs into a sorted decoration set. */
 export function toDecorations(specs: DecoSpec[]): DecorationSet {
@@ -280,18 +352,27 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
         );
         break;
       case "widget":
-        if (s.widget === "footnote" || s.widget === "footnote-label") {
+        if (s.widget === "break") {
+          ranges.push(br.range(s.from, s.to));
+        } else if (s.widget === "text") {
+          ranges.push(
+            Decoration.replace({ widget: new TextWidget(s.label ?? "") }).range(s.from, s.to),
+          );
+        } else if (s.widget === "footnote" || s.widget === "footnote-label") {
           const widget = new FootnoteWidget(
             s.footnote ?? "",
             s.label ?? "",
             s.widget === "footnote-label",
+            s.note,
           );
           ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
         } else if (s.widget === "callout") {
           const widget = new CalloutWidget(s.callout ?? "note", s.label);
           ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
         } else {
-          ranges.push((s.widget === "bullet" ? bullet : checkbox(!!s.checked)).range(s.from, s.to));
+          ranges.push(
+            (s.widget === "bullet" ? bullet : checkbox(!!s.checked, s.status)).range(s.from, s.to),
+          );
         }
         break;
     }
@@ -372,6 +453,12 @@ export function livePreview(
       const onSourceLine = !reading && activeLines(view.state, view.hasFocus).has(lineNo);
       if (onSourceLine && !(event.metaKey || event.ctrlKey)) return false;
       const wl = target.closest<HTMLElement>("[data-wikilink]");
+      // [[#Heading]] and [[#^id]]: this note.
+      if (wl && !wl.dataset.wikilink && wl.dataset.heading) {
+        revealAnchor(view, wl.dataset.heading);
+        event.preventDefault();
+        return true;
+      }
       if (wl && handlers.onWikilink) {
         handlers.onWikilink(wl.dataset.wikilink!, wl.dataset.heading);
         event.preventDefault();
@@ -384,6 +471,12 @@ export function livePreview(
         return true;
       }
       const link = target.closest<HTMLElement>("[data-href]");
+      // [text](#heading): this note.
+      if (link?.dataset.href!.startsWith("#")) {
+        revealAnchor(view, link.dataset.href!.slice(1));
+        event.preventDefault();
+        return true;
+      }
       if (link && handlers.onLink) {
         handlers.onLink(link.dataset.href!);
         event.preventDefault();

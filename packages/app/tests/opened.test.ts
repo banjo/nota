@@ -56,6 +56,11 @@ describe("a vault note opened from the file manager", () => {
       path: "A.md",
     });
     expect(persistedRoute({ kind: "inbox" })).toEqual({ kind: "inbox" });
+    // A link's anchor is for that one open.
+    expect(persistedRoute({ kind: "note", path: "A.md", anchor: "Mål" })).toEqual({
+      kind: "note",
+      path: "A.md",
+    });
   });
 
   test("the last file wins the page; failures are toasts", () => {

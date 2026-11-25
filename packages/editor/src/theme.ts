@@ -130,6 +130,33 @@ export const notaTheme = EditorView.theme({
     padding: "0 0.1em",
     cursor: "pointer",
   },
+  // [label]: url definitions, quiet like footnote definitions.
+  ".cm-linkref": { fontSize: "0.9em", color: v("muted-foreground", "#6b6f78") },
+  // ^[inline footnotes]: the number, and the text in a bubble above it.
+  ".cm-footnote-inline": { color: v("muted-foreground", "#6b6f78") },
+  ".cm-footnote-ref[tabindex]": { position: "relative", outline: "none" },
+  ".cm-footnote-pop": {
+    display: "none",
+    position: "absolute",
+    bottom: "calc(100% + 4px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "max-content",
+    maxWidth: "280px",
+    padding: "6px 10px",
+    borderRadius: "6px",
+    backgroundColor: v("surface", "#ffffff"),
+    boxShadow: v("shadow-pop", "0 4px 16px rgba(0,0,0,0.15)"),
+    color: v("text", "#2a2c31"),
+    fontSize: "13px",
+    lineHeight: "1.45",
+    fontWeight: "400",
+    whiteSpace: "normal",
+    zIndex: "10",
+  },
+  ".cm-footnote-ref:hover .cm-footnote-pop, .cm-footnote-ref:focus .cm-footnote-pop": {
+    display: "block",
+  },
   ".cm-footnote-source": { color: v("faint", "#9ca0a8") },
   ".cm-footnote-def": {
     fontSize: "0.9em",
@@ -146,9 +173,12 @@ export const notaTheme = EditorView.theme({
     transition: "background-color 0.3s",
   },
 
+  // One 3px border per level (--quote-depth, 1 when unset), 14px apart.
   ".cm-quote": {
-    borderLeft: `3px solid ${v("hairline", "#e7e7e4")}`,
-    paddingLeft: "14px !important",
+    backgroundImage: `repeating-linear-gradient(to right, ${v("hairline", "#e7e7e4")} 0 3px, transparent 3px 14px)`,
+    backgroundSize: "calc(var(--quote-depth, 1) * 14px - 11px) 100%",
+    backgroundRepeat: "no-repeat",
+    paddingLeft: "calc(var(--quote-depth, 1) * 14px + 3px) !important",
     color: md("quote", "muted-foreground", "#6b6f78"),
   },
   // Callouts: a quote with "[!type]" on its first line. The colour is
@@ -202,6 +232,25 @@ export const notaTheme = EditorView.theme({
     borderTop: `1px solid ${v("hairline", "#e7e7e4")}`,
   },
   ".cm-hr-source": { color: v("faint", "#9ca0a8") },
+  // The inline HTML Nota formats (<kbd>, <sup> …); none of it renders as HTML.
+  ".cm-kbd": {
+    fontFamily: mono,
+    fontSize: "0.85em",
+    padding: "0.05em 0.4em",
+    border: `1px solid ${v("hairline", "#e7e7e4")}`,
+    borderBottomWidth: "2px",
+    borderRadius: "4px",
+    backgroundColor: v("code", "#f1f1ee"),
+  },
+  ".cm-sup": { fontSize: "0.75em", verticalAlign: "super", lineHeight: "0" },
+  ".cm-sub": { fontSize: "0.75em", verticalAlign: "sub", lineHeight: "0" },
+  ".cm-underline": { textDecoration: "underline", textUnderlineOffset: "3px" },
+  ".cm-small": { fontSize: "0.85em" },
+  ".cm-break": { display: "block" },
+  ".cm-block-id": { color: v("faint", "#9ca0a8"), fontSize: "0.85em" },
+  ".cm-comment": { color: v("faint", "#9ca0a8") },
+  ".cm-comment-hidden": { fontSize: "0", lineHeight: "0" },
+  ".cm-setext-underline": { lineHeight: "0.6", fontSize: "0.6em" },
 
   ".cm-codeblock": {
     fontFamily: mono,
@@ -307,5 +356,32 @@ export const notaTheme = EditorView.theme({
     WebkitMaskPosition: "center",
     WebkitMaskRepeat: "no-repeat",
   },
+  // Other statuses: in progress is half filled, the rest show their sign.
+  ".cm-task-checkbox[data-status]": {
+    position: "relative",
+    borderColor: v("ink", "#1e7363"),
+    color: v("ink", "#1e7363"),
+    fontSize: "11px",
+    fontWeight: "700",
+    lineHeight: "12px",
+    textAlign: "center",
+  },
+  '.cm-task-checkbox[data-status="/"]': {
+    backgroundImage: `linear-gradient(to right, ${v("ink", "#1e7363")} 50%, transparent 50%)`,
+  },
+  '.cm-task-checkbox[data-status="-"]': {
+    borderColor: v("faint", "#9ca0a8"),
+    color: v("faint", "#9ca0a8"),
+  },
+  '.cm-task-checkbox[data-status="-"]::after': { content: '"–"' },
+  '.cm-task-checkbox[data-status=">"]::after': { content: '"›"' },
+  '.cm-task-checkbox[data-status="<"]::after': { content: '"‹"' },
+  '.cm-task-checkbox[data-status="!"]': {
+    borderColor: v("danger", "#d4483b"),
+    color: v("danger", "#d4483b"),
+  },
+  '.cm-task-checkbox[data-status="!"]::after': { content: '"!"' },
+  '.cm-task-checkbox[data-status="?"]::after': { content: '"?"' },
+  '.cm-task-checkbox[data-status="*"]::after': { content: '"★"', fontSize: "9px" },
   ".cm-task-done": { color: v("faint", "#9ca0a8"), textDecoration: "line-through" },
 });

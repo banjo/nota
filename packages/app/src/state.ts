@@ -27,8 +27,11 @@ export type ListSpec =
 
 export type Route =
   | { kind: "home" }
-  /** `via: "open"`: opened from the file manager, shown in Reading for this open. */
-  | { kind: "note"; path: string; via?: "open" }
+  /**
+   * `via: "open"`: opened from the file manager, shown in Reading for this
+   * open. `anchor`: a heading or "^block" to scroll to, from a link.
+   */
+  | { kind: "note"; path: string; via?: "open"; anchor?: string }
   | { kind: "inbox" }
   /** A Markdown file from outside the vault (desktop), by its opener id. */
   | { kind: "external"; id: string }
@@ -179,7 +182,7 @@ export const useUI = create<UIState>()(
  * that one open, and previews of outside files do not come back.
  */
 export function persistedRoute(r: Route): Route {
-  if (r.kind === "note" && r.via) return { kind: "note", path: r.path };
+  if (r.kind === "note" && (r.via || r.anchor)) return { kind: "note", path: r.path };
   // Preview ids die with the process.
   if (r.kind === "external") return { kind: "home" };
   return r;

@@ -4,7 +4,10 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   activeLines,
   calloutKind,
+  decodeEntity,
+  findAnchor,
   footnotes,
+  headingSlug,
   extensions,
   findTags,
   parseWikilink,
@@ -435,5 +438,328 @@ describe("highlight", () => {
     const doc = "Rubrik\n===\n\ntext";
     const { s } = specs(doc);
     expect(syntaxTree(s).topNode.firstChild!.name).toBe("SetextHeading1");
+  });
+});
+
+describe("setext headings", () => {
+  test("style the text as a heading and hide the underline", () => {
+    const doc = "Rubrik\növer två\n===\n\nUnder\n---\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-h1")).toEqual([0, doc.indexOf("över")]);
+    expect(lines(sp, "cm-h2")).toEqual([doc.indexOf("Under")]);
+    expect(lines(sp, "cm-setext-underline")).toEqual([doc.indexOf("==="), doc.indexOf("---")]);
+    expect(hidden(doc, sp)).toEqual(["===", "---"]);
+  });
+
+  test("show the underline while the cursor is in the heading", () => {
+    const doc = "Rubrik\n===\n\nslut";
+    const { specs: sp } = specs(doc, { cursor: 2 });
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["==="]);
+    expect(lines(sp, "cm-setext-underline")).toEqual([]);
+  });
+});
+
+describe("escapes", () => {
+  test("hide the backslash, and keep the character as text", () => {
+    const doc = "Inte \\*fet\\* och \\[[ingen länk]] här\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(hidden(doc, sp)).toEqual(["\\", "\\", "\\"]);
+    expect(marks(doc, sp, "cm-strong")).toEqual([]);
+    expect(marks(doc, sp, "cm-em")).toEqual([]);
+    expect(marks(doc, sp, "cm-wikilink")).toEqual([]);
+  });
+
+  test("show the backslash on the line being edited, and in code", () => {
+    const doc = "a \\* b\n\n`c \\* d`";
+    expect(marks(doc, specs(doc, { cursor: 0 }).specs, "cm-marker").map((m) => m.text)).toEqual([
+      "\\",
+    ]);
+    expect(hidden(doc, specs(doc, { cursor: 0 }).specs)).toEqual(["`", "`"]);
+  });
+});
+
+describe("reference links", () => {
+  const DOC = [
+    "Se [docs][D], [Docs][] och [docs] men [okänd] och [a](<https://z.se/a b>).",
+    "",
+    '[d]: https://x.se "Titel"',
+    "[docs]: <https://y.se>",
+  ].join("\n");
+
+  test("[text][label], [text][] and [text] link to their definition", () => {
+    const { specs: sp } = specs(DOC, { cursor: DOC.length });
+    const links = marks(DOC, sp, "cm-link").map((m) => [m.text, m.attrs?.["data-href"]]);
+    expect(links).toEqual([
+      ["docs", "https://x.se"],
+      ["Docs", "https://y.se"],
+      ["docs", "https://y.se"],
+      ["a", "https://z.se/a b"],
+      ["https://x.se", "https://x.se"],
+      ["<https://y.se>", "https://y.se"],
+    ]);
+    expect(hidden(DOC, sp)).toContain("][D]");
+    expect(hidden(DOC, sp)).toContain("][]");
+    expect(hidden(DOC, sp).some((h) => h.includes("okänd"))).toBe(false);
+  });
+
+  test("definitions are quiet lines", () => {
+    const { specs: sp } = specs(DOC, { cursor: 0 });
+    expect(lines(sp, "cm-linkref")).toEqual([DOC.indexOf("[d]:"), DOC.indexOf("[docs]:")]);
+  });
+});
+
+describe("nested quotes", () => {
+  test("get one border per level", () => {
+    // "> d" right under c would continue c (lazily), at depth 3.
+    const doc = "> a\n> > b\n> > > c\n>\n> d\n\nslut";
+    const { specs: sp } = specs(doc);
+    const quotes = sp
+      .filter(
+        (x): x is Extract<DecoSpec, { type: "line" }> =>
+          x.type === "line" && x.class === "cm-quote",
+      )
+      .map((x) => [doc.slice(x.from, doc.indexOf("\n", x.from)), x.style]);
+    expect(quotes).toEqual([
+      ["> a", undefined],
+      ["> > b", "--quote-depth:2"],
+      ["> > > c", "--quote-depth:3"],
+      [">", undefined],
+      ["> d", undefined],
+    ]);
+    expect(hidden(doc, sp).filter((h) => h === "> ")).toHaveLength(7);
+  });
+});
+
+describe("comments", () => {
+  const DOC = "Synlig %%dold **text**%% här.\n\n%%\nEtt block\n\nmed tomrad\n%%\n\nslut";
+  const reading = (doc: string) => {
+    const s = state(doc, 0);
+    return previewSpecs(s, { activeLines: new Set(), reading: true });
+  };
+
+  test("are hidden in Reading mode, inline and as blocks", () => {
+    const sp = reading(DOC);
+    expect(hidden(DOC, sp)).toContain("%%dold **text**%%");
+    expect(hidden(DOC, sp)).toEqual(expect.arrayContaining(["%%", "Ett block", "med tomrad"]));
+    expect(lines(sp, "cm-comment-hidden")).toHaveLength(5);
+    expect(marks(DOC, sp, "cm-strong")).toEqual([]);
+  });
+
+  test("are faint while writing", () => {
+    const { specs: sp } = specs(DOC, { cursor: DOC.length });
+    expect(marks(DOC, sp, "cm-comment").map((m) => m.text)).toEqual([
+      "%%dold **text**%%",
+      "%%\nEtt block\n\nmed tomrad\n%%",
+    ]);
+    expect(hidden(DOC, sp)).toEqual([]);
+  });
+
+  test("a lone %% or 100%% is not a comment", () => {
+    for (const doc of ["50%% rabatt", "a %% b"]) {
+      const { specs: sp } = specs(doc, { cursor: 0 });
+      expect(marks(doc, sp, "cm-comment"), doc).toEqual([]);
+    }
+  });
+});
+
+describe("entities", () => {
+  test("decode named and numeric entities; unknown ones stay", () => {
+    expect(
+      ["&copy;", "&nbsp;", "&#8594;", "&#x2192;", "&rArr;", "&bogus;", "&#0;", "&#x110000;"].map(
+        decodeEntity,
+      ),
+    ).toEqual(["©", "\u00a0", "→", "→", "⇒", undefined, "\ufffd", "\ufffd"]);
+  });
+
+  test("show their character, and their source on the line being edited", () => {
+    const doc = "a &copy; b &bogus; c &#8594;\n\nslut";
+    const texts = (all: DecoSpec[]) =>
+      all.flatMap((x) =>
+        x.type === "widget" && x.widget === "text" ? [[text(doc, x), x.label]] : [],
+      );
+    expect(texts(specs(doc).specs)).toEqual([
+      ["&copy;", "©"],
+      ["&#8594;", "→"],
+    ]);
+    expect(texts(specs(doc, { cursor: 0 }).specs)).toEqual([]);
+  });
+
+  test("in a table cell, they stand in as data-text", () => {
+    const doc = "| a |\n| - |\n| x &rarr; y |\n\nslut";
+    const [t] = tableSpecs(state(doc, doc.length), { activeLines: new Set() });
+    const cell = t!.rows[0]![0]!;
+    expect(cell.specs.map((x) => (x.type === "mark" ? x.attrs?.["data-text"] : x.type))).toEqual([
+      "→",
+    ]);
+  });
+});
+
+describe("inline HTML", () => {
+  test("formatting tags style their text and hide", () => {
+    const doc =
+      'Tryck <kbd>⌘</kbd>+<kbd class="x">K</kbd>, H<sub>2</sub>O, x<sup>2</sup> och <u>under</u>.\n\nslut';
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["⌘", "K"]);
+    expect(marks(doc, sp, "cm-sub").map((m) => m.text)).toEqual(["2"]);
+    expect(marks(doc, sp, "cm-sup").map((m) => m.text)).toEqual(["2"]);
+    expect(marks(doc, sp, "cm-underline").map((m) => m.text)).toEqual(["under"]);
+    expect(hidden(doc, sp)).toEqual([
+      "<kbd>",
+      "</kbd>",
+      '<kbd class="x">',
+      "</kbd>",
+      "<sub>",
+      "</sub>",
+      "<sup>",
+      "</sup>",
+      "<u>",
+      "</u>",
+    ]);
+  });
+
+  test("<br> is a line break; other HTML and unclosed tags stay source", () => {
+    const doc = "a<br>b<br/>c <span>x</span> <kbd>öppen <script>y</script>\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(
+      sp
+        .filter((x) => x.type === "widget" && x.widget === "break")
+        .map((x) => text(doc, x as never)),
+    ).toEqual(["<br>", "<br/>"]);
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-kbd")).toEqual([]);
+  });
+
+  test("nested tags of the same name pair up", () => {
+    const doc = "<sup>a<sup>b</sup>c</sup>\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-sup").map((m) => m.text)).toEqual(["a<sup>b</sup>c", "b"]);
+  });
+
+  test("show their tags on the line being edited", () => {
+    const doc = "<kbd>K</kbd>";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["<kbd>", "</kbd>"]);
+    expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["K"]);
+  });
+});
+
+describe("task statuses", () => {
+  const boxes = (doc: string, all: DecoSpec[]) =>
+    all.flatMap((x) =>
+      x.type === "widget" && x.widget === "checkbox" ? [[text(doc, x), x.status ?? x.checked]] : [],
+    );
+
+  test("Obsidian's statuses are checkboxes; cancelled is struck", () => {
+    const doc =
+      "- [/] pågår\n- [-] avbruten\n- [!] viktig\n- [a] inte en status\n- [x] klar\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(boxes(doc, sp)).toEqual([
+      ["[/]", "/"],
+      ["[-]", "-"],
+      ["[!]", "!"],
+      ["[x]", true],
+    ]);
+    expect(marks(doc, sp, "cm-task-done").map((m) => m.text)).toEqual(["avbruten", "klar"]);
+    expect(hidden(doc, sp)).toEqual(["- ", "- ", "- ", "- "]);
+  });
+
+  test("a click marks one done", () => {
+    const doc = "- [/] pågår";
+    expect(toggleTaskAt(state(doc), 2)).toEqual({ from: 3, to: 4, insert: "x" });
+  });
+
+  test("show their source on the line being edited", () => {
+    const doc = "- [/] pågår";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(boxes(doc, sp)).toEqual([["[/]", "/"]]);
+    expect(boxes(doc, specs(doc, { cursor: 3 }).specs)).toEqual([]);
+  });
+});
+
+describe("inline footnotes", () => {
+  const notes = (all: DecoSpec[]) =>
+    all.flatMap((x) =>
+      x.type === "widget" && x.widget === "footnote" ? [[x.footnote, x.label, x.note]] : [],
+    );
+
+  test("are numbered along with the others, and carry their text", () => {
+    const doc = "Först[^a], sen^[en **inline** [x] not] och [^a].\n\n[^a]: Def";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(notes(sp)).toEqual([
+      ["a", "1", undefined],
+      [`^${doc.indexOf("^[")}`, "2", "en **inline** [x] not"],
+      ["a", "1", undefined],
+    ]);
+    // Inline footnotes have no definition to jump to.
+    expect(footnotes(state(doc)).defs.has(`^${doc.indexOf("^[")}`)).toBe(false);
+  });
+
+  test("show their source, formatted, on the line being edited", () => {
+    const doc = "a ^[b **c**] d";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(notes(sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-footnote-inline").map((m) => m.text)).toEqual(["^[b **c**]"]);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["c"]);
+  });
+
+  test("^ without [ or an empty ^[] is text", () => {
+    for (const doc of ["x^2 och ^[]", "a^ [b]"]) {
+      expect(notes(specs(doc, { cursor: doc.length }).specs), doc).toEqual([]);
+    }
+  });
+});
+
+describe("block ids", () => {
+  test("^id ending a line, or alone on one, is hidden with its space", () => {
+    const doc = "Ett stycke ^abc-1\n\n- punkt ^p2\n\n> citat\n\n^q3\n\nx^2 och a ^b c\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(hidden(doc, sp).filter((h) => h.includes("^"))).toEqual([" ^abc-1", " ^p2", "^q3"]);
+  });
+
+  test("is faint on the line being edited", () => {
+    const doc = "Ett stycke ^abc";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-block-id").map((m) => m.text)).toEqual(["^abc"]);
+  });
+});
+
+describe("anchors", () => {
+  const DOC = [
+    "# Mål & plan!",
+    "",
+    "Text om det. ^stycke",
+    "",
+    "Underrubrik",
+    "---",
+    "",
+    "- punkt ^p1",
+    "",
+    "> citat",
+    "",
+    "^efter",
+    "",
+    "## Sista ## ",
+  ].join("\n");
+  const at = (t: string) => DOC.indexOf(t);
+
+  test("find headings by text, case or GitHub slug, and the last part of a path", () => {
+    const s = state(DOC);
+    expect(findAnchor(s, "Mål & plan!")).toBe(0);
+    expect(findAnchor(s, "mål & PLAN!")).toBe(0);
+    expect(findAnchor(s, "m%C3%A5l--plan")).toBe(0);
+    expect(findAnchor(s, "#underrubrik")).toBe(at("Underrubrik"));
+    expect(findAnchor(s, "Mål & plan!#Sista")).toBe(at("## Sista"));
+    expect(findAnchor(s, "Finns inte")).toBeUndefined();
+    expect(headingSlug("Mål & plan!")).toBe("mål--plan");
+  });
+
+  test("find blocks by id; an id alone on its line names the block above", () => {
+    const s = state(DOC);
+    expect(findAnchor(s, "^stycke")).toBe(at("Text om det"));
+    expect(findAnchor(s, "^P1")).toBe(at("- punkt"));
+    expect(findAnchor(s, "^efter")).toBe(at("> citat"));
+    expect(findAnchor(s, "^nej")).toBeUndefined();
   });
 });
