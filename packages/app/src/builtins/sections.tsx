@@ -16,29 +16,42 @@ import { FoldersHeaderActions } from "../components/FoldersHeader.tsx";
 import { NoteRow } from "../components/NoteRow.tsx";
 import { Row, SectionHeader } from "../components/Row.tsx";
 import { useInbox, useList, useTags, useViews } from "../queries.ts";
-import { useUI } from "../state.ts";
+import { type Route, useUI } from "../state.ts";
 
 // The built-in sidebar sections, registered like any plugin's.
+
+/** The nav row a route lights up: "inbox", "list:recent", "list:tag:<tag>", or "". */
+export function navKey(route: Route): string {
+  if (route.kind === "inbox") return "inbox";
+  if (route.kind !== "list") return "";
+  const l = route.list;
+  return l.type === "tag" ? `list:tag:${l.tag}` : `list:${l.type}`;
+}
+
+/** Whether the nav key lights the list row of `type` (and `key`, for a tag). */
+export const navActive = (current: string, type: string, key?: string) =>
+  key === undefined
+    ? current === `list:${type}` || current.startsWith(`list:${type}:`)
+    : current === `list:${type}:${key}`;
 
 /** Inbox, Recent and Tags. */
 export function NavSection() {
   const inbox = useInbox();
   const tags = useTags();
-  const route = useUI((s) => s.route);
+  // Which of these rows is the page on screen, as a string: opening a
+  // note does not re-render the section.
+  const current = useUI((s) => navKey(s.route));
   const navigate = useUI((s) => s.navigate);
   const open = useUI((s) => !!s.expanded["section:tags"]);
   const toggle = useUI((s) => s.toggle);
-  const listActive = (type: string, key?: string) =>
-    route.kind === "list" &&
-    route.list.type === type &&
-    (key === undefined || ("tag" in route.list && route.list.tag === key));
+  const listActive = (type: string, key?: string) => navActive(current, type, key);
   return (
     <div className="flex flex-col">
       <Row
         icon={<Inbox strokeWidth={1.75} />}
         label="Inbox"
         count={inbox.data?.length}
-        active={route.kind === "inbox"}
+        active={current === "inbox"}
         onClick={() => navigate({ kind: "inbox" })}
       />
       <Row
@@ -88,11 +101,12 @@ function ViewRow({ view }: { view: ViewInfo }) {
   const key = `view:${view.id}`;
   const open = useUI((s) => !!s.expanded[key]);
   const toggle = useUI((s) => s.toggle);
-  const route = useUI((s) => s.route);
+  const active = useUI(
+    (s) => s.route.kind === "list" && s.route.list.type === "view" && s.route.list.id === view.id,
+  );
   const navigate = useUI((s) => s.navigate);
   const notes = useList({ view: view.id }, open);
   const Icon = VIEW_ICONS[view.icon ?? ""] ?? Layers;
-  const active = route.kind === "list" && route.list.type === "view" && route.list.id === view.id;
   return (
     <>
       <Row

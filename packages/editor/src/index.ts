@@ -1,6 +1,8 @@
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
+import { syntaxHighlighting } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
 import { Annotation, EditorState, type Extension, Transaction } from "@codemirror/state";
 import {
   drawSelection,
@@ -9,19 +11,36 @@ import {
   keymap,
   placeholder as placeholderExt,
 } from "@codemirror/view";
-import { modeCompartment, modeExtensions, rememberHandlers, type EditorMode } from "./mode.ts";
-import { type PreviewHandlers } from "./preview.ts";
+import {
+  codeHighlight,
+  modeCompartment,
+  modeExtensions,
+  rememberHandlers,
+  type EditorMode,
+} from "./mode.ts";
+import { type PreviewHandlers, setEmbedMount } from "./preview.ts";
 import { notaSyntax } from "./syntax.ts";
 import { notaTheme } from "./theme.ts";
 
 export {
   activeLines,
+  calloutKind,
+  decodeEntity,
+  findAnchor,
+  findSection,
+  footnotes,
+  headingSlug,
   previewSpecs,
+  tableSpecs,
   toggleTaskAt,
+  type CalloutKind,
   type DecoSpec,
+  type Footnotes,
   type PreviewOptions,
+  type TableSpec,
 } from "./decorations.ts";
 export {
+  codeHighlight,
   EDITOR_MODES,
   isEditorMode,
   modeExtensions,
@@ -29,14 +48,31 @@ export {
   sourceHighlight,
   type EditorMode,
 } from "./mode.ts";
-export { livePreview, toDecorations, type PreviewHandlers } from "./preview.ts";
+export {
+  attachments,
+  livePreview,
+  refreshMedia,
+  revealAnchor,
+  toDecorations,
+  type EmbeddedNote,
+  type MediaContext,
+  type PreviewHandlers,
+} from "./preview.ts";
 export { findTags, notaSyntax, parseWikilink, tagLength, type Wikilink } from "./syntax.ts";
 export { notaTheme } from "./theme.ts";
 export type { EditorView } from "@codemirror/view";
 
-/** Markdown with GFM and Nota's wikilinks and tags. */
+/**
+ * Markdown with GFM and Nota's wikilinks and tags. Code in fenced blocks
+ * is parsed in its language, which loads when a block first uses it.
+ */
 export const notaMarkdown = () =>
-  markdown({ base: markdownLanguage, extensions: [notaSyntax], addKeymap: false });
+  markdown({
+    base: markdownLanguage,
+    extensions: [notaSyntax],
+    codeLanguages: languages,
+    addKeymap: false,
+  });
 
 /** Extensions shared by every editor instance (no DOM handlers). */
 export const extensions: Extension[] = [notaMarkdown(), EditorView.lineWrapping];
@@ -94,6 +130,7 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
         placeholder ? placeholderExt(placeholder) : [],
         modeCompartment.of(modeExtensions(mode, handlers)),
         notaTheme,
+        syntaxHighlighting(codeHighlight),
         touchScrollMargins,
         EditorView.updateListener.of((u) => {
           if (!u.docChanged || !onChange) return;
@@ -107,6 +144,12 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
   rememberHandlers(view, handlers);
   return view;
 }
+
+// ![[Note]] shows the note in a read-only editor of its own.
+setEmbedMount(
+  (parent, doc, handlers) => createEditor(parent, { doc, mode: "reading", ...handlers }),
+  notaMarkdown(),
+);
 
 /**
  * Replaces the editor's text with text from outside (the file changed

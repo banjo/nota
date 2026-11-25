@@ -1,4 +1,5 @@
-import type { NotesClient } from "./client.ts";
+import { NotaError, type NotesClient } from "./client.ts";
+import { escapePath } from "./http.ts";
 import type {
   AccountState,
   ChangeEvent,
@@ -15,6 +16,8 @@ import type {
   OpenerApi,
   PluginInfo,
   PropertyPatch,
+  SettingsApi,
+  SettingsLayers,
   SyncStatus,
   TagCount,
   Tree,
@@ -118,6 +121,11 @@ export interface MygoBindings {
     follow(id: string, href: string): Promise<RawOpened>;
     pickFile(): Promise<void>;
   };
+  /** settings.toml and the account's settings; absent in builds before they existed. */
+  Settings?: {
+    state(): Promise<RawSettings>;
+    update(p: { set: Record<string, string>; unset: string[] }): Promise<RawSettings>;
+  };
   events: {
     changed: MygoEvent<{ paths: string[] | null; seq: number }>;
     syncStatus: MygoEvent<SyncStatus>;
@@ -125,6 +133,35 @@ export interface MygoBindings {
     command: MygoEvent<{ id: string }>;
     opened?: MygoEvent<{ seq: number }>;
     externalChanged?: MygoEvent<{ id: string }>;
+    settings?: MygoEvent<RawSettings>;
+  };
+}
+
+/** SettingsLayers as Go sends them: nil maps and slices come as null. */
+interface RawSettings {
+  file: Record<string, string> | null;
+  account: Record<string, string> | null;
+  signedIn: boolean;
+  path: string;
+  warnings: string[] | null;
+}
+
+const layers = (r: RawSettings): SettingsLayers => ({
+  file: r.file ?? {},
+  account: r.account ?? null,
+  signedIn: r.signedIn,
+  path: r.path,
+  warnings: r.warnings ?? [],
+});
+
+function settingsApi(b: MygoBindings): SettingsApi | undefined {
+  const s = b.Settings;
+  const ev = b.events.settings;
+  if (!s || !ev) return undefined;
+  return {
+    get: async () => layers(await s.state()),
+    update: async (p) => layers(await s.update({ set: p.set ?? {}, unset: p.unset ?? [] })),
+    subscribe: (listener) => ev.on((r) => listener(layers(r))),
   };
 }
 
@@ -184,6 +221,25 @@ function platform(): string {
   return "linux";
 }
 
+/**
+ * The desktop app's notafile:// scheme (apps/desktop/files.go) at host:
+ * WebView2 serves custom schemes at http://<host>.<scheme>.localhost.
+ */
+const fileBase = (host: string) =>
+  platform() === "windows" ? `http://${host}.notafile.localhost/` : `notafile://${host}/`;
+
+async function attach(name: string, data: Blob): Promise<string> {
+  const res = await fetch(fileBase("attach") + encodeURIComponent(name), {
+    method: "POST",
+    body: data,
+  });
+  if (!res.ok) {
+    const msg = (await res.text()).trim() || `${res.status} ${res.statusText}`;
+    throw new NotaError(msg, res.status === 400 ? "invalid_path" : `http_${res.status}`, res.status);
+  }
+  return ((await res.json()) as { path: string }).path;
+}
+
 /** A NotesClient over the desktop app's Go services. */
 export function createMygoClient(b: MygoBindings): NotesClient {
   const v = b.Vault;
@@ -210,6 +266,11 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     plugins: async () => list(await v.plugins()),
     history: async (path) => list(await v.history(path)),
     restore: (path, version) => v.restore(path, version),
+    fileUrl: (path, from) =>
+      fileBase("vault") +
+      escapePath(path) +
+      (from ? `?${new URLSearchParams({ from })}` : ""),
+    attach,
     subscribe: (listener: (e: ChangeEvent) => void) =>
       b.events.changed.on((c) => listener({ paths: list(c.paths) })),
     sync: {
@@ -247,5 +308,6 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       onCommand: (listener) => b.events.command.on((c) => listener(c.id)),
     },
     opener: openerApi(b),
+    settings: settingsApi(b),
   };
 }

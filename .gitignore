@@ -11,3 +11,6 @@ bin/
 mygo_windows_*.syso
 # The release workflow builds the CLI into the macOS app here.
 apps/desktop/resources/darwin-*/
+
+# go build ./apps/desktop from the root.
+/desktop

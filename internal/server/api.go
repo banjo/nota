@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"slices"
@@ -47,7 +48,8 @@ func (s *Server) apiRoutes() {
 	s.route("GET /v1/api/vaults/{vault}/inbox", ro, s.apiInbox)
 	s.route("GET /v1/api/vaults/{vault}/history/{path...}", ro, s.apiHistory)
 	s.route("POST /v1/api/vaults/{vault}/history/{path...}", ro, s.apiRestore)
-	s.route("GET /v1/api/vaults/{vault}/files/{path...}", ro, s.getFile)
+	s.route("GET /v1/api/vaults/{vault}/files/{path...}", ro, s.apiFile)
+	s.route("POST /v1/api/vaults/{vault}/attachments", ro, s.apiAttach)
 	s.route("GET /v1/api/vaults/{vault}/changes", ro, s.changes)
 	s.route("GET /v1/api/vaults/{vault}/events", ro, s.events)
 }
@@ -126,7 +128,7 @@ func vaultErr(err error) error {
 		return &apiErr{http.StatusConflict, protocol.Error{Code: protocol.CodeCaseCollision, Message: msg, Existing: existing}}
 	case errors.Is(err, nvault.ErrExists):
 		return &apiErr{http.StatusConflict, protocol.Error{Code: protocol.CodeExists, Message: msg, Existing: existing}}
-	case errors.Is(err, nvault.ErrInvalidPath), errors.Is(err, nvault.ErrNotNote):
+	case errors.Is(err, nvault.ErrInvalidPath), errors.Is(err, nvault.ErrNotNote), errors.Is(err, nvault.ErrNotImage):
 		return &apiErr{http.StatusBadRequest, protocol.Error{Code: protocol.CodeInvalidPath, Message: msg}}
 	case errors.Is(err, edit.ErrInvalidTag), errors.Is(err, index.ErrEmptyQuery):
 		return badRequest("%s", msg)
@@ -959,5 +961,73 @@ func (s *Server) apiRenameFolder(w http.ResponseWriter, r *http.Request, p Princ
 	}
 	info(r).attrs = append(info(r).attrs, "folder", to, "from", req.Path)
 	writeJSON(w, http.StatusOK, RenameFolderResponse{From: req.Path, Path: to})
+	return nil
+}
+
+// apiFile is GET …/files/{path}: the raw file. With ?from=<note> the
+// path is an embed's target (![[name]]), found as vault.FindFile does.
+// The browser may keep it, and asks again with its ETag.
+func (s *Server) apiFile(w http.ResponseWriter, r *http.Request, p Principal) error {
+	w.Header().Set("Cache-Control", "private, no-cache")
+	from := r.URL.Query().Get("from")
+	if from == "" {
+		return s.getFile(w, r, p)
+	}
+	target, err := filePath(r)
+	if err != nil {
+		return err
+	}
+	ws, err := s.openWS(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	found, err := ws.client.FindFile(target, from)
+	ws.mu.Unlock()
+	if err != nil {
+		return vaultErr(err)
+	}
+	r.SetPathValue("path", found)
+	return s.getFile(w, r, p)
+}
+
+// AttachResult is the answer to POST …/attachments.
+type AttachResult struct {
+	Path string `json:"path"`
+}
+
+// apiAttach is POST …/attachments?name=: an image pasted or dropped into
+// a note, saved to the vault's Attachments folder under a free name.
+func (s *Server) apiAttach(w http.ResponseWriter, r *http.Request, p Principal) error {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		return badRequest("name is required")
+	}
+	if r.ContentLength > s.cfg.MaxFileSize {
+		return ErrTooLarge
+	}
+	data, err := io.ReadAll(io.LimitReader(r.Body, s.cfg.MaxFileSize+1))
+	if err != nil {
+		return err
+	}
+	if int64(len(data)) > s.cfg.MaxFileSize {
+		return ErrTooLarge
+	}
+	ws, err := s.openWS(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	ed, err := ws.editor(p.Device)
+	if err != nil {
+		return err
+	}
+	saved, err := ed.SaveAttachment(name, data)
+	if err != nil {
+		return vaultErr(err)
+	}
+	info(r).attrs = append(info(r).attrs, "file", saved, "size", len(data))
+	writeJSON(w, http.StatusCreated, AttachResult{Path: saved})
 	return nil
 }

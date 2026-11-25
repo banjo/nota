@@ -52,7 +52,7 @@ func TestDeleteUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, bytes, err := RemoveUserData(ctx, e.srv.Store(), e.srv.cfg.DataDir, rm)
+	files, bytes, err := RemoveUserData(ctx, e.srv.Store(), e.srv.blobs, e.srv.cfg.DataDir, rm)
 	if err != nil {
 		t.Fatal(err)
 	}

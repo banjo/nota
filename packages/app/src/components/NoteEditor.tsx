@@ -1,11 +1,19 @@
 import type { Base, Note } from "@nota/client";
-import { createEditor, type EditorView, replaceDoc, setEditorMode } from "@nota/editor";
+import {
+  createEditor,
+  type EditorView,
+  refreshMedia,
+  replaceDoc,
+  revealAnchor,
+  setEditorMode,
+} from "@nota/editor";
 import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
-import { fail, openExternal, openWikilink } from "../actions.ts";
+import { fail } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { noteHandlers } from "../editorHandlers.ts";
 import { label } from "../lib/shortcuts.ts";
 import { filename, joinTitle, splitTitle, stem, type TitleParts } from "../lib/notes.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
@@ -207,9 +215,7 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
         }
         schedule();
       },
-      onWikilink: (target) => void openWikilink(client, qc, target, path),
-      onTag: (tag) => useUI.getState().navigate({ kind: "list", list: { type: "tag", tag } }),
-      onLink: openExternal,
+      ...noteHandlers(client, qc, path),
     });
     view.current = v;
     const flush = () => void save();
@@ -234,6 +240,38 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     };
     // The editor is keyed by path; later note updates arrive below.
   }, [path]);
+
+  // Images or embedded notes changed elsewhere (sync, another program):
+  // they load again. The web's events don't say what changed.
+  useEffect(
+    () =>
+      client.subscribe(({ paths }) => {
+        const v = view.current;
+        if (!v) return;
+        refreshMedia(v, {
+          files: paths.some((p) => /\.(?:png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(p)),
+          notes: paths.some((p) => /\.md$/i.test(p) && p !== path),
+        });
+      }),
+    [client, path],
+  );
+
+  // A link asked for a heading or block of this note: scroll there once
+  // the editor has it, then forget it (a reload starts at the top).
+  const anchor = useUI((s) =>
+    s.route.kind === "note" && s.route.path === path ? s.route.anchor : undefined,
+  );
+  useEffect(() => {
+    const v = view.current;
+    if (!v || !anchor) return;
+    const id = requestAnimationFrame(() => {
+      if (!revealAnchor(v, anchor)) toast(`No heading or block “${anchor}” in this note`);
+      const r = useUI.getState().route;
+      if (r.kind === "note" && r.path === path)
+        useUI.setState({ route: { ...r, anchor: undefined } });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [anchor, path]);
 
   // The mode changed (⌘E, ⌘K, the top bar): same editor, other extensions.
   // Source holds the title line too, so the text swaps when entering or
@@ -270,7 +308,12 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     const onClick = (e: MouseEvent) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       const t = e.target as HTMLElement | null;
-      if (t?.closest(".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], a")) return;
+      if (
+        t?.closest(
+          ".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], [data-footnote], [data-footnote-def], .cm-embed, a",
+        )
+      )
+        return;
       if (!(window.getSelection()?.isCollapsed ?? true)) return;
       editAt.current = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
       useUI.getState().setNoteMode("live");

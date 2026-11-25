@@ -23,6 +23,7 @@ scripts/demo-vault.sh /tmp/nota-demo   # A small vault to try things on.
   `events`, `edit`, `hooks`, `mcp`, `protocol`, `server`, `sync`, `cli`.
 - `apps/desktop`: the MyGo desktop app (Go services + the shared React UI).
 - `apps/web`, `apps/landing`: the web app and the landing page.
+- `skills/nota`: the agent skill, installed with `npx skills add banjo/nota`.
 - `packages/app` (React UI), `packages/client` (desktop and HTTP clients), `packages/editor`
   (CodeMirror 6), `packages/ui` (Tailwind tokens and components).
 
@@ -49,7 +50,8 @@ review the diff before you commit it.
 
 - One logical change per commit, with a message in the imperative ("Add …", "Fix …") and a body
   that says why.
-- Add or update tests with the change, and docs when behaviour changes.
+- Add or update tests with the change, and docs when behaviour changes. A change to a CLI
+  command, an MCP tool or a `.nota/` format also needs the agent skill in `skills/nota/`.
 - Add a changeset (`bunx changeset`, pick `@nota/desktop`, patch) when the change reaches users;
   its line goes into the release notes. See [RELEASE.md](RELEASE.md).
 - `bun.lock` resolves everything from the public npm registry. If your machine points npm at

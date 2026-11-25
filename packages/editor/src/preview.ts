@@ -1,4 +1,11 @@
-import type { Extension, Range } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
+import {
+  EditorState,
+  type Extension,
+  type Range,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -7,21 +14,51 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { activeLines, type DecoSpec, previewSpecs, toggleTaskAt } from "./decorations.ts";
+import {
+  activeLines,
+  type CalloutKind,
+  type DecoSpec,
+  findAnchor,
+  findSection,
+  footnotes,
+  type InlineSpec,
+  previewSpecs,
+  type TableCell,
+  type TableSpec,
+  tableSpecs,
+  toggleTaskAt,
+} from "./decorations.ts";
+
+const STATUS_LABELS: Record<string, string> = {
+  "/": "In progress",
+  "-": "Cancelled",
+  ">": "Forwarded",
+  "<": "Scheduled",
+  "!": "Important",
+  "?": "Question",
+  "*": "Star",
+};
 
 class CheckboxWidget extends WidgetType {
-  constructor(readonly checked: boolean) {
+  constructor(
+    readonly checked: boolean,
+    readonly status?: string,
+  ) {
     super();
   }
   eq(other: CheckboxWidget) {
-    return other.checked === this.checked;
+    return other.checked === this.checked && other.status === this.status;
   }
   toDOM() {
     const box = document.createElement("span");
     box.className = "cm-task-checkbox";
     box.setAttribute("role", "checkbox");
-    box.setAttribute("aria-checked", String(this.checked));
     box.dataset.checked = String(this.checked);
+    if (this.status) {
+      box.dataset.status = this.status;
+      box.setAttribute("aria-checked", this.status === "/" ? "mixed" : "false");
+      box.title = STATUS_LABELS[this.status] ?? "";
+    } else box.setAttribute("aria-checked", String(this.checked));
     return box;
   }
   ignoreEvent() {
@@ -41,14 +78,428 @@ class BulletWidget extends WidgetType {
   }
 }
 
+/** Text with its inline specs as spans: hidden ranges dropped, marks nested. */
+function renderInline(parent: HTMLElement, text: string, specs: InlineSpec[]) {
+  const cuts = new Set([0, text.length]);
+  for (const s of specs) {
+    cuts.add(s.from);
+    cuts.add(s.to);
+  }
+  const points = [...cuts].sort((a, b) => a - b);
+  const marks = specs
+    .filter((s): s is Extract<InlineSpec, { type: "mark" }> => s.type === "mark")
+    .sort((a, b) => a.from - b.from || b.to - a.to);
+  for (let i = 0; i < points.length - 1; i++) {
+    const from = points[i]!;
+    const to = points[i + 1]!;
+    if (specs.some((s) => s.type === "hide" && s.from <= from && s.to >= to)) continue;
+    // A mark with data-text stands in for its whole range (a footnote's number).
+    const stand = marks.find((m) => m.attrs?.["data-text"] && m.from <= from && m.to >= to);
+    if (stand && stand.from !== from) continue;
+    let node: Node = document.createTextNode(
+      stand ? stand.attrs!["data-text"]! : text.slice(from, to),
+    );
+    for (const m of marks.filter((m) => m.from <= from && m.to >= to).reverse()) {
+      const span = document.createElement("span");
+      span.className = m.class;
+      for (const [k, v] of Object.entries(m.attrs ?? {})) span.setAttribute(k, v);
+      span.append(node);
+      node = span;
+    }
+    parent.append(node);
+  }
+}
+
+class TableWidget extends WidgetType {
+  constructor(readonly table: TableSpec) {
+    super();
+  }
+  eq(other: TableWidget) {
+    return other.table.source === this.table.source;
+  }
+  toDOM() {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-table-widget";
+    const table = document.createElement("table");
+    const row = (cells: TableCell[], tag: "th" | "td") => {
+      const tr = document.createElement("tr");
+      cells.forEach((cell, i) => {
+        const el = document.createElement(tag);
+        const align = this.table.align[i];
+        if (align) el.style.textAlign = align;
+        el.dataset.offset = String(cell.offset + cell.text.length);
+        renderInline(el, cell.text, cell.specs);
+        tr.append(el);
+      });
+      return tr;
+    };
+    const head = document.createElement("thead");
+    head.append(row(this.table.header, "th"));
+    const body = document.createElement("tbody");
+    for (const r of this.table.rows) body.append(row(r, "td"));
+    table.append(head);
+    if (this.table.rows.length) table.append(body);
+    wrap.append(table);
+    return wrap;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+const setFocused = StateEffect.define<boolean>();
+
+/** Whether the editor has focus, as state, for the table field. */
+const focused = StateField.define<boolean>({
+  create: () => false,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setFocused)) return e.value;
+    return value;
+  },
+});
+
+const tableDecorations = (state: EditorState, reading: boolean): DecorationSet =>
+  Decoration.set(
+    tableSpecs(state, {
+      activeLines: reading ? new Set<number>() : activeLines(state, state.field(focused)),
+      reading,
+    }).map((t) =>
+      Decoration.replace({ widget: new TableWidget(t), block: true }).range(t.from, t.to),
+    ),
+  );
+
+/**
+ * Rendered tables replace whole lines, which only a state field may do
+ * (block decorations can't come from a view plugin).
+ */
+const tablesField = (reading: boolean) =>
+  StateField.define<DecorationSet>({
+    create: (state) => tableDecorations(state, reading),
+    update(deco, tr) {
+      const changed =
+        tr.docChanged ||
+        tr.selection ||
+        tr.effects.some((e) => e.is(setFocused)) ||
+        syntaxTree(tr.state) !== syntaxTree(tr.startState);
+      return changed ? tableDecorations(tr.state, reading) : deco;
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
+
+class CalloutWidget extends WidgetType {
+  constructor(
+    readonly kind: CalloutKind,
+    readonly label: string | undefined,
+  ) {
+    super();
+  }
+  eq(other: CalloutWidget) {
+    return other.kind === this.kind && other.label === this.label;
+  }
+  toDOM() {
+    const head = document.createElement("span");
+    head.className = "cm-callout-head";
+    const icon = document.createElement("span");
+    icon.className = "cm-callout-icon";
+    icon.dataset.callout = this.kind;
+    icon.setAttribute("aria-hidden", "true");
+    head.append(icon);
+    if (this.label) {
+      const label = document.createElement("span");
+      label.className = "cm-callout-label";
+      label.textContent = this.label;
+      head.append(label);
+    }
+    return head;
+  }
+}
+
+/** A footnote reference as its number, or a definition's number. */
+class FootnoteWidget extends WidgetType {
+  constructor(
+    readonly id: string,
+    readonly label: string,
+    readonly definition: boolean,
+    /** An inline footnote's text, shown in a bubble on hover or focus. */
+    readonly note?: string,
+  ) {
+    super();
+  }
+  eq(other: FootnoteWidget) {
+    return (
+      other.id === this.id &&
+      other.label === this.label &&
+      other.definition === this.definition &&
+      other.note === this.note
+    );
+  }
+  toDOM() {
+    if (this.definition) {
+      const el = document.createElement("span");
+      el.className = "cm-footnote-label";
+      el.dataset.footnoteDef = this.id;
+      el.textContent = `${this.label}.`;
+      return el;
+    }
+    const el = document.createElement("sup");
+    el.className = "cm-footnote-ref";
+    el.dataset.footnote = this.id;
+    el.textContent = this.label;
+    if (this.note !== undefined) {
+      el.tabIndex = 0;
+      el.setAttribute("aria-label", `Footnote ${this.label}: ${this.note}`);
+      const pop = document.createElement("span");
+      pop.className = "cm-footnote-pop";
+      pop.setAttribute("aria-hidden", "true");
+      pop.textContent = this.note;
+      el.append(pop);
+    }
+    return el;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+const flashLine = StateEffect.define<number | null>();
+
+/** A line that briefly lights up after a jump to it. */
+const flash = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    for (const e of tr.effects)
+      if (e.is(flashLine))
+        return e.value === null
+          ? Decoration.none
+          : Decoration.set(
+              Decoration.line({ class: "cm-footnote-flash" }).range(
+                tr.state.doc.lineAt(e.value).from,
+              ),
+            );
+    return tr.docChanged ? deco.map(tr.changes) : deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/** Scrolls to pos and lights its line up, without moving the cursor. */
+function jumpTo(view: EditorView, pos: number) {
+  view.dispatch({ effects: [EditorView.scrollIntoView(pos, { y: "center" }), flashLine.of(pos)] });
+  setTimeout(() => {
+    if (view.dom.isConnected) view.dispatch({ effects: flashLine.of(null) });
+  }, 1200);
+}
+
+/** Text in place of its source, such as an entity's character. */
+class TextWidget extends WidgetType {
+  constructor(readonly text: string) {
+    super();
+  }
+  eq(other: TextWidget) {
+    return other.text === this.text;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-text-widget";
+    el.textContent = this.text;
+    return el;
+  }
+}
+
+class BreakWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-break";
+    return el;
+  }
+}
+
+const br = Decoration.replace({ widget: new BreakWidget() });
+
+/** A placeholder for an image or embed that isn't there. */
+function missing(el: HTMLElement, text: string) {
+  el.classList.add("cm-media-missing");
+  el.replaceChildren(text);
+}
+
+class ImageWidget extends WidgetType {
+  constructor(
+    readonly src: string,
+    readonly url: string | null,
+    readonly alt: string,
+    readonly width: number | undefined,
+    readonly block: boolean,
+  ) {
+    super();
+  }
+  eq(other: ImageWidget) {
+    return (
+      other.url === this.url &&
+      other.src === this.src &&
+      other.alt === this.alt &&
+      other.width === this.width &&
+      other.block === this.block
+    );
+  }
+  toDOM() {
+    const wrap = document.createElement("span");
+    wrap.className = this.block ? "cm-image cm-image-block" : "cm-image";
+    const name = this.src.split("/").pop() ?? this.src;
+    if (!this.url) {
+      missing(wrap, `Image not found: ${name}`);
+      return wrap;
+    }
+    const img = document.createElement("img");
+    img.src = this.url;
+    img.alt = this.alt;
+    if (this.alt) img.title = this.alt;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.draggable = false;
+    if (this.width) img.style.width = `${this.width}px`;
+    img.addEventListener("error", () => missing(wrap, `Image not found: ${name}`), { once: true });
+    wrap.append(img);
+    return wrap;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+/** What an embed shows: the note's body, read with the embedded note's links. */
+export interface EmbeddedNote {
+  path: string;
+  title: string;
+  body: string;
+  /** For the embedded note's own links and images (it may be in another folder). */
+  handlers: PreviewHandlers;
+}
+
+type Mount = (parent: HTMLElement, doc: string, handlers: PreviewHandlers) => EditorView;
+let mountReading: Mount | null = null;
+/** The markdown language, for findSection outside an editor. */
+let language: Extension = [];
+
+/**
+ * How an embed mounts a read-only editor, and the language it parses
+ * sections with; set by createEditor's module (which imports this one).
+ */
+export function setEmbedMount(mount: Mount, markdown: Extension) {
+  mountReading = mount;
+  language = markdown;
+}
+
+class EmbedWidget extends WidgetType {
+  child: EditorView | null = null;
+  gone = false;
+  constructor(
+    readonly target: string,
+    readonly heading: string | undefined,
+    readonly epoch: number,
+    readonly handlers: PreviewHandlers,
+  ) {
+    super();
+  }
+  eq(other: EmbedWidget) {
+    return (
+      other.target === this.target && other.heading === this.heading && other.epoch === this.epoch
+    );
+  }
+  toDOM() {
+    const box = document.createElement("div");
+    box.className = "cm-embed";
+    const head = document.createElement("div");
+    head.className = "cm-embed-head";
+    head.textContent = this.heading ? `${this.target} › ${this.heading}` : this.target;
+    head.setAttribute("role", "link");
+    head.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      this.handlers.onWikilink?.(this.target, this.heading);
+    });
+    const body = document.createElement("div");
+    body.className = "cm-embed-body";
+    box.append(head, body);
+    const load = this.handlers.embedNote?.(this.target, this.heading);
+    void load?.then(
+      (note) => {
+        if (this.gone) return;
+        if (!note) return missing(body, `No note named “${this.target}”`);
+        head.textContent = this.heading ? `${note.title} › ${this.heading}` : note.title;
+        let text = note.body;
+        if (this.heading) {
+          const range = findSection(
+            EditorState.create({ doc: text, extensions: language }),
+            this.heading,
+          );
+          if (!range)
+            return missing(body, `No heading or block “${this.heading}” in ${note.title}`);
+          text = text.slice(range.from, range.to);
+        }
+        // One level: an embed in the embedded note is a link.
+        const { embedNote: _, ...inner } = note.handlers;
+        if (mountReading) this.child = mountReading(body, text, inner);
+      },
+      () => missing(body, `Couldn't load “${this.target}”`),
+    );
+    return box;
+  }
+  destroy() {
+    this.gone = true;
+    this.child?.destroy();
+    this.child = null;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+/**
+ * Scrolls to a heading ("Mål", "mål", GitHub's "#m%C3%A5l") or block
+ * ("^id") of the note and lights it up. False when there is none.
+ */
+export function revealAnchor(view: EditorView, anchor: string): boolean {
+  const pos = findAnchor(view.state, anchor);
+  if (pos === undefined) return false;
+  jumpTo(view, pos);
+  return true;
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
-const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
+const checkbox = (checked: boolean, status?: string) =>
+  Decoration.replace({ widget: new CheckboxWidget(checked, status) });
+
+/** What images and embeds need besides their specs. */
+export interface MediaContext {
+  handlers?: PreviewHandlers;
+  /** Bumped when the vault's files (images) or other notes (embeds) change. */
+  epoch?: { files: number; notes: number };
+}
 
 /** Turns specs into a sorted decoration set. */
-export function toDecorations(specs: DecoSpec[]): DecorationSet {
+export function toDecorations(specs: DecoSpec[], ctx: MediaContext = {}): DecorationSet {
   const ranges: Range<Decoration>[] = [];
+  const epoch = ctx.epoch ?? { files: 0, notes: 0 };
   for (const s of specs) {
+    if (s.type === "widget" && (s.widget === "image" || s.widget === "embed")) {
+      let widget: WidgetType;
+      if (s.widget === "image") {
+        let url = ctx.handlers?.resolveAsset?.(s.src ?? "", !!s.wiki) ?? null;
+        if (url && epoch.files) url += `${url.includes("?") ? "&" : "?"}v=${epoch.files}`;
+        widget = new ImageWidget(s.src ?? "", url, s.alt ?? "", s.width, !!s.block);
+      } else {
+        widget = new EmbedWidget(s.src ?? "", s.heading, epoch.notes, ctx.handlers ?? {});
+      }
+      ranges.push(
+        s.after
+          ? Decoration.widget({ widget, side: 1 }).range(s.to)
+          : Decoration.replace({ widget }).range(s.from, s.to),
+      );
+      continue;
+    }
     switch (s.type) {
       case "hide":
         ranges.push(hidden.range(s.from, s.to));
@@ -65,7 +516,28 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
         );
         break;
       case "widget":
-        ranges.push((s.widget === "bullet" ? bullet : checkbox(!!s.checked)).range(s.from, s.to));
+        if (s.widget === "break") {
+          ranges.push(br.range(s.from, s.to));
+        } else if (s.widget === "text") {
+          ranges.push(
+            Decoration.replace({ widget: new TextWidget(s.label ?? "") }).range(s.from, s.to),
+          );
+        } else if (s.widget === "footnote" || s.widget === "footnote-label") {
+          const widget = new FootnoteWidget(
+            s.footnote ?? "",
+            s.label ?? "",
+            s.widget === "footnote-label",
+            s.note,
+          );
+          ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
+        } else if (s.widget === "callout") {
+          const widget = new CalloutWidget(s.callout ?? "note", s.label);
+          ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
+        } else {
+          ranges.push(
+            (s.widget === "bullet" ? bullet : checkbox(!!s.checked, s.status)).range(s.from, s.to),
+          );
+        }
         break;
     }
   }
@@ -79,6 +551,132 @@ export interface PreviewHandlers {
   onTag?: (tag: string) => void;
   /** A click on a rendered link or URL. */
   onLink?: (href: string) => void;
+  /**
+   * The URL of an image in the note: src as written in ![](src), or an
+   * embed's target from ![[src]] (wiki). Null when it can't be shown.
+   * Without it, images are links.
+   */
+  resolveAsset?: (src: string, wiki: boolean) => string | null;
+  /** The note ![[target#heading]] embeds, or null. Without it, embeds are links. */
+  embedNote?: (target: string, heading?: string) => Promise<EmbeddedNote | null>;
+  /**
+   * Saves an image pasted or dropped into the note and resolves to the
+   * markdown that shows it, or null. Without it, pasting a file does
+   * what the browser does.
+   */
+  onAttach?: (file: File) => Promise<string | null>;
+}
+
+const refresh = StateEffect.define<{ files: boolean; notes: boolean }>();
+
+/** How often the vault's files and notes changed, for images and embeds to reload. */
+const epochs = StateField.define<{ files: number; notes: number }>({
+  create: () => ({ files: 0, notes: 0 }),
+  update(value, tr) {
+    let out = value;
+    for (const e of tr.effects)
+      if (e.is(refresh))
+        out = {
+          files: out.files + (e.value.files ? 1 : 0),
+          notes: out.notes + (e.value.notes ? 1 : 0),
+        };
+    return out;
+  },
+});
+
+/**
+ * Tells a mounted editor that the vault's images (files) or other notes
+ * (notes) changed: images and embeds load again.
+ */
+export function refreshMedia(view: EditorView, changed: { files?: boolean; notes?: boolean }) {
+  if (!changed.files && !changed.notes) return;
+  view.dispatch({ effects: refresh.of({ files: !!changed.files, notes: !!changed.notes }) });
+}
+
+const addPending = StateEffect.define<{ id: number; pos: number }>();
+const endPending = StateEffect.define<number>();
+
+/** Where pasted files go while they upload, kept in place through edits. */
+const pending = StateField.define<ReadonlyMap<number, number>>({
+  create: () => new Map(),
+  update(value, tr) {
+    let out = value;
+    if (tr.docChanged) {
+      const next = new Map<number, number>();
+      for (const [id, pos] of value) next.set(id, tr.changes.mapPos(pos, 1));
+      out = next;
+    }
+    for (const e of tr.effects) {
+      if (e.is(addPending)) out = new Map(out).set(e.value.id, e.value.pos);
+      if (e.is(endPending)) {
+        const next = new Map(out);
+        next.delete(e.value);
+        out = next;
+      }
+    }
+    return out;
+  },
+});
+
+let pendingId = 0;
+
+const imageFiles = (data: DataTransfer | null) =>
+  [...(data?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+
+/** Uploads files and inserts their markdown where they were put, one per line. */
+async function insertFiles(
+  view: EditorView,
+  files: File[],
+  attach: (file: File) => Promise<string | null>,
+  at: { from: number; to: number },
+  userEvent: string,
+) {
+  const id = ++pendingId;
+  view.dispatch({
+    changes: at.to > at.from ? { from: at.from, to: at.to } : undefined,
+    effects: addPending.of({ id, pos: at.from }),
+  });
+  const results: (string | null)[] = [];
+  for (const f of files) results.push(await attach(f).catch(() => null));
+  const text = results.filter(Boolean).join("\n");
+  if (!view.dom.isConnected) return;
+  const pos = view.state.field(pending, false)?.get(id) ?? view.state.selection.main.head;
+  view.dispatch({
+    ...(text
+      ? { changes: { from: pos, insert: text }, selection: { anchor: pos + text.length } }
+      : {}),
+    effects: endPending.of(id),
+    userEvent,
+  });
+}
+
+/** Pasting or dropping images saves them (onAttach) and links them. */
+export function attachments(handlers: PreviewHandlers): Extension {
+  const attach = handlers.onAttach;
+  if (!attach) return [];
+  return [
+    pending,
+    EditorView.domEventHandlers({
+      paste(event, view) {
+        const files = imageFiles(event.clipboardData);
+        if (!files.length || view.state.readOnly) return false;
+        event.preventDefault();
+        const { from, to } = view.state.selection.main;
+        void insertFiles(view, files, attach, { from, to }, "input.paste");
+        return true;
+      },
+      drop(event, view) {
+        const files = imageFiles(event.dataTransfer);
+        if (!files.length || view.state.readOnly) return false;
+        event.preventDefault();
+        const pos =
+          view.posAtCoords({ x: event.clientX, y: event.clientY }) ??
+          view.state.selection.main.head;
+        void insertFiles(view, files, attach, { from: pos, to: pos }, "input.drop");
+        return true;
+      },
+    }),
+  ];
 }
 
 /** The live-preview extension: decorations plus clickable widgets. */
@@ -94,7 +692,13 @@ export function livePreview(
         this.decorations = this.build(view);
       }
       update(u: ViewUpdate) {
-        if (u.docChanged || u.selectionSet || u.viewportChanged || u.focusChanged)
+        if (
+          u.docChanged ||
+          u.selectionSet ||
+          u.viewportChanged ||
+          u.focusChanged ||
+          u.startState.field(epochs) !== u.state.field(epochs)
+        )
           this.decorations = this.build(u.view);
       }
       build(view: EditorView) {
@@ -104,7 +708,10 @@ export function livePreview(
             activeLines: reading ? new Set<number>() : activeLines(view.state, view.hasFocus),
             reading,
             ranges: view.visibleRanges,
+            images: !!handlers.resolveAsset,
+            embeds: !!handlers.embedNote,
           }),
+          { handlers, epoch: view.state.field(epochs) },
         );
       }
     },
@@ -122,6 +729,20 @@ export function livePreview(
         event.preventDefault();
         return true;
       }
+      // A footnote jumps to its definition, and a definition's number
+      // back to the first reference.
+      const note = target.closest<HTMLElement>("[data-footnote], [data-footnote-def]");
+      if (note && event.button === 0) {
+        const fn = footnotes(view.state);
+        const pos = note.dataset.footnote
+          ? fn.defs.get(note.dataset.footnote)
+          : fn.refs.get(note.dataset.footnoteDef!);
+        if (pos !== undefined) {
+          jumpTo(view, pos);
+          event.preventDefault();
+          return true;
+        }
+      }
       // Rendered links open on click; on the line being edited (where
       // the source shows) they need ⌘/Ctrl, so clicking still places
       // the cursor.
@@ -131,6 +752,12 @@ export function livePreview(
       const onSourceLine = !reading && activeLines(view.state, view.hasFocus).has(lineNo);
       if (onSourceLine && !(event.metaKey || event.ctrlKey)) return false;
       const wl = target.closest<HTMLElement>("[data-wikilink]");
+      // [[#Heading]] and [[#^id]]: this note.
+      if (wl && !wl.dataset.wikilink && wl.dataset.heading) {
+        revealAnchor(view, wl.dataset.heading);
+        event.preventDefault();
+        return true;
+      }
       if (wl && handlers.onWikilink) {
         handlers.onWikilink(wl.dataset.wikilink!, wl.dataset.heading);
         event.preventDefault();
@@ -143,6 +770,12 @@ export function livePreview(
         return true;
       }
       const link = target.closest<HTMLElement>("[data-href]");
+      // [text](#heading): this note.
+      if (link?.dataset.href!.startsWith("#")) {
+        revealAnchor(view, link.dataset.href!.slice(1));
+        event.preventDefault();
+        return true;
+      }
       if (link && handlers.onLink) {
         handlers.onLink(link.dataset.href!);
         event.preventDefault();
@@ -152,5 +785,32 @@ export function livePreview(
     },
   });
 
-  return [plugin, clicks];
+  // A click on a rendered table puts the cursor at the end of that cell,
+  // which shows the table's source (Live only).
+  const tableClicks = EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (reading || event.button !== 0) return false;
+      const target = event.target as HTMLElement;
+      const wrap = target.closest<HTMLElement>(".cm-table-widget");
+      if (!wrap) return false;
+      const cell = target.closest<HTMLElement>("[data-offset]");
+      const start = view.posAtDOM(wrap);
+      const anchor = cell ? start + Number(cell.dataset.offset) : view.state.doc.lineAt(start).to;
+      view.dispatch({ selection: { anchor }, scrollIntoView: true, userEvent: "select.pointer" });
+      view.focus();
+      event.preventDefault();
+      return true;
+    },
+  });
+
+  return [
+    epochs,
+    focused,
+    flash,
+    EditorView.focusChangeEffect.of((_, focusing) => setFocused.of(focusing)),
+    tablesField(reading),
+    plugin,
+    clicks,
+    tableClicks,
+  ];
 }

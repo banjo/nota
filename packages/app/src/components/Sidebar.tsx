@@ -7,7 +7,7 @@ import { useState } from "react";
 import { createNote, newNoteFolder } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { label } from "../lib/shortcuts.ts";
-import { useTree, useVaultInfo } from "../queries.ts";
+import { useInboxName, useVaultInfo } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { SidebarScroll } from "./FolderTree.tsx";
@@ -24,7 +24,7 @@ export function Sidebar() {
   const navigate = useUI((s) => s.navigate);
   const client = useClient();
   const qc = useQueryClient();
-  const tree = useTree();
+  const inbox = useInboxName();
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const name = info.data?.name ?? "Notes";
 
@@ -69,11 +69,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={() =>
-              void createNote(
-                client,
-                qc,
-                newNoteFolder(useUI.getState().route, tree.data?.inbox ?? "Inbox"),
-              )
+              void createNote(client, qc, newNoteFolder(useUI.getState().route, inbox))
             }
             className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-ui text-muted-foreground outline-none hover:bg-hover hover:text-foreground focus-visible:bg-hover active:bg-hover pointer-coarse:h-11 pointer-coarse:text-[15px]"
           >

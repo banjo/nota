@@ -10,14 +10,15 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/banjo/nota/internal/protocol"
 )
 
 // BlobStore keeps file contents by their hash (protocol.Hash). Writing
 // the same content twice stores it once. Implementations must be safe for
-// concurrent use. The local disk store is DiskBlobs; an S3 store can
-// implement the same interface later.
+// concurrent use: DiskBlobs keeps them in a local directory, S3Blobs in
+// an S3-compatible bucket.
 type BlobStore interface {
 	// Put reads r to the end, stores the bytes under their hash and
 	// returns it with the size. It fails with ErrTooLarge when r has more
@@ -26,6 +27,22 @@ type BlobStore interface {
 	// Open returns the content stored under hash, or an error wrapping
 	// fs.ErrNotExist.
 	Open(ctx context.Context, hash string) (io.ReadCloser, error)
+	// Stat returns the size and time of the content stored under hash,
+	// or an error wrapping fs.ErrNotExist.
+	Stat(ctx context.Context, hash string) (BlobInfo, error)
+	// Delete removes the content stored under hash; it is not an error
+	// when there is none.
+	Delete(ctx context.Context, hash string) error
+	// Walk calls fn for every blob stored, in no particular order, and
+	// stops at the first error fn returns.
+	Walk(ctx context.Context, fn func(BlobInfo) error) error
+}
+
+// BlobInfo describes a stored blob.
+type BlobInfo struct {
+	Hash     string
+	Size     int64
+	Modified time.Time
 }
 
 // ErrTooLarge is returned by BlobStore.Put for content above the limit.
@@ -92,4 +109,61 @@ func (d *DiskBlobs) Open(_ context.Context, hash string) (io.ReadCloser, error) 
 		return nil, &fs.PathError{Op: "open", Path: hash, Err: fs.ErrNotExist}
 	}
 	return os.Open(d.path(hash))
+}
+
+// Stat implements BlobStore.
+func (d *DiskBlobs) Stat(_ context.Context, hash string) (BlobInfo, error) {
+	if !protocol.ValidHash(hash) {
+		return BlobInfo{}, &fs.PathError{Op: "stat", Path: hash, Err: fs.ErrNotExist}
+	}
+	fi, err := os.Stat(d.path(hash))
+	if err != nil {
+		return BlobInfo{}, err
+	}
+	return BlobInfo{Hash: hash, Size: fi.Size(), Modified: fi.ModTime()}, nil
+}
+
+// Delete implements BlobStore.
+func (d *DiskBlobs) Delete(_ context.Context, hash string) error {
+	if !protocol.ValidHash(hash) {
+		return nil
+	}
+	if err := os.Remove(d.path(hash)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// Walk implements BlobStore. Files outside the <ab>/ directories (tmp/)
+// and names that are not hashes are skipped.
+func (d *DiskBlobs) Walk(ctx context.Context, fn func(BlobInfo) error) error {
+	return filepath.WalkDir(d.dir, func(p string, e fs.DirEntry, err error) error {
+		if err != nil {
+			if p == d.dir && errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil // removed while walking
+			}
+			return err
+		}
+		if e.IsDir() {
+			if p != d.dir && filepath.Dir(p) != d.dir {
+				return filepath.SkipDir
+			}
+			return ctx.Err()
+		}
+		name := e.Name()
+		if filepath.Dir(p) == d.dir || !protocol.ValidHash(name) || filepath.Base(filepath.Dir(p)) != name[:2] {
+			return nil
+		}
+		fi, err := e.Info()
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		return fn(BlobInfo{Hash: name, Size: fi.Size(), Modified: fi.ModTime()})
+	})
 }

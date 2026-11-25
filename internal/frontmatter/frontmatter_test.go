@@ -73,8 +73,7 @@ func TestSetIsByteStable(t *testing.T) {
 	}
 }
 
-// SetLiteral keeps the line's own style: a timestamp stays unquoted,
-// where Set would quote it because YAML could read it as a date.
+// SetLiteral writes the value as it is, without quoting.
 func TestSetLiteral(t *testing.T) {
 	out, err := SetLiteral([]byte(sample), "updated", "2026-11-22T10:42:00+01:00")
 	if err != nil {
@@ -85,6 +84,35 @@ func TestSetLiteral(t *testing.T) {
 	}
 	if _, err := SetLiteral([]byte(sample), "updated", "a\nb"); err == nil {
 		t.Fatal("a newline in the value must be refused")
+	}
+}
+
+// Dates and timestamps are written without quotes, as Obsidian and the
+// created/updated lines write them; other text is encoded as before.
+func TestSetDatesUnquoted(t *testing.T) {
+	cases := map[string]string{
+		"2026-12-24":                    "due: 2026-12-24",
+		"2026-12-24T10:00:00+01:00":     "due: 2026-12-24T10:00:00+01:00",
+		"2026-12-24T10:00:00.5Z":        "due: 2026-12-24T10:00:00.5Z",
+		"2026-13-01":                    "due: 2026-13-01",
+		"2026-12-24 10:00":              `due: "2026-12-24 10:00"`,
+		"2026-12-24T10:00:00+01:00 ish": `due: "2026-12-24T10:00:00+01:00 ish"`,
+	}
+	for in, want := range cases {
+		out, err := Set([]byte("# Trip\n"), "due", in)
+		if err != nil {
+			t.Fatalf("%s: %v", in, err)
+		}
+		if !strings.Contains(string(out), "\n"+want+"\n") {
+			t.Errorf("%s: got\n%s", in, out)
+		}
+		p, err := Split(out).Properties()
+		if err != nil {
+			t.Fatalf("%s: %v", in, err)
+		}
+		if p["due"] != in {
+			t.Errorf("%s: reads back as %#v", in, p["due"])
+		}
 	}
 }
 

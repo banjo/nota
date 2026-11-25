@@ -2,13 +2,7 @@ package server
 
 import (
 	"context"
-	"errors"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"time"
-
-	"github.com/banjo/nota/internal/protocol"
 )
 
 // Blob garbage collection. The blob store is content addressed and the
@@ -20,7 +14,7 @@ import (
 //   - rows of the blobs table whose hash appears in no version and no
 //     file (a vault or an account was deleted, or a delete was undone
 //     by a restored older version);
-//   - files in the blob directory that the database does not know: the
+//   - blobs in the store that the database does not know: the
 //     upload of a file that failed between writing the bytes and
 //     committing the version, or the leftovers of a deleted vault.
 //
@@ -30,7 +24,7 @@ import (
 //     path every other mutation uses (SQLite BEGIN IMMEDIATE, also across
 //     processes), so a commit that references a hash cannot run between
 //     reading the reference set and deleting the rows;
-//   - a disk file is only removed once no version and no row references
+//   - a stored blob is only removed once no version and no row references
 //     it;
 //   - a file younger than MinAge (default DefaultBlobGrace) is left
 //     alone even when unreferenced, because an upload writes its bytes
@@ -77,15 +71,10 @@ type GCResult struct {
 	Young int `json:"young"`
 }
 
-type diskBlob struct {
-	size int64
-	mod  time.Time
-}
-
 // CollectBlobs runs one garbage collection pass over the database and
-// the blob directory (normally <data>/blobs). Call it only from one place
-// at a time; CollectBlobs itself is safe next to the server's writes.
-func (s *Store) CollectBlobs(ctx context.Context, blobDir string, opt BlobGC) (GCResult, error) {
+// the blob store. Call it only from one place at a time; CollectBlobs
+// itself is safe next to the server's writes.
+func (s *Store) CollectBlobs(ctx context.Context, blobs BlobStore, opt BlobGC) (GCResult, error) {
 	res := GCResult{DryRun: opt.DryRun}
 	if opt.Now.IsZero() {
 		opt.Now = s.now()
@@ -95,37 +84,13 @@ func (s *Store) CollectBlobs(ctx context.Context, blobDir string, opt BlobGC) (G
 	}
 	cutoff := opt.Now.Add(-opt.MinAge)
 
-	// Snapshot the files first, outside the transaction: the walk can
+	// Snapshot the store first, outside the transaction: the walk can
 	// take a while and holds no lock.
-	disk := map[string]diskBlob{}
-	err := filepath.WalkDir(blobDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if p == blobDir && errors.Is(err, os.ErrNotExist) {
-				return nil
-			}
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		name := d.Name()
-		if filepath.Dir(p) == blobDir { // tmp/ and anything else loose
-			return nil
-		}
-		if !protocol.ValidHash(name) {
-			return nil
-		}
-		fi, err := d.Info()
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return nil
-			}
-			return err
-		}
-		disk[name] = diskBlob{size: fi.Size(), mod: fi.ModTime()}
+	disk := map[string]BlobInfo{}
+	if err := blobs.Walk(ctx, func(b BlobInfo) error {
+		disk[b.Hash] = b
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return res, err
 	}
 
@@ -199,10 +164,7 @@ func (s *Store) CollectBlobs(ctx context.Context, blobDir string, opt BlobGC) (G
 		if opt.DryRun {
 			return nil
 		}
-		if err := os.Remove(BlobPath(blobDir, h)); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		return nil
+		return blobs.Delete(ctx, h)
 	}
 	for h, size := range stale {
 		if live[h] {
@@ -219,12 +181,12 @@ func (s *Store) CollectBlobs(ctx context.Context, blobDir string, opt BlobGC) (G
 		if live[h] || stale[h] > 0 {
 			continue
 		}
-		if f.mod.After(cutoff) {
+		if f.Modified.After(cutoff) {
 			res.Young++
 			continue
 		}
 		res.Orphans++
-		if err := remove(h, f.size); err != nil {
+		if err := remove(h, f.Size); err != nil {
 			return res, err
 		}
 	}

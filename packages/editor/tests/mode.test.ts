@@ -1,8 +1,11 @@
-import { ensureSyntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, LanguageDescription, syntaxTree } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
+import { highlightTree } from "@lezer/highlight";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, test } from "vite-plus/test";
 import {
+  codeHighlight,
   extensions,
   isEditorMode,
   modeExtensions,
@@ -35,7 +38,9 @@ const DOC = [
 function parsed(doc: string, cursor: number) {
   const s = EditorState.create({ doc, extensions, selection: EditorSelection.cursor(cursor) });
   ensureSyntaxTree(s, s.doc.length, 5000);
-  return s;
+  // syntaxTree(s) is still the tree of the state's first, time-boxed
+  // parse (partial on a slow machine); a transaction picks up the rest.
+  return s.update({}).state;
 }
 
 // Spec order inside a code fence depends on the parse, so compare sorted.
@@ -109,5 +114,23 @@ describe("switching modes", () => {
     expect(["live", "reading", "source"].every(isEditorMode)).toBe(true);
     expect(isEditorMode("edit")).toBe(false);
     expect(isEditorMode(undefined)).toBe(false);
+  });
+});
+
+describe("code blocks", () => {
+  test("are coloured in their language, once it has loaded", async () => {
+    await LanguageDescription.matchLanguageName(languages, "ts")!.load();
+    const doc = '```ts\nconst a = "x"; // note\n```\n\nconst is *not* code here.';
+    const s = parsed(doc, doc.length);
+    const styled = new Map<string, string>();
+    highlightTree(syntaxTree(s), codeHighlight, (from, to, cls) =>
+      styled.set(doc.slice(from, to), cls),
+    );
+    expect(styled.get("const")).toBeDefined();
+    expect(styled.get('"x"')).toBeDefined();
+    expect(styled.get("// note")).toBeDefined();
+    expect(new Set([styled.get("const"), styled.get('"x"'), styled.get("// note")]).size).toBe(3);
+    // Markdown outside the block is left to the live preview.
+    expect([...styled.keys()].some((k) => k.includes("here"))).toBe(false);
   });
 });

@@ -11,6 +11,8 @@ import type {
   NoteInfo,
   PluginInfo,
   PropertyPatch,
+  SettingsApi,
+  SettingsLayers,
   TagCount,
   Tree,
   VaultInfo,
@@ -87,10 +89,14 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     init: {
       query?: Record<string, string | number | string[] | undefined>;
       body?: unknown;
+      /** Sent as is (a file), instead of body as JSON. */
+      raw?: Blob;
       headers?: Record<string, string>;
+      /** The path is under the server, not the vault (the account's routes). */
+      account?: boolean;
     } = {},
   ): Promise<T> {
-    const url = new URL(vaultRoot + path);
+    const url = new URL((init.account ? root : vaultRoot) + path);
     for (const [k, v] of Object.entries(init.query ?? {})) {
       if (v === undefined || v === "") continue;
       for (const item of Array.isArray(v) ? v : [v]) url.searchParams.append(k, String(item));
@@ -108,7 +114,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         method,
         headers,
         credentials: "include",
-        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+        body: init.raw ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
       });
     } catch (e) {
       options.onStatus?.(false);
@@ -164,8 +170,43 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     }
   }
 
+  // The web app has no settings.toml: only the account layer. The
+  // revision tells the stream's nudges apart from what is known.
+  type AccountSettings = { rev: number; settings: Record<string, string> | null };
+  let rev = -1;
+  const layers = (s: AccountSettings): SettingsLayers => {
+    rev = s.rev;
+    return { file: {}, account: s.settings ?? {}, signedIn: true, path: "", warnings: [] };
+  };
+  const settings: SettingsApi = {
+    get: async () =>
+      layers(await request<AccountSettings>("GET", "/v1/account/settings", { account: true })),
+    update: async (patch) =>
+      layers(
+        await request<AccountSettings>("PATCH", "/v1/account/settings", {
+          account: true,
+          body: patch,
+        }),
+      ),
+    subscribe(listener) {
+      const es = openEvents(`${root}/v1/account/events?protocol=${PROTOCOL}`);
+      es.addEventListener("settings", (e) => {
+        let next: number | undefined;
+        try {
+          next = (JSON.parse(e.data) as { rev?: number }).rev;
+        } catch {
+          next = undefined;
+        }
+        if (next === rev) return;
+        void settings.get().then(listener, () => {});
+      });
+      return () => es.close();
+    },
+  };
+
   return {
     kind: "web",
+    settings,
     ...(options.auth ? { auth: options.auth } : {}),
     ...(options.openVault ? { serverVault: { name: options.vault, open: options.openVault } } : {}),
     async info(): Promise<VaultInfo> {
@@ -173,6 +214,19 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       return { name: options.vault, dir: `${root}/${options.vault}`, inbox: tree.inbox };
     },
     tree: () => request<Tree>("GET", "/tree"),
+    fileUrl: (path, from) => {
+      const q = new URLSearchParams({ protocol: PROTOCOL });
+      if (from) q.set("from", from);
+      return `${vaultRoot}/files/${escapePath(path)}?${q}`;
+    },
+    attach: async (name, data) =>
+      (
+        await request<{ path: string }>("POST", "/attachments", {
+          query: { name },
+          raw: data,
+          headers: { "Content-Type": data.type || "application/octet-stream" },
+        })
+      ).path,
     list: async (q) =>
       (await request<{ notes: NoteInfo[] }>("GET", "/notes", { query: listParams(q) })).notes,
     inbox: async () => (await request<{ notes: NoteInfo[] }>("GET", "/inbox")).notes,

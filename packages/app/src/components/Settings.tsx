@@ -7,10 +7,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   Cloud,
+  Copy,
   ExternalLink,
   FolderOpen,
   FolderPlus,
   LoaderCircle,
+  Lock,
   type LucideIcon,
   Monitor,
   Moon,
@@ -23,8 +25,11 @@ import { DeviceList } from "../auth/Devices.tsx";
 import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
 import { keys, usePlugins, useVaultInfo } from "../queries.ts";
-import { useContributions } from "../registry.ts";
+import type { NoteMode } from "../lib/noteMode.ts";
 import type { ShowPref } from "../lib/showPref.ts";
+import { useContributions } from "../registry.ts";
+import { settingsSync, useSettingSource, useSettingsLayers } from "../settings/index.ts";
+import { settingsToml } from "../settings/toml.ts";
 import { useUI } from "../state.ts";
 import { contrastIssues, VAULT_GROUP } from "../theme/custom.ts";
 import { chooseTheme } from "../theme/register.ts";
@@ -68,39 +73,57 @@ const MODES: { id: ThemeMode; label: string; icon: LucideIcon }[] = [
   { id: "dark", label: "Dark", icon: Moon },
 ];
 
-/** Show or hide a section of a note; the same choice as its chip on the note. */
-function ShowHideSetting({
+const NOTE_MODES: { id: NoteMode; label: string }[] = [
+  { id: "live", label: "Live" },
+  { id: "reading", label: "Reading" },
+  { id: "source", label: "Source" },
+];
+
+const SHOWN: { id: ShowPref; label: string }[] = [
+  { id: "hide", label: "Hidden" },
+  { id: "show", label: "Shown" },
+];
+
+/** A row of radio buttons on a chip, like a segmented control. */
+function Segmented<T extends string>({
   label,
-  pref,
-  set,
+  options,
+  value,
+  onChange,
+  disabled,
 }: {
   label: string;
-  pref: ShowPref;
-  set: (p: ShowPref) => void;
+  options: { id: T; label: string; icon?: LucideIcon }[];
+  value: T;
+  onChange: (v: T) => void;
+  disabled?: boolean;
 }) {
   return (
     <div
       role="radiogroup"
       aria-label={label}
+      aria-disabled={disabled || undefined}
       className="inline-flex gap-0.5 rounded-md bg-chip p-0.5"
     >
-      {(["hide", "show"] as const).map((p) => {
-        const on = pref === p;
+      {options.map((o) => {
+        const on = value === o.id;
         return (
           <button
-            key={p}
+            key={o.id}
             type="button"
             role="radio"
             aria-checked={on}
-            onClick={() => set(p)}
+            disabled={disabled}
+            onClick={() => onChange(o.id)}
             className={cn(
-              "flex h-7 items-center rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150 pointer-coarse:h-10 pointer-coarse:px-3.5 pointer-coarse:text-[14px]",
+              "flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150 disabled:cursor-default pointer-coarse:h-10 pointer-coarse:px-3.5 pointer-coarse:text-[14px]",
               on
                 ? "bg-surface text-foreground shadow-card dark:bg-foreground/12"
-                : "text-muted-foreground hover:text-foreground",
+                : "text-muted-foreground not-disabled:hover:text-foreground disabled:opacity-60",
             )}
           >
-            {p === "hide" ? "Hidden" : "Shown"}
+            {o.icon ? <o.icon className="size-3.5" strokeWidth={1.75} aria-hidden /> : null}
+            {o.label}
           </button>
         );
       })}
@@ -108,53 +131,123 @@ function ShowHideSetting({
   );
 }
 
-/** Mode and colour theme. Applies at once; kept on this device. */
+/** Under a control whose key settings.toml sets. */
+function Locked({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1 text-small text-faint">
+      <Lock className="size-3" strokeWidth={2} aria-hidden />
+      Set in settings.toml
+    </p>
+  );
+}
+
+/** Where the settings come from: the file, its problems, and a copy for dotfiles. */
+function SettingsFile() {
+  const layers = useSettingsLayers();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+  const copy = () =>
+    void navigator.clipboard?.writeText(settingsToml(settingsSync.values())).then(
+      () => setCopied(true),
+      (e: unknown) => fail("Couldn't copy the settings", e),
+    );
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      {layers?.path ? (
+        <Field label="Settings file">
+          <code className="block min-w-0 truncate rounded-xs bg-code px-1.5 py-0.5 font-mono text-[12px] text-text-soft">
+            {layers.path}
+          </code>
+        </Field>
+      ) : null}
+      {layers?.warnings.length ? (
+        <ul className="flex flex-col gap-1 text-small text-danger">
+          {layers.warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </ul>
+      ) : null}
+      <div>
+        <Button variant="outline" size="sm" onClick={copy}>
+          {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy as TOML"}
+        </Button>
+        <p className="mt-2 text-small text-faint">
+          Paste it into settings.toml to keep these settings in your dotfiles. What the file sets
+          wins on every device, and Nota doesn't change it.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Mode, colour theme and how notes show. Applies at once. */
 function Appearance() {
   const theme = useTheme();
   const themes = useContributions("theme");
   const store = themeStore();
-  const ui = {
-    properties: useUI((s) => s.properties),
-    setProperties: useUI((s) => s.setProperties),
-    backlinks: useUI((s) => s.backlinks),
-    setBacklinks: useUI((s) => s.setBacklinks),
-  };
+  const layers = useSettingsLayers();
+  const noteMode = useUI((s) => s.noteMode);
+  const setNoteMode = useUI((s) => s.setNoteMode);
+  const properties = useUI((s) => s.properties);
+  const setProperties = useUI((s) => s.setProperties);
+  const mode = useSettingSource("theme");
+  const palette = useSettingSource("palette");
+  const notes = useSettingSource("note_mode");
+  const props = useSettingSource("properties");
+  const backlinks = useUI((s) => s.backlinks);
+  const setBacklinks = useUI((s) => s.setBacklinks);
+  const links = useSettingSource("backlinks");
+  const description = !layers
+    ? "Applies at once, on this device."
+    : layers.signedIn
+      ? "Applies at once and follows you to your other devices."
+      : "Applies at once, on this device. Sign in to sync to take it to your other devices.";
   return (
-    <Section title="Appearance" description="Applies at once, on this device only.">
+    <Section title="Appearance" description={description}>
       <Field label="Mode">
-        <div
-          role="radiogroup"
-          aria-label="Mode"
-          className="inline-flex gap-0.5 rounded-md bg-chip p-0.5"
-        >
-          {MODES.map((m) => {
-            const on = theme.mode === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => store.setMode(m.id)}
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-small font-medium transition-[color,background-color] duration-150 pointer-coarse:h-10 pointer-coarse:px-3.5 pointer-coarse:text-[14px]",
-                  on
-                    ? "bg-surface text-foreground shadow-card dark:bg-foreground/12"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <m.icon className="size-3.5" strokeWidth={1.75} aria-hidden />
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          label="Mode"
+          options={MODES}
+          value={theme.mode}
+          onChange={(m) => store.setMode(m)}
+          disabled={mode.locked}
+        />
+        <Locked show={mode.locked} />
+      </Field>
+      <Field label="Notes open in">
+        <Segmented
+          label="Notes open in"
+          options={NOTE_MODES}
+          value={noteMode}
+          onChange={setNoteMode}
+          disabled={notes.locked}
+        />
+        <Locked show={notes.locked} />
       </Field>
       <Field label="Properties">
-        <ShowHideSetting label="Properties" pref={ui.properties} set={ui.setProperties} />
+        <Segmented
+          label="Properties"
+          options={SHOWN}
+          value={properties}
+          onChange={setProperties}
+          disabled={props.locked}
+        />
+        <Locked show={props.locked} />
       </Field>
       <Field label="Linked from">
-        <ShowHideSetting label="Linked from" pref={ui.backlinks} set={ui.setBacklinks} />
+        <Segmented
+          label="Linked from"
+          options={SHOWN}
+          value={backlinks}
+          onChange={setBacklinks}
+          disabled={links.locked}
+        />
+        <Locked show={links.locked} />
       </Field>
       <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-ui max-[520px]:grid-cols-1 max-[520px]:gap-1">
         <span className="pt-1 text-muted-foreground">Theme</span>
@@ -170,12 +263,14 @@ function Appearance() {
                       theme={t}
                       mode={theme.resolved}
                       on={theme.palette === t.id}
+                      disabled={palette.locked}
                     />
                   ))}
                 </div>
               </div>
             ))}
           </div>
+          <Locked show={palette.locked} />
           <PluginProblems themes={themes} />
           <p className="mt-3 text-small text-muted-foreground">
             Your own themes go in the vault's <code className="font-mono">.nota/plugins/</code>{" "}
@@ -183,6 +278,7 @@ function Appearance() {
           </p>
         </div>
       </div>
+      <SettingsFile />
     </Section>
   );
 }
@@ -201,10 +297,12 @@ function ThemeSwatch({
   theme: t,
   mode,
   on,
+  disabled,
 }: {
   theme: ColorTheme;
   mode: "light" | "dark";
   on: boolean;
+  disabled?: boolean;
 }) {
   const c = t[mode];
   return (
@@ -214,8 +312,9 @@ function ThemeSwatch({
       aria-checked={on}
       aria-label={t.only ? `${t.name} (${t.only} only)` : t.name}
       title={t.only ? `${t.name} has a ${t.only} mode only` : undefined}
+      disabled={disabled}
       onClick={() => chooseTheme(t)}
-      className="flex w-[68px] flex-col items-center gap-1.5 rounded-lg focus-visible:outline-offset-4"
+      className="flex w-[68px] flex-col items-center gap-1.5 rounded-lg focus-visible:outline-offset-4 disabled:cursor-default disabled:not-aria-checked:opacity-60"
     >
       <span
         aria-hidden

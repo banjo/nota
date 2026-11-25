@@ -1,14 +1,27 @@
-import type { MarkdownConfig } from "@lezer/markdown";
+import type { Element, MarkdownConfig } from "@lezer/markdown";
 import { tags as t } from "@lezer/highlight";
 
 // Nota's dialect on top of CommonMark + GFM (decision 4): Obsidian's
-// [[wikilinks]], ![[embeds]] and #tags (nested #a/b). The Go index
-// (internal/markdown) reads the same syntax.
+// [[wikilinks]], ![[embeds]], #tags (nested #a/b), ==highlights== and
+// %%comments%%, and
+// footnotes ([^id] and [^id]: text) as on GitHub. The Go index (internal/markdown)
+// reads the same links and tags.
 
 const OPEN = 91; // [
 const CLOSE = 93; // ]
 const BANG = 33; // !
 const HASH = 35; // #
+const CARET = 94; // ^
+const EQUALS = 61; // =
+const PERCENT = 37; // %
+
+const highlightDelim = { resolve: "Highlight", mark: "HighlightMark" };
+const punctuation = /[\p{P}\p{S}]/u;
+
+/** "[^id]:" at the start of a footnote definition. */
+const FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
+/** A line that continues a footnote definition: indented, not blank. */
+const FOOTNOTE_MORE = /^(?: {2,}|\t)\S/;
 
 /** A parsed [[target#heading|alias]]. */
 export interface Wikilink {
@@ -21,7 +34,8 @@ export interface Wikilink {
 /** Splits the inside of a wikilink ("Plan#Mål|planen"). */
 export function parseWikilink(inner: string, embed = false): Wikilink {
   const bar = inner.indexOf("|");
-  const ref = bar < 0 ? inner : inner.slice(0, bar);
+  // "\|" is the alias bar inside a table, where "|" splits cells.
+  const ref = bar < 0 ? inner : inner.slice(0, bar).replace(/\\$/, "");
   const alias = bar < 0 ? undefined : inner.slice(bar + 1).trim() || undefined;
   const hash = ref.indexOf("#");
   const target = (hash < 0 ? ref : ref.slice(0, hash)).trim();
@@ -61,14 +75,177 @@ export function findTags(text: string): string[] {
   return out;
 }
 
-/** Lezer markdown extension: WikiLink (with WikiLinkMark) and Tag nodes. */
+/**
+ * Lezer markdown extension: WikiLink (with WikiLinkMark), Tag, Highlight
+ * (with HighlightMark), Comment (inline or a block, with CommentMark),
+ * FootnoteRef, and FootnoteDefinition (a FootnoteLabel, then the text's
+ * inline nodes).
+ */
 export const notaSyntax: MarkdownConfig = {
   defineNodes: [
     { name: "WikiLink", style: t.link },
     { name: "WikiLinkMark", style: t.processingInstruction },
     { name: "Tag", style: t.labelName },
+    { name: "Highlight", style: t.special(t.content) },
+    { name: "HighlightMark", style: t.processingInstruction },
+    { name: "Comment", style: t.comment },
+    { name: "CommentBlock", block: true, style: t.comment },
+    { name: "CommentMark", style: t.processingInstruction },
+    { name: "FootnoteRef", style: t.labelName },
+    { name: "InlineFootnote" },
+    { name: "BlockId", style: t.labelName },
+    { name: "InlineFootnoteMark", style: t.processingInstruction },
+    { name: "FootnoteDefinition", block: true },
+    { name: "FootnoteLabel", style: t.labelName },
+  ],
+  parseBlock: [
+    {
+      // A line starting with %% that doesn't close on it: a comment up to
+      // the next line with %%, blank lines and all.
+      name: "CommentBlock",
+      before: "LinkReference",
+      parse(cx, line) {
+        const text = line.text.slice(line.pos);
+        if (!text.startsWith("%%") || text.indexOf("%%", 2) >= 0) return false;
+        const from = cx.lineStart + line.pos;
+        const marks = [cx.elt("CommentMark", from, from + 2)];
+        let to = cx.lineStart + line.text.length;
+        while (cx.nextLine()) {
+          to = cx.lineStart + line.text.length;
+          const end = line.text.indexOf("%%");
+          if (end >= 0) {
+            marks.push(cx.elt("CommentMark", cx.lineStart + end, cx.lineStart + end + 2));
+            cx.nextLine();
+            break;
+          }
+        }
+        cx.addElement(cx.elt("CommentBlock", from, to, marks));
+        return true;
+      },
+      endLeaf: (_, line) => {
+        const text = line.text.slice(line.pos);
+        return text.startsWith("%%") && text.indexOf("%%", 2) < 0;
+      },
+    },
+    {
+      name: "FootnoteDefinition",
+      before: "LinkReference",
+      parse(cx, line) {
+        const m = FOOTNOTE_DEF.exec(line.text.slice(line.pos));
+        if (!m || line.indent - line.baseIndent >= 4) return false;
+        const from = cx.lineStart + line.pos;
+        const children: Element[] = [cx.elt("FootnoteLabel", from, from + m[0].length)];
+        const text = (start: number) =>
+          children.push(...cx.parser.parseInline(line.text.slice(start), cx.lineStart + start));
+        text(line.pos + m[0].length);
+        let to = cx.lineStart + line.text.length;
+        // Indented lines below continue it (top-level only: inside a quote
+        // or list the next line carries that container's markers).
+        while (line.baseIndent === 0 && FOOTNOTE_MORE.test(cx.peekLine())) {
+          cx.nextLine();
+          text(line.pos);
+          to = cx.lineStart + line.text.length;
+        }
+        cx.nextLine();
+        cx.addElement(cx.elt("FootnoteDefinition", from, to, children));
+        return true;
+      },
+      // A definition right after a paragraph line starts its own block.
+      endLeaf: (_, line) => FOOTNOTE_DEF.test(line.text.slice(line.pos)),
+    },
   ],
   parseInline: [
+    {
+      // "%%text%%", up to the next %% in the paragraph.
+      name: "Comment",
+      before: "Emphasis",
+      parse(cx, next, pos) {
+        if (next !== PERCENT || cx.char(pos + 1) !== PERCENT) return -1;
+        for (let i = pos + 2; i < cx.end - 1; i++)
+          if (cx.char(i) === PERCENT && cx.char(i + 1) === PERCENT)
+            return cx.addElement(
+              cx.elt("Comment", pos, i + 2, [
+                cx.elt("CommentMark", pos, pos + 2),
+                cx.elt("CommentMark", i, i + 2),
+              ]),
+            );
+        return -1;
+      },
+    },
+    {
+      // "==text==", flanked like GFM's ~~strikethrough~~; "===" is not one.
+      name: "Highlight",
+      after: "Emphasis",
+      parse(cx, next, pos) {
+        if (next !== EQUALS || cx.char(pos + 1) !== EQUALS) return -1;
+        if (cx.char(pos + 2) === EQUALS || cx.char(pos - 1) === EQUALS) return -1;
+        const before = cx.slice(pos - 1, pos);
+        const after = cx.slice(pos + 2, pos + 3);
+        const spaceBefore = /\s|^$/.test(before);
+        const spaceAfter = /\s|^$/.test(after);
+        const punctBefore = punctuation.test(before);
+        const punctAfter = punctuation.test(after);
+        return cx.addDelimiter(
+          highlightDelim,
+          pos,
+          pos + 2,
+          !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
+          !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
+        );
+      },
+    },
+    {
+      // Obsidian's block id: " ^id" ending a line, or "^id" alone on one.
+      name: "BlockId",
+      parse(cx, next, pos) {
+        if (next !== CARET) return -1;
+        const before = pos > cx.offset ? cx.char(pos - 1) : 10;
+        if (before !== 32 && before !== 9 && before !== 10) return -1;
+        let i = pos + 1;
+        while (i < cx.end && /[A-Za-z0-9-]/.test(String.fromCharCode(cx.char(i)))) i++;
+        if (i === pos + 1 || (i < cx.end && cx.char(i) !== 10)) return -1;
+        return cx.addElement(cx.elt("BlockId", pos, i));
+      },
+    },
+    {
+      // Obsidian's "^[text]": a footnote written where it is used.
+      name: "InlineFootnote",
+      before: "Link",
+      parse(cx, next, pos) {
+        if (next !== CARET || cx.char(pos + 1) !== OPEN) return -1;
+        let depth = 0;
+        for (let i = pos + 2; i < cx.end; i++) {
+          const c = cx.char(i);
+          if (c === 92) i++; // \] doesn't close it
+          else if (c === OPEN) depth++;
+          else if (c === CLOSE && depth-- === 0) {
+            if (i === pos + 2) return -1;
+            return cx.addElement(
+              cx.elt("InlineFootnote", pos, i + 1, [
+                cx.elt("InlineFootnoteMark", pos, pos + 2),
+                ...cx.parser.parseInline(cx.slice(pos + 2, i), pos + 2),
+                cx.elt("InlineFootnoteMark", i, i + 1),
+              ]),
+            );
+          }
+        }
+        return -1;
+      },
+    },
+    {
+      name: "FootnoteRef",
+      before: "Link",
+      parse(cx, next, pos) {
+        if (next !== OPEN || cx.char(pos + 1) !== CARET) return -1;
+        for (let i = pos + 2; i < cx.end; i++) {
+          const c = cx.char(i);
+          if (c === CLOSE)
+            return i > pos + 2 ? cx.addElement(cx.elt("FootnoteRef", pos, i + 1)) : -1;
+          if (c === OPEN || c === 32 || c === 9 || c === 10) return -1;
+        }
+        return -1;
+      },
+    },
     {
       name: "WikiLink",
       before: "Link",

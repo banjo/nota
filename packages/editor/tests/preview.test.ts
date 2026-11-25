@@ -1,12 +1,20 @@
-import { ensureSyntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, test } from "vite-plus/test";
 import {
   activeLines,
+  calloutKind,
+  decodeEntity,
+  findAnchor,
+  findSection,
+  footnotes,
+  headingSlug,
   extensions,
   findTags,
   parseWikilink,
   previewSpecs,
+  tableSpecs,
+  toDecorations,
   toggleTaskAt,
   type DecoSpec,
 } from "../src/index.ts";
@@ -15,13 +23,25 @@ import {
 function state(doc: string, cursor = doc.length) {
   const s = EditorState.create({ doc, extensions, selection: EditorSelection.cursor(cursor) });
   ensureSyntaxTree(s, s.doc.length, 5000);
-  return s;
+  // syntaxTree(s) is still the tree of the state's first, time-boxed
+  // parse (partial on a slow machine); a transaction picks up the rest.
+  return s.update({}).state;
 }
 
 /** Specs with the cursor's line active (focused) or none (blurred). */
-function specs(doc: string, opts: { cursor?: number; focused?: boolean } = {}) {
+function specs(
+  doc: string,
+  opts: { cursor?: number; focused?: boolean; images?: boolean; embeds?: boolean } = {},
+) {
   const s = state(doc, opts.cursor);
-  return { s, specs: previewSpecs(s, { activeLines: activeLines(s, opts.focused ?? true) }) };
+  return {
+    s,
+    specs: previewSpecs(s, {
+      activeLines: activeLines(s, opts.focused ?? true),
+      images: opts.images,
+      embeds: opts.embeds,
+    }),
+  };
 }
 
 const text = (doc: string, sp: { from: number; to: number }) => doc.slice(sp.from, sp.to);
@@ -197,5 +217,701 @@ describe("lists and tasks", () => {
     expect(toggleTaskAt(s, doc.indexOf("slut"))).toBeNull();
     const after = s.update({ changes: toggleTaskAt(s, second)! }).state;
     expect(after.doc.line(2).text).toBe("- [x] Namnformat");
+  });
+});
+
+describe("tables", () => {
+  const doc = [
+    "Intro",
+    "",
+    "| Name | **Age** | Länk |",
+    "|:--|:-:|--:|",
+    "| Ann |  | [[Plan\\|planen]] |",
+    "| Bo |",
+    "",
+    "slut",
+  ].join("\n");
+  const tables = (cursor: number, focused = true) => {
+    const s = state(doc, cursor);
+    return tableSpecs(s, { activeLines: activeLines(s, focused) });
+  };
+
+  test("render in place of their lines while the cursor is elsewhere", () => {
+    const [t, ...rest] = tables(doc.length);
+    expect(rest).toEqual([]);
+    expect(text(doc, t!)).toBe(doc.split("\n").slice(2, 6).join("\n"));
+    expect(t!.align).toEqual(["left", "center", "right"]);
+    expect(t!.header.map((c) => c.text)).toEqual(["Name", "**Age**", "Länk"]);
+    expect(t!.rows.map((r) => r.map((c) => c.text))).toEqual([
+      ["Ann", "", "[[Plan\\|planen]]"],
+      ["Bo", "", ""],
+    ]);
+  });
+
+  test("cells carry their inline formatting", () => {
+    const [t] = tables(doc.length);
+    const age = t!.header[1]!;
+    expect(age.specs.filter((s) => s.type === "hide").map((s) => text(age.text, s))).toEqual([
+      "**",
+      "**",
+    ]);
+    const link = t!.rows[0]![2]!;
+    const wl = link.specs.find((s) => s.type === "mark" && s.class === "cm-wikilink");
+    expect(wl && text(link.text, wl)).toBe("planen");
+    expect(wl?.type === "mark" && wl.attrs).toEqual({ "data-wikilink": "Plan" });
+  });
+
+  test("cell offsets point at the cell's text in the source", () => {
+    const [t] = tables(doc.length);
+    for (const cell of [...t!.header, ...t!.rows.flat()].filter((c) => c.text))
+      expect(doc.slice(t!.from + cell.offset).startsWith(cell.text)).toBe(true);
+  });
+
+  test("show their source, in monospace, while the cursor is in them", () => {
+    const cursor = doc.indexOf("Ann");
+    expect(tables(cursor)).toEqual([]);
+    const { specs: sp } = specs(doc, { cursor });
+    expect(lines(sp, "cm-table-source").length).toBe(4);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toContain("|:--|:-:|--:|");
+    expect(hidden(doc, sp)).toEqual([]);
+  });
+
+  test("render when the editor is not focused, and are not decorated as source", () => {
+    expect(tables(doc.indexOf("Ann"), false).length).toBe(1);
+    const { specs: sp } = specs(doc, { cursor: doc.indexOf("Ann"), focused: false });
+    expect(lines(sp, "cm-table-source")).toEqual([]);
+  });
+
+  test("in a quote keep their source", () => {
+    const quoted = "> | a | b |\n> |---|---|\n> | 1 | 2 |\n\nslut";
+    const s = state(quoted);
+    expect(tableSpecs(s, { activeLines: new Set() })).toEqual([]);
+    const sp = previewSpecs(s, { activeLines: new Set() });
+    expect(hidden(quoted, sp)).toEqual(["> ", "> ", "> "]);
+  });
+});
+
+describe("callouts", () => {
+  const widgets = (all: DecoSpec[]) =>
+    all.filter(
+      (x): x is Extract<DecoSpec, { type: "widget" }> =>
+        x.type === "widget" && x.widget === "callout",
+    );
+
+  test("a GitHub alert becomes a callout with its type as title", () => {
+    const doc = "> [!WARNING]\n> Spara **först**.\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-callout-warning")).toEqual([0, doc.indexOf("> Spara")]);
+    expect(lines(sp, "cm-callout-title")).toEqual([0]);
+    expect(lines(sp, "cm-callout-last")).toEqual([doc.indexOf("> Spara")]);
+    expect(lines(sp, "cm-quote")).toEqual([]);
+    const [w, ...rest] = widgets(sp);
+    expect(rest).toEqual([]);
+    expect([text(doc, w!), w!.callout, w!.label]).toEqual(["[!WARNING]", "warning", "Warning"]);
+    expect(hidden(doc, sp).filter((h) => h === "> ")).toHaveLength(2);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["först"]);
+  });
+
+  test("an Obsidian callout keeps its own title, and maps its type", () => {
+    const doc = "> [!info]- Mer om det  \n> text";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(lines(sp, "cm-callout-note")).toEqual([0, doc.indexOf("> text")]);
+    const [w] = widgets(sp);
+    expect([text(doc, w!), w!.callout, w!.label]).toEqual(["[!info]- ", "note", undefined]);
+    expect(marks(doc, sp, "cm-callout-title-text").map((m) => m.text)).toEqual(["Mer om det"]);
+  });
+
+  test("Obsidian's types map onto GitHub's five; unknown ones are notes", () => {
+    expect(
+      ["tip", "success", "question", "bug", "attention", "Danger", "whatever"].map(calloutKind),
+    ).toEqual(["tip", "tip", "important", "caution", "warning", "caution", "note"]);
+  });
+
+  test("show their source on the title line being edited", () => {
+    const doc = "> [!TIP] Kort\n> text";
+    const { specs: sp } = specs(doc, { cursor: 3 });
+    expect(widgets(sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toContain("[!TIP]");
+    expect(lines(sp, "cm-callout-tip")).toEqual([0, doc.indexOf("> text")]);
+  });
+
+  test("a plain quote stays a quote", () => {
+    const doc = "> [inte] en callout\n> rad";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-quote")).toEqual([0, doc.indexOf("> rad")]);
+    expect(widgets(sp)).toEqual([]);
+  });
+});
+
+describe("footnotes", () => {
+  const notes = (all: DecoSpec[], kind: "footnote" | "footnote-label") =>
+    all
+      .filter(
+        (x): x is Extract<DecoSpec, { type: "widget" }> => x.type === "widget" && x.widget === kind,
+      )
+      .map((x) => [x.footnote, x.label]);
+  const DOC = [
+    "Andra[^b] och första[^A], igen[^b], okänd[^x].",
+    "",
+    "[^a]: Om **a**",
+    "    fortsätter",
+    "[^b]: Om b",
+    "[^c]: Aldrig använd",
+  ].join("\n");
+
+  test("references are numbered by first use, case-insensitive", () => {
+    const { s, specs: sp } = specs(DOC, { cursor: DOC.indexOf("fortsätter") });
+    expect(notes(sp, "footnote")).toEqual([
+      ["b", "1"],
+      ["a", "2"],
+      ["b", "1"],
+    ]);
+    // An undefined footnote stays text.
+    expect(sp.some((x) => x.type !== "line" && text(DOC, x).includes("[^x]"))).toBe(false);
+    expect(footnotes(s).numbers).toEqual(
+      new Map([
+        ["b", 1],
+        ["a", 2],
+      ]),
+    );
+    expect(footnotes(s).defs.get("a")).toBe(DOC.indexOf("[^a]:"));
+    expect(footnotes(s).refs.get("b")).toBe(DOC.indexOf("[^b]"));
+  });
+
+  test("definitions are quiet lines with their number", () => {
+    const { specs: sp } = specs(DOC, { cursor: 0 });
+    const at = (t: string) => DOC.indexOf(t);
+    expect(lines(sp, "cm-footnote-def")).toEqual([
+      at("[^a]:"),
+      at("    fortsätter"),
+      at("[^b]:"),
+      at("[^c]:"),
+    ]);
+    expect(notes(sp, "footnote-label")).toEqual([
+      ["a", "2"],
+      ["b", "1"],
+      ["c", "c"],
+    ]);
+    expect(marks(DOC, sp, "cm-strong").map((m) => m.text)).toEqual(["a"]);
+  });
+
+  test("show their source on the line being edited", () => {
+    const { specs: sp } = specs(DOC, { cursor: 2 });
+    expect(notes(sp, "footnote")).toEqual([]);
+    expect(marks(DOC, sp, "cm-footnote-source").map((m) => m.text)).toEqual([
+      "[^b]",
+      "[^A]",
+      "[^b]",
+    ]);
+    const def = specs(DOC, { cursor: DOC.indexOf("Om b") });
+    expect(marks(DOC, def.specs, "cm-marker").map((m) => m.text)).toContain("[^b]:");
+  });
+
+  test("a definition right after a paragraph line starts its own block", () => {
+    const doc = "Text[^1]\n[^1]: Not";
+    expect(notes(specs(doc, { cursor: 0 }).specs, "footnote-label")).toEqual([["1", "1"]]);
+  });
+
+  test("in a table cell, a reference is a mark that stands for its number", () => {
+    const doc = "| a |\n| - |\n| x[^n] |\n\nslut\n\n[^n]: Not";
+    const s = state(doc, doc.length);
+    const [t] = tableSpecs(s, { activeLines: new Set() });
+    const cell = t!.rows[0]![0]!;
+    const [m, ...rest] = cell.specs;
+    expect(rest).toEqual([]);
+    expect([m!.type, cell.text.slice(m!.from, m!.to)]).toEqual(["mark", "[^n]"]);
+    expect(m!.type === "mark" && m!.attrs).toEqual({ "data-footnote": "n", "data-text": "1" });
+  });
+});
+
+describe("highlight", () => {
+  test("==text== is highlighted and its markers hidden", () => {
+    const doc = "Det här är ==viktigt **nu**== och klart.\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-highlight").map((m) => m.text)).toEqual(["viktigt **nu**"]);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["nu"]);
+    expect(hidden(doc, sp).filter((h) => h === "==")).toHaveLength(2);
+  });
+
+  test("shows its markers on the line being edited", () => {
+    const doc = "a ==b== c";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-highlight").map((m) => m.text)).toEqual(["b"]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["==", "=="]);
+  });
+
+  test("is not ===, a == comparison or an unclosed ==", () => {
+    for (const doc of ["a ===b=== c", "if a == b == c", "x ==y", "a == b ==", "a=b"]) {
+      expect(marks(doc, specs(doc, { cursor: 0 }).specs, "cm-highlight"), doc).toEqual([]);
+    }
+  });
+
+  test("a setext heading's === underline stays a heading", () => {
+    const doc = "Rubrik\n===\n\ntext";
+    const { s } = specs(doc);
+    expect(syntaxTree(s).topNode.firstChild!.name).toBe("SetextHeading1");
+  });
+});
+
+describe("setext headings", () => {
+  test("style the text as a heading and hide the underline", () => {
+    const doc = "Rubrik\növer två\n===\n\nUnder\n---\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-h1")).toEqual([0, doc.indexOf("över")]);
+    expect(lines(sp, "cm-h2")).toEqual([doc.indexOf("Under")]);
+    expect(lines(sp, "cm-setext-underline")).toEqual([doc.indexOf("==="), doc.indexOf("---")]);
+    expect(hidden(doc, sp)).toEqual(["===", "---"]);
+  });
+
+  test("show the underline while the cursor is in the heading", () => {
+    const doc = "Rubrik\n===\n\nslut";
+    const { specs: sp } = specs(doc, { cursor: 2 });
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["==="]);
+    expect(lines(sp, "cm-setext-underline")).toEqual([]);
+  });
+});
+
+describe("escapes", () => {
+  test("hide the backslash, and keep the character as text", () => {
+    const doc = "Inte \\*fet\\* och \\[[ingen länk]] här\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(hidden(doc, sp)).toEqual(["\\", "\\", "\\"]);
+    expect(marks(doc, sp, "cm-strong")).toEqual([]);
+    expect(marks(doc, sp, "cm-em")).toEqual([]);
+    expect(marks(doc, sp, "cm-wikilink")).toEqual([]);
+  });
+
+  test("show the backslash on the line being edited, and in code", () => {
+    const doc = "a \\* b\n\n`c \\* d`";
+    expect(marks(doc, specs(doc, { cursor: 0 }).specs, "cm-marker").map((m) => m.text)).toEqual([
+      "\\",
+    ]);
+    expect(hidden(doc, specs(doc, { cursor: 0 }).specs)).toEqual(["`", "`"]);
+  });
+});
+
+describe("reference links", () => {
+  const DOC = [
+    "Se [docs][D], [Docs][] och [docs] men [okänd] och [a](<https://z.se/a b>).",
+    "",
+    '[d]: https://x.se "Titel"',
+    "[docs]: <https://y.se>",
+  ].join("\n");
+
+  test("[text][label], [text][] and [text] link to their definition", () => {
+    const { specs: sp } = specs(DOC, { cursor: DOC.length });
+    const links = marks(DOC, sp, "cm-link").map((m) => [m.text, m.attrs?.["data-href"]]);
+    expect(links).toEqual([
+      ["docs", "https://x.se"],
+      ["Docs", "https://y.se"],
+      ["docs", "https://y.se"],
+      ["a", "https://z.se/a b"],
+      ["https://x.se", "https://x.se"],
+      ["<https://y.se>", "https://y.se"],
+    ]);
+    expect(hidden(DOC, sp)).toContain("][D]");
+    expect(hidden(DOC, sp)).toContain("][]");
+    expect(hidden(DOC, sp).some((h) => h.includes("okänd"))).toBe(false);
+  });
+
+  test("definitions are quiet lines", () => {
+    const { specs: sp } = specs(DOC, { cursor: 0 });
+    expect(lines(sp, "cm-linkref")).toEqual([DOC.indexOf("[d]:"), DOC.indexOf("[docs]:")]);
+  });
+});
+
+describe("nested quotes", () => {
+  test("get one border per level", () => {
+    // "> d" right under c would continue c (lazily), at depth 3.
+    const doc = "> a\n> > b\n> > > c\n>\n> d\n\nslut";
+    const { specs: sp } = specs(doc);
+    const quotes = sp
+      .filter(
+        (x): x is Extract<DecoSpec, { type: "line" }> =>
+          x.type === "line" && x.class === "cm-quote",
+      )
+      .map((x) => [doc.slice(x.from, doc.indexOf("\n", x.from)), x.style]);
+    expect(quotes).toEqual([
+      ["> a", undefined],
+      ["> > b", "--quote-depth:2"],
+      ["> > > c", "--quote-depth:3"],
+      [">", undefined],
+      ["> d", undefined],
+    ]);
+    expect(hidden(doc, sp).filter((h) => h === "> ")).toHaveLength(7);
+  });
+});
+
+describe("comments", () => {
+  const DOC = "Synlig %%dold **text**%% här.\n\n%%\nEtt block\n\nmed tomrad\n%%\n\nslut";
+  const reading = (doc: string) => {
+    const s = state(doc, 0);
+    return previewSpecs(s, { activeLines: new Set(), reading: true });
+  };
+
+  test("are hidden in Reading mode, inline and as blocks", () => {
+    const sp = reading(DOC);
+    expect(hidden(DOC, sp)).toContain("%%dold **text**%%");
+    expect(hidden(DOC, sp)).toEqual(expect.arrayContaining(["%%", "Ett block", "med tomrad"]));
+    expect(lines(sp, "cm-comment-hidden")).toHaveLength(5);
+    expect(marks(DOC, sp, "cm-strong")).toEqual([]);
+  });
+
+  test("are faint while writing", () => {
+    const { specs: sp } = specs(DOC, { cursor: DOC.length });
+    expect(marks(DOC, sp, "cm-comment").map((m) => m.text)).toEqual([
+      "%%dold **text**%%",
+      "%%\nEtt block\n\nmed tomrad\n%%",
+    ]);
+    expect(hidden(DOC, sp)).toEqual([]);
+  });
+
+  test("a lone %% or 100%% is not a comment", () => {
+    for (const doc of ["50%% rabatt", "a %% b"]) {
+      const { specs: sp } = specs(doc, { cursor: 0 });
+      expect(marks(doc, sp, "cm-comment"), doc).toEqual([]);
+    }
+  });
+});
+
+describe("entities", () => {
+  test("decode named and numeric entities; unknown ones stay", () => {
+    expect(
+      ["&copy;", "&nbsp;", "&#8594;", "&#x2192;", "&rArr;", "&bogus;", "&#0;", "&#x110000;"].map(
+        decodeEntity,
+      ),
+    ).toEqual(["©", "\u00a0", "→", "→", "⇒", undefined, "\ufffd", "\ufffd"]);
+  });
+
+  test("show their character, and their source on the line being edited", () => {
+    const doc = "a &copy; b &bogus; c &#8594;\n\nslut";
+    const texts = (all: DecoSpec[]) =>
+      all.flatMap((x) =>
+        x.type === "widget" && x.widget === "text" ? [[text(doc, x), x.label]] : [],
+      );
+    expect(texts(specs(doc).specs)).toEqual([
+      ["&copy;", "©"],
+      ["&#8594;", "→"],
+    ]);
+    expect(texts(specs(doc, { cursor: 0 }).specs)).toEqual([]);
+  });
+
+  test("in a table cell, they stand in as data-text", () => {
+    const doc = "| a |\n| - |\n| x &rarr; y |\n\nslut";
+    const [t] = tableSpecs(state(doc, doc.length), { activeLines: new Set() });
+    const cell = t!.rows[0]![0]!;
+    expect(cell.specs.map((x) => (x.type === "mark" ? x.attrs?.["data-text"] : x.type))).toEqual([
+      "→",
+    ]);
+  });
+});
+
+describe("inline HTML", () => {
+  test("formatting tags style their text and hide", () => {
+    const doc =
+      'Tryck <kbd>⌘</kbd>+<kbd class="x">K</kbd>, H<sub>2</sub>O, x<sup>2</sup> och <u>under</u>.\n\nslut';
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["⌘", "K"]);
+    expect(marks(doc, sp, "cm-sub").map((m) => m.text)).toEqual(["2"]);
+    expect(marks(doc, sp, "cm-sup").map((m) => m.text)).toEqual(["2"]);
+    expect(marks(doc, sp, "cm-underline").map((m) => m.text)).toEqual(["under"]);
+    expect(hidden(doc, sp)).toEqual([
+      "<kbd>",
+      "</kbd>",
+      '<kbd class="x">',
+      "</kbd>",
+      "<sub>",
+      "</sub>",
+      "<sup>",
+      "</sup>",
+      "<u>",
+      "</u>",
+    ]);
+  });
+
+  test("<br> is a line break; other HTML and unclosed tags stay source", () => {
+    const doc = "a<br>b<br/>c <span>x</span> <kbd>öppen <script>y</script>\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(
+      sp
+        .filter((x) => x.type === "widget" && x.widget === "break")
+        .map((x) => text(doc, x as never)),
+    ).toEqual(["<br>", "<br/>"]);
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-kbd")).toEqual([]);
+  });
+
+  test("nested tags of the same name pair up", () => {
+    const doc = "<sup>a<sup>b</sup>c</sup>\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(marks(doc, sp, "cm-sup").map((m) => m.text)).toEqual(["a<sup>b</sup>c", "b"]);
+  });
+
+  test("show their tags on the line being edited", () => {
+    const doc = "<kbd>K</kbd>";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["<kbd>", "</kbd>"]);
+    expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["K"]);
+  });
+});
+
+describe("task statuses", () => {
+  const boxes = (doc: string, all: DecoSpec[]) =>
+    all.flatMap((x) =>
+      x.type === "widget" && x.widget === "checkbox" ? [[text(doc, x), x.status ?? x.checked]] : [],
+    );
+
+  test("Obsidian's statuses are checkboxes; cancelled is struck", () => {
+    const doc =
+      "- [/] pågår\n- [-] avbruten\n- [!] viktig\n- [a] inte en status\n- [x] klar\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(boxes(doc, sp)).toEqual([
+      ["[/]", "/"],
+      ["[-]", "-"],
+      ["[!]", "!"],
+      ["[x]", true],
+    ]);
+    expect(marks(doc, sp, "cm-task-done").map((m) => m.text)).toEqual(["avbruten", "klar"]);
+    expect(hidden(doc, sp)).toEqual(["- ", "- ", "- ", "- "]);
+  });
+
+  test("a click marks one done", () => {
+    const doc = "- [/] pågår";
+    expect(toggleTaskAt(state(doc), 2)).toEqual({ from: 3, to: 4, insert: "x" });
+  });
+
+  test("show their source on the line being edited", () => {
+    const doc = "- [/] pågår";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(boxes(doc, sp)).toEqual([["[/]", "/"]]);
+    expect(boxes(doc, specs(doc, { cursor: 3 }).specs)).toEqual([]);
+  });
+});
+
+describe("inline footnotes", () => {
+  const notes = (all: DecoSpec[]) =>
+    all.flatMap((x) =>
+      x.type === "widget" && x.widget === "footnote" ? [[x.footnote, x.label, x.note]] : [],
+    );
+
+  test("are numbered along with the others, and carry their text", () => {
+    const doc = "Först[^a], sen^[en **inline** [x] not] och [^a].\n\n[^a]: Def";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(notes(sp)).toEqual([
+      ["a", "1", undefined],
+      [`^${doc.indexOf("^[")}`, "2", "en **inline** [x] not"],
+      ["a", "1", undefined],
+    ]);
+    // Inline footnotes have no definition to jump to.
+    expect(footnotes(state(doc)).defs.has(`^${doc.indexOf("^[")}`)).toBe(false);
+  });
+
+  test("show their source, formatted, on the line being edited", () => {
+    const doc = "a ^[b **c**] d";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(notes(sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-footnote-inline").map((m) => m.text)).toEqual(["^[b **c**]"]);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["c"]);
+  });
+
+  test("^ without [ or an empty ^[] is text", () => {
+    for (const doc of ["x^2 och ^[]", "a^ [b]"]) {
+      expect(notes(specs(doc, { cursor: doc.length }).specs), doc).toEqual([]);
+    }
+  });
+});
+
+describe("block ids", () => {
+  test("^id ending a line, or alone on one, is hidden with its space", () => {
+    const doc = "Ett stycke ^abc-1\n\n- punkt ^p2\n\n> citat\n\n^q3\n\nx^2 och a ^b c\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(hidden(doc, sp).filter((h) => h.includes("^"))).toEqual([" ^abc-1", " ^p2", "^q3"]);
+  });
+
+  test("is faint on the line being edited", () => {
+    const doc = "Ett stycke ^abc";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-block-id").map((m) => m.text)).toEqual(["^abc"]);
+  });
+});
+
+describe("anchors", () => {
+  const DOC = [
+    "# Mål & plan!",
+    "",
+    "Text om det. ^stycke",
+    "",
+    "Underrubrik",
+    "---",
+    "",
+    "- punkt ^p1",
+    "",
+    "> citat",
+    "",
+    "^efter",
+    "",
+    "## Sista ## ",
+  ].join("\n");
+  const at = (t: string) => DOC.indexOf(t);
+
+  test("find headings by text, case or GitHub slug, and the last part of a path", () => {
+    const s = state(DOC);
+    expect(findAnchor(s, "Mål & plan!")).toBe(0);
+    expect(findAnchor(s, "mål & PLAN!")).toBe(0);
+    expect(findAnchor(s, "m%C3%A5l--plan")).toBe(0);
+    expect(findAnchor(s, "#underrubrik")).toBe(at("Underrubrik"));
+    expect(findAnchor(s, "Mål & plan!#Sista")).toBe(at("## Sista"));
+    expect(findAnchor(s, "Finns inte")).toBeUndefined();
+    expect(headingSlug("Mål & plan!")).toBe("mål--plan");
+  });
+
+  test("find blocks by id; an id alone on its line names the block above", () => {
+    const s = state(DOC);
+    expect(findAnchor(s, "^stycke")).toBe(at("Text om det"));
+    expect(findAnchor(s, "^P1")).toBe(at("- punkt"));
+    expect(findAnchor(s, "^efter")).toBe(at("> citat"));
+    expect(findAnchor(s, "^nej")).toBeUndefined();
+  });
+});
+
+const media = (doc: string, all: DecoSpec[]) =>
+  all
+    .filter(
+      (x): x is Extract<DecoSpec, { type: "widget" }> =>
+        x.type === "widget" && (x.widget === "image" || x.widget === "embed"),
+    )
+    .map((x) => {
+      const { type: _, from, to, ...rest } = x;
+      return { ...rest, text: doc.slice(from, to) };
+    });
+
+describe("images", () => {
+  const DOC = [
+    "![Skiss|300](bilder/skiss%201.png)",
+    "",
+    "Se ![liten](x.png) här och ![webb](https://example.com/y.png).",
+    "",
+    "![logo][l]",
+    "",
+    "- ![[foto.jpg|200]]",
+    "> ![[foto.jpg|Ett foto]]",
+    "",
+    "[l]: <logo.svg>",
+  ].join("\n");
+
+  test("of the vault replace their source; web images stay links", () => {
+    const { specs: sp } = specs(DOC, { images: true, focused: false });
+    expect(media(DOC, sp)).toEqual([
+      {
+        widget: "image",
+        src: "bilder/skiss%201.png",
+        alt: "Skiss",
+        width: 300,
+        block: true,
+        text: "![Skiss|300](bilder/skiss%201.png)",
+      },
+      { widget: "image", src: "x.png", alt: "liten", text: "![liten](x.png)" },
+      { widget: "image", src: "logo.svg", alt: "logo", block: true, text: "![logo][l]" },
+      {
+        widget: "image",
+        src: "foto.jpg",
+        wiki: true,
+        alt: "",
+        width: 200,
+        block: true,
+        text: "![[foto.jpg|200]]",
+      },
+      {
+        widget: "image",
+        src: "foto.jpg",
+        wiki: true,
+        alt: "Ett foto",
+        block: true,
+        text: "![[foto.jpg|Ett foto]]",
+      },
+    ]);
+    expect(marks(DOC, sp, "cm-link").map((m) => [m.text, m.attrs?.["data-href"]])).toEqual([
+      ["webb", "https://example.com/y.png"],
+      ["<logo.svg>", "logo.svg"],
+    ]);
+    expect(hidden(DOC, sp)).toEqual(["![", "](https://example.com/y.png)", "> "]);
+  });
+
+  test("show under their source on the line being edited", () => {
+    const { specs: sp } = specs(DOC, { images: true, cursor: 3 });
+    const first = media(DOC, sp)[0]!;
+    expect(first).toMatchObject({ after: true, text: "" });
+    expect(hidden(DOC, sp).some((h) => h.includes("Skiss"))).toBe(false);
+    expect(marks(DOC, sp, "cm-image-source").map((m) => m.text)).toEqual([DOC.split("\n")[0]]);
+  });
+
+  test("are links where the vault's files can't be shown", () => {
+    const { specs: sp } = specs(DOC, { focused: false });
+    expect(media(DOC, sp)).toEqual([]);
+    expect(marks(DOC, sp, "cm-link").map((m) => m.text)).toEqual([
+      "Skiss|300",
+      "liten",
+      "webb",
+      "logo",
+      "<logo.svg>",
+    ]);
+  });
+
+  test("load from the URL the app gives, again when files change", () => {
+    const { specs: sp } = specs("![a](x.png)", { images: true, focused: false });
+    const urls = (epoch: number) => {
+      const out: (string | null)[] = [];
+      toDecorations(sp, {
+        handlers: { resolveAsset: (src, wiki) => (wiki ? null : `notafile://vault/${src}`) },
+        epoch: { files: epoch, notes: 0 },
+      }).between(0, 20, (_f, _t, d) => {
+        out.push((d.spec.widget as { url: string | null }).url);
+      });
+      return out;
+    };
+    expect(urls(0)).toEqual(["notafile://vault/x.png"]);
+    expect(urls(2)).toEqual(["notafile://vault/x.png?v=2"]);
+  });
+});
+
+describe("embeds", () => {
+  test("![[Note]] and ![[Note#Heading]] embed the note; images and links don't", () => {
+    const doc = "![[Plan]]\n\n![[Plan#Mål]]\n\n[[Plan]] och ![[bild.png]]";
+    const { specs: sp } = specs(doc, { embeds: true, focused: false });
+    expect(media(doc, sp)).toEqual([
+      { widget: "embed", src: "Plan", block: true, text: "![[Plan]]" },
+      { widget: "embed", src: "Plan", heading: "Mål", block: true, text: "![[Plan#Mål]]" },
+    ]);
+  });
+
+  test("a section runs to the next heading of its level, a block is its block", () => {
+    const doc = [
+      "# Plan",
+      "",
+      "## Mål",
+      "",
+      "Bli klara.",
+      "",
+      "### Delmål",
+      "",
+      "Ett.",
+      "",
+      "## Risker",
+      "",
+      "- punkt ^p1",
+      "- annan",
+    ].join("\n");
+    const s = state(doc);
+    const slice = (a: string) => {
+      const r = findSection(s, a);
+      return r && doc.slice(r.from, r.to);
+    };
+    expect(slice("Mål")).toBe("## Mål\n\nBli klara.\n\n### Delmål\n\nEtt.");
+    expect(slice("Risker")).toBe("## Risker\n\n- punkt ^p1\n- annan");
+    expect(slice("Plan")).toBe(doc);
+    expect(slice("^p1")).toBe("- punkt ^p1");
+    expect(slice("Saknas")).toBeUndefined();
   });
 });

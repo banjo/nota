@@ -1,0 +1,49 @@
+{
+  "about": "Max median commits/renders per scenario (scripts/perf/run.mjs --budget): the highest of the 3 after-runs at f8b4bbe plus 15%. h (idle) must stay at 0.",
+  "scenarios": {
+    "a": {
+      "commits": 12,
+      "renders": 411
+    },
+    "b": {
+      "commits": 35,
+      "renders": 690
+    },
+    "b-2000": {
+      "commits": 35,
+      "renders": 687
+    },
+    "c": {
+      "commits": 5,
+      "renders": 13
+    },
+    "d": {
+      "commits": 60,
+      "renders": 1047
+    },
+    "e": {
+      "commits": 42,
+      "renders": 454
+    },
+    "e-2000": {
+      "commits": 13,
+      "renders": 2629
+    },
+    "f": {
+      "commits": 35,
+      "renders": 512
+    },
+    "g": {
+      "commits": 222,
+      "renders": 3838
+    },
+    "h": {
+      "commits": 0,
+      "renders": 0
+    },
+    "i": {
+      "commits": 9,
+      "renders": 80
+    }
+  }
+}

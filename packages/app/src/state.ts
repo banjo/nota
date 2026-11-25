@@ -17,6 +17,7 @@ import {
   toggledNoteMode,
   watchNoteMode,
 } from "./lib/noteMode.ts";
+import { settingsSync } from "./settings/index.ts";
 
 // UI state: what is on screen. Data lives in TanStack Query.
 
@@ -28,8 +29,11 @@ export type ListSpec =
 
 export type Route =
   | { kind: "home" }
-  /** `via: "open"`: opened from the file manager, shown in Reading for this open. */
-  | { kind: "note"; path: string; via?: "open" }
+  /**
+   * `via: "open"`: opened from the file manager, shown in Reading for this
+   * open. `anchor`: a heading or "^block" to scroll to, from a link.
+   */
+  | { kind: "note"; path: string; via?: "open"; anchor?: string }
   | { kind: "inbox" }
   /** A Markdown file from outside the vault (desktop), by its opener id. */
   | { kind: "external"; id: string }
@@ -117,7 +121,10 @@ export const useUI = create<UIState>()(
       openVaultFlow: (mode) => set({ vaultFlow: { mode } }),
       closeVaultFlow: () => set({ vaultFlow: null }),
       setNoteMode: (mode) => {
-        saveNoteMode(deviceStorage(), mode);
+        // settings.toml sets it: the change lasts this window.
+        const keep = !settingsSync.locked("note_mode");
+        if (keep) saveNoteMode(deviceStorage(), mode);
+        if (keep && mode !== get().noteMode) settingsSync.changed("note_mode", mode);
         const r = get().route;
         set(
           r.kind === "note" && r.via
@@ -128,12 +135,18 @@ export const useUI = create<UIState>()(
       toggleNoteMode: () =>
         get().setNoteMode(toggledNoteMode(noteModeFor(get().route, get().noteMode))),
       setProperties: (pref) => {
-        savePropertiesPref(deviceStorage(), pref);
+        if (!settingsSync.locked("properties")) {
+          savePropertiesPref(deviceStorage(), pref);
+          if (pref !== get().properties) settingsSync.changed("properties", pref);
+        }
         set({ properties: pref });
       },
       toggleProperties: () => get().setProperties(toggledPropertiesPref(get().properties)),
       setBacklinks: (pref) => {
-        backlinksPref.save(deviceStorage(), pref);
+        if (!settingsSync.locked("backlinks")) {
+          backlinksPref.save(deviceStorage(), pref);
+          if (pref !== get().backlinks) settingsSync.changed("backlinks", pref);
+        }
         set({ backlinks: pref });
       },
       toggleBacklinks: () => get().setBacklinks(toggledShowPref(get().backlinks)),
@@ -184,7 +197,7 @@ export const useUI = create<UIState>()(
  * that one open, and previews of outside files do not come back.
  */
 export function persistedRoute(r: Route): Route {
-  if (r.kind === "note" && r.via) return { kind: "note", path: r.path };
+  if (r.kind === "note" && (r.via || r.anchor)) return { kind: "note", path: r.path };
   // Preview ids die with the process.
   if (r.kind === "external") return { kind: "home" };
   return r;
@@ -205,4 +218,12 @@ watchPropertiesPref(typeof window === "undefined" ? null : window, deviceStorage
 );
 backlinksPref.watch(typeof window === "undefined" ? null : window, deviceStorage(), (backlinks) =>
   useUI.setState({ backlinks }),
+);
+// The settings layers (settings.toml, the account) changed them.
+settingsSync.onReload(() =>
+  useUI.setState({
+    noteMode: loadNoteMode(deviceStorage()),
+    properties: loadPropertiesPref(deviceStorage()),
+    backlinks: backlinksPref.load(deviceStorage()),
+  }),
 );

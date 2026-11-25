@@ -48,6 +48,14 @@ const (
 	// EnvServerHooks=on runs each vault's .nota/hooks.toml on the server
 	// (default off).
 	EnvServerHooks = "NOTA_SERVER_HOOKS"
+	// EnvServerBlobs is where file contents are kept: s3://bucket/prefix
+	// for an S3-compatible bucket, else <data>/blobs.
+	EnvServerBlobs = "NOTA_SERVER_BLOBS"
+	// EnvServerS3Endpoint is the bucket's service URL (empty: AWS S3).
+	EnvServerS3Endpoint = "NOTA_SERVER_S3_ENDPOINT"
+	// EnvServerS3Region signs the requests (default $AWS_REGION, auto
+	// with an endpoint, us-east-1 on AWS).
+	EnvServerS3Region = "NOTA_SERVER_S3_REGION"
 )
 
 type serveFlags struct {
@@ -103,7 +111,10 @@ func (a *app) serveCmd() *cobra.Command {
 users, synced by "nota sync" over HTTP (protocol in docs/sync-protocol.md).
 
 Everything the server keeps is in the data directory (--data): the
-SQLite database nota.db and the blob store blobs/. Settings can come
+SQLite database nota.db and the blob store blobs/, or with
+$NOTA_SERVER_BLOBS=s3://bucket/prefix the file contents in an
+S3-compatible bucket (Cloudflare R2, AWS S3, MinIO; see docs/deploy.md
+for $NOTA_SERVER_S3_ENDPOINT and the credentials). Settings can come
 from the environment instead of flags: $NOTA_SERVER_ADDR,
 $NOTA_SERVER_DATA, $NOTA_SERVER_MAX_FILE_SIZE, $NOTA_SERVER_LOG_FORMAT.
 
@@ -389,6 +400,10 @@ Settings › Vaults.`,
 			if err != nil {
 				return err
 			}
+			blobs, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
 			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
 				u, err := st.UserByEmail(ctx, args[0])
 				if err != nil {
@@ -398,7 +413,7 @@ Settings › Vaults.`,
 				if err != nil {
 					return serverErr(err)
 				}
-				if _, _, err := server.RemoveVaultData(ctx, st, dir, rm); err != nil {
+				if _, _, err := server.RemoveVaultData(ctx, st, blobs, dir, rm); err != nil {
 					fmt.Fprintf(a.stderr, "nota: vault %s is deleted, but cleaning up its files failed: %v\n", args[1], err)
 				}
 				if a.json {
@@ -443,8 +458,12 @@ Run it from a timer or by hand.`,
 			if err != nil {
 				return err
 			}
+			blobs, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
 			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
-				res, err := st.CollectBlobs(ctx, filepath.Join(dir, "blobs"), server.BlobGC{DryRun: dryRun, MinAge: minAge})
+				res, err := st.CollectBlobs(ctx, blobs, server.BlobGC{DryRun: dryRun, MinAge: minAge})
 				if err != nil {
 					return err
 				}
@@ -468,7 +487,69 @@ Run it from a timer or by hand.`,
 	}
 	gc.Flags().BoolVar(&dryRun, "dry-run", false, "report what would go without removing anything")
 	gc.Flags().DurationVar(&minAge, "min-age", server.DefaultBlobGrace, "leave unreferenced files younger than this alone")
-	cmd.AddCommand(gc)
+	var del bool
+	migrate := &cobra.Command{
+		Use:   "migrate [--delete]",
+		Short: "Copy the blobs in <data>/blobs into the bucket of $NOTA_SERVER_BLOBS",
+		Long: `Copy every blob in <data>/blobs that the bucket $NOTA_SERVER_BLOBS names
+does not have yet, checking that each one's content matches its hash.
+It is safe next to a running server and can run again: a second run
+copies only what came since.
+
+To move a server's blobs into a bucket:
+
+  1. nota serve blobs migrate            (while the server runs: the bulk)
+  2. stop the server, then run it again  (only what came since)
+  3. set $NOTA_SERVER_BLOBS and start the server
+  4. nota serve blobs migrate --delete   (removes the copied local files)
+
+With --delete each local file is removed once the bucket has it.`,
+		Args: exactArgs(0, "no arguments"),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			dir, err := f.dataDir()
+			if err != nil {
+				return err
+			}
+			dst, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
+			if _, ok := dst.(*server.DiskBlobs); ok {
+				return usageErr("set $%s to the bucket to copy into (s3://bucket/prefix)", EnvServerBlobs)
+			}
+			src, err := server.NewDiskBlobs(filepath.Join(dir, "blobs"))
+			if err != nil {
+				return err
+			}
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			last := time.Now()
+			res, err := server.CopyBlobs(ctx, src, dst, server.CopyOptions{
+				Delete: del,
+				Progress: func(r server.CopyResult) {
+					if !a.json && time.Since(last) > 2*time.Second {
+						last = time.Now()
+						fmt.Fprintf(a.stderr, "copied %d (%d bytes), %d already there\n", r.Copied, r.Bytes, r.Present)
+					}
+				},
+			})
+			if a.json {
+				if perr := a.printJSON(res); err == nil {
+					err = perr
+				}
+				return err
+			}
+			fmt.Fprintf(a.stdout, "copied %d blob(s), %d bytes, to %s; %d were there already",
+				res.Copied, res.Bytes, blobsName(dst, dir), res.Present)
+			if del {
+				fmt.Fprintf(a.stdout, "; removed %d from %s", res.Deleted, filepath.Join(dir, "blobs"))
+			}
+			fmt.Fprintln(a.stdout)
+			return err
+		},
+	}
+	migrate.Flags().BoolVar(&del, "delete", false, "remove each local blob once the bucket has it")
+	cmd.AddCommand(gc, migrate)
 	return cmd
 }
 
@@ -525,6 +606,9 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 		return usageErr("%v", err)
 	}
 	cfg.DataDir, cfg.MaxFileSize = dir, maxSize
+	if cfg.Blobs, err = blobStore(dir); err != nil {
+		return err
+	}
 	format := f.logFormat
 	if format == "" {
 		format = envOr(EnvServerLogFormat, "text")
@@ -549,7 +633,8 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 	}
 	defer srv.Close()
 	err = srv.ListenAndServe(ctx, addr, 10*time.Second, func(ln net.Addr) {
-		log.Info("nota serve: listening", "addr", ln.String(), "data", dir, "max_file_size", maxSize, "version", Version,
+		log.Info("nota serve: listening", "addr", ln.String(), "data", dir, "blobs", blobsName(cfg.Blobs, dir),
+			"max_file_size", maxSize, "version", Version,
 			"public_url", cfg.PublicURL, "web_origins", strings.Join(cfg.WebOrigins, ","), "rp_id", cfg.RPID,
 			"signup", string(cfg.Signup), "trusted_proxies", len(cfg.TrustedProxies), "hooks", cfg.Hooks)
 		if f.addrFile != "" {
@@ -622,6 +707,46 @@ func signupLink(code string) string {
 		return ""
 	}
 	return o[0] + "/app/signup?invite=" + code
+}
+
+// blobStore opens the server's blob store: the bucket
+// $NOTA_SERVER_BLOBS names, else <data>/blobs.
+func blobStore(dataDir string) (server.BlobStore, error) {
+	spec := strings.TrimSpace(os.Getenv(EnvServerBlobs))
+	if spec == "" || spec == "disk" {
+		return server.NewDiskBlobs(filepath.Join(dataDir, "blobs"))
+	}
+	rest, ok := strings.CutPrefix(spec, "s3://")
+	bucket, prefix, _ := strings.Cut(rest, "/")
+	if !ok || bucket == "" {
+		return nil, usageErr("$%s: want s3://bucket/prefix, got %q", EnvServerBlobs, spec)
+	}
+	region := os.Getenv(EnvServerS3Region)
+	if region == "" {
+		region = os.Getenv("AWS_REGION")
+	}
+	b, err := server.NewS3Blobs(server.S3Config{
+		Endpoint:     os.Getenv(EnvServerS3Endpoint),
+		Region:       region,
+		Bucket:       bucket,
+		Prefix:       prefix,
+		AccessKey:    os.Getenv("AWS_ACCESS_KEY_ID"),
+		SecretKey:    os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		SessionToken: os.Getenv("AWS_SESSION_TOKEN"),
+		TmpDir:       filepath.Join(dataDir, "tmp"),
+	})
+	if err != nil {
+		return nil, usageErr("$%s: %v", EnvServerBlobs, err)
+	}
+	return b, nil
+}
+
+// blobsName is how logs name a store: s3://bucket/prefix or the directory.
+func blobsName(b server.BlobStore, dataDir string) string {
+	if s, ok := b.(fmt.Stringer); ok {
+		return s.String()
+	}
+	return filepath.Join(dataDir, "blobs")
 }
 
 // withStore opens the data directory for an admin command.
@@ -723,6 +848,10 @@ it only prints what it would remove. This cannot be undone.`,
 			if err != nil {
 				return err
 			}
+			blobs, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
 			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
 				rmv, err := st.PlanUserRemoval(ctx, args[0])
 				if err != nil {
@@ -735,7 +864,7 @@ it only prints what it would remove. This cannot be undone.`,
 				if rmv, err = st.DeleteUser(ctx, args[0]); err != nil {
 					return serverErr(err)
 				}
-				files, bytes, err := server.RemoveUserData(ctx, st, dir, rmv)
+				files, bytes, err := server.RemoveUserData(ctx, st, blobs, dir, rmv)
 				rmv.BlobsReclaimed, rmv.BytesReclaimed = files, bytes
 				a.printRemoval(rmv, true)
 				return err

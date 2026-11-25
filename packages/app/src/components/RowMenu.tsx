@@ -12,7 +12,7 @@ import { createNote, createNoteIn, deleteNote, newNoteFolder } from "../actions.
 import { useClient } from "../context.ts";
 import { useLongPress } from "../lib/longPress.ts";
 import { folderOf } from "../lib/notes.ts";
-import { useTree } from "../queries.ts";
+import { useInboxName } from "../queries.ts";
 import { useUI } from "../state.ts";
 import { startNewFolder } from "./NewFolder.tsx";
 import { startRename } from "./Rename.tsx";
@@ -47,7 +47,7 @@ export interface RowAction {
 export function useRowActions(): (t: MenuTarget) => RowAction[] {
   const client = useClient();
   const qc = useQueryClient();
-  const tree = useTree();
+  const inbox = useInboxName();
   const openPalette = useUI((s) => s.openPalette);
   return (t) => {
     if (t.kind === "folder") {
@@ -67,7 +67,7 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
           group: 0,
         },
         // The inbox is named in the vault's settings, not renamed here.
-        ...(t.path === tree.data?.inbox
+        ...(t.path === inbox
           ? []
           : [
               {
@@ -128,12 +128,7 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
         id: "newNote",
         label: "New note",
         icon: FilePlus2,
-        run: () =>
-          void createNote(
-            client,
-            qc,
-            newNoteFolder(useUI.getState().route, tree.data?.inbox ?? "Inbox"),
-          ),
+        run: () => void createNote(client, qc, newNoteFolder(useUI.getState().route, inbox)),
         group: 0,
       },
       {

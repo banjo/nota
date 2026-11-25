@@ -121,6 +121,20 @@ NAME` (or `--id N`).
 CLI: `nota devices [--server URL]`, `nota devices revoke <id>`,
 `nota logout [url]`.
 
+## Settings
+
+The account keeps the user's settings (`docs/settings.md`) so they
+follow them to every device. The server stores any key that matches
+`^[a-z][a-z0-9_]{0,63}$` with a string value of at most 256 bytes, at
+most 64 keys, so an older server keeps what a newer app writes; the
+apps check the values.
+
+| Route | Auth | Body → response |
+| --- | --- | --- |
+| `GET /v1/account/settings` | any | → `{rev, settings: {key: value}}`; a new account is `{rev: 0, settings: {}}` |
+| `PATCH /v1/account/settings` | any | `{set?: {key: value}, unset?: [key]}` → `{rev, settings}`; `400 bad_request` for a bad key or value. Keys change one by one and the last write of a key wins, so two devices changing different keys don't collide. A patch that changes nothing keeps `rev`. |
+| `GET /v1/account/events` | any | Server-sent events: `event: settings` with `data: {"rev": N}`, once at the start and after every change from any device. Fetch the settings when `rev` is new. Keep-alive comments as on the vault stream. |
+
 ## Web API
 
 The web app's `NotesClient` talks to `/v1/api/vaults/{vault}/…` with the
@@ -170,7 +184,8 @@ Shapes:
 | `GET …/history/{path}` | → `{path, versions: [Entry]}` newest first, through renames |
 | `GET …/history/{path}?version=N` | → `Entry` plus `content` (absent for a delete) |
 | `POST …/history/{path}/restore` | `{version}`, optional `Base-Version` → the new `Entry`: the old bytes become the newest version; history is never rewritten |
-| `GET …/files/{path}` | the raw file (attachments), with the sync protocol's headers |
+| `GET …/files/{path}` | the raw file (attachments), with the sync protocol's headers. Images (png, jpg, gif, webp, avif, svg, bmp) have their content type, anything else is `application/octet-stream`; every file has `nosniff` and a sandboxing CSP, so an SVG opened on its own runs nothing. `Cache-Control: private, no-cache`; `If-None-Match` with the `ETag` → `304`. With `?from=<note path>` the path is an embed's target (`![[name]]`), found from that note: a vault path, the note's folder, `Attachments/`, then the shortest path ending in it; `404 not_found` otherwise. `protocol=1` may be in the query, for `<img src>`. |
+| `POST …/attachments?name=` | the raw bytes of an image (pasted or dropped into a note) → `201 {path}`: saved to `Attachments/` (or an existing `attachments/`) under its name, or with ` 2`, ` 3` …, as a version of the calling device. `400 invalid_path` for other file types, `413 too_large` above the file size limit. |
 | `GET …/changes?since=` | the sync change feed (to see which paths changed) |
 | `GET …/events?protocol=1` | SSE: `event: change` / `data: {"cursor": N}` on every new version (from any device, the web or a hook), `: keepalive` comments every 25 s. Use `new EventSource(url, {withCredentials: true})`. Responses send `X-Accel-Buffering: no` so proxies do not buffer. |
 

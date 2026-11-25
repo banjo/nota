@@ -1,0 +1,628 @@
+{
+  "meta": {
+    "date": "2026-11-24T22:30:21.527Z",
+    "commit": "b0fe4b8",
+    "runs": 3,
+    "chromium": "159.0.8154.6",
+    "react": "production build (react-dom production bundle), app code unminified, React Compiler on",
+    "client": "in-memory NotesClient (scripts/perf/app/memory-client.ts), desktop-style change events",
+    "viewport": "1440x900 @1x, headless"
+  },
+  "scenarios": {
+    "a": {
+      "name": "cold load → first note visible",
+      "median": {
+        "commits": 11,
+        "renders": 873,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 111,
+        "taskMs": 169,
+        "readyMs": 188
+      },
+      "top": [
+        ["ForwardRef", 60],
+        ["Primitive.div", 42],
+        ["Presence", 40],
+        ["Popper", 39],
+        ["PopperProvider", 39],
+        ["Tooltip", 39],
+        ["TooltipTrigger", 39],
+        ["PopperAnchor", 38],
+        ["Primitive.button", 36],
+        ["Primitive.div.Slot", 36],
+        ["TooltipProvider", 28],
+        ["Primitive.button.Slot", 26],
+        ["TooltipPortal", 26],
+        ["TooltipPortalProvider", 26],
+        ["Row", 24]
+      ],
+      "runs": [
+        {
+          "commits": 11,
+          "renders": 873,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 112,
+          "taskMs": 177,
+          "readyMs": 200,
+          "errors": []
+        },
+        {
+          "commits": 11,
+          "renders": 873,
+          "longTasks": 1,
+          "longTaskMs": 50,
+          "scriptMs": 111,
+          "taskMs": 169,
+          "readyMs": 188,
+          "errors": []
+        },
+        {
+          "commits": 11,
+          "renders": 873,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 108,
+          "taskMs": 166,
+          "readyMs": 184,
+          "errors": []
+        }
+      ]
+    },
+    "b": {
+      "name": "open 10 notes via sidebar",
+      "median": {
+        "commits": 30,
+        "renders": 1520,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 70,
+        "taskMs": 194
+      },
+      "top": [
+        ["Row", 310],
+        ["NoteRow", 210],
+        ["FolderRow", 100],
+        ["ForwardRef", 70],
+        ["DropdownMenu", 60],
+        ["DropdownMenuTrigger", 60],
+        ["MenuProvider", 60],
+        ["Popper", 40],
+        ["PopperAnchor", 40],
+        ["PopperProvider", 40],
+        ["Primitive.button", 40],
+        ["Primitive.div", 40],
+        ["Primitive.div.Slot", 40],
+        ["DropdownMenuProvider", 30],
+        ["Menu", 30]
+      ],
+      "runs": [
+        {
+          "commits": 30,
+          "renders": 1520,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 69,
+          "taskMs": 194,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 1520,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 70,
+          "taskMs": 192,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 1520,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 74,
+          "taskMs": 206,
+          "errors": []
+        }
+      ]
+    },
+    "b-2000": {
+      "name": "open 10 notes via sidebar (2000 notes)",
+      "median": {
+        "commits": 30,
+        "renders": 1604,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 65,
+        "taskMs": 188
+      },
+      "top": [
+        ["Row", 360],
+        ["NoteRow", 320],
+        ["ForwardRef", 70],
+        ["DropdownMenu", 58],
+        ["DropdownMenuTrigger", 58],
+        ["MenuProvider", 58],
+        ["FolderRow", 40],
+        ["Popper", 39],
+        ["PopperAnchor", 39],
+        ["PopperProvider", 39],
+        ["Primitive.button", 39],
+        ["Primitive.div", 39],
+        ["Primitive.div.Slot", 39],
+        ["DropdownMenuProvider", 29],
+        ["Menu", 29]
+      ],
+      "runs": [
+        {
+          "commits": 30,
+          "renders": 1604,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 65,
+          "taskMs": 185,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 1604,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 65,
+          "taskMs": 188,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 1604,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 67,
+          "taskMs": 189,
+          "errors": []
+        }
+      ]
+    },
+    "c": {
+      "name": "type 60 chars in a note",
+      "median": {
+        "commits": 7,
+        "renders": 104,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 133,
+        "taskMs": 367
+      },
+      "top": [
+        ["Row", 9],
+        ["ContextMenu", 8],
+        ["MenuProvider", 8],
+        ["FolderRow", 5],
+        ["ContextMenuContent", 4],
+        ["ContextMenuPortal", 4],
+        ["ContextMenuProvider", 4],
+        ["Dialog", 4],
+        ["DialogProvider", 4],
+        ["Menu", 4],
+        ["MenuPortal", 4],
+        ["MenuPortalProvider", 4],
+        ["NoteRow", 4],
+        ["Palette", 4],
+        ["Popper", 4]
+      ],
+      "runs": [
+        {
+          "commits": 7,
+          "renders": 104,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 131,
+          "taskMs": 361,
+          "errors": []
+        },
+        {
+          "commits": 7,
+          "renders": 104,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 137,
+          "taskMs": 373,
+          "errors": []
+        },
+        {
+          "commits": 7,
+          "renders": 104,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 133,
+          "taskMs": 367,
+          "errors": []
+        }
+      ]
+    },
+    "d": {
+      "name": "⌘K: open, type query, ↓×5, close",
+      "median": {
+        "commits": 53,
+        "renders": 1991,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 55,
+        "taskMs": 124
+      },
+      "top": [
+        ["ForwardRef", 536],
+        ["Primitive.div", 411],
+        ["CommandItem", 213],
+        ["NoteItem", 90],
+        ["Presence", 66],
+        ["Palette", 62],
+        ["Primitive.div.Slot", 45],
+        ["Portal", 32],
+        ["CommandShortcut", 31],
+        ["Dialog", 30],
+        ["DialogOverlay", 30],
+        ["CommandGroup", 28],
+        ["DialogContent", 27],
+        ["FileText", 25],
+        ["Primitive.input", 20]
+      ],
+      "runs": [
+        {
+          "commits": 53,
+          "renders": 2029,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 55,
+          "taskMs": 120,
+          "errors": []
+        },
+        {
+          "commits": 50,
+          "renders": 1839,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 52,
+          "taskMs": 124,
+          "errors": []
+        },
+        {
+          "commits": 53,
+          "renders": 1991,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 56,
+          "taskMs": 124,
+          "errors": []
+        }
+      ]
+    },
+    "e": {
+      "name": "expand/collapse 5 folders, toggle sidebar",
+      "median": {
+        "commits": 44,
+        "renders": 1568,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 44,
+        "taskMs": 159
+      },
+      "top": [
+        ["Row", 253],
+        ["NoteRow", 153],
+        ["FolderRow", 100],
+        ["ForwardRef", 80],
+        ["Primitive.div", 76],
+        ["Popper", 54],
+        ["PopperAnchor", 54],
+        ["PopperProvider", 54],
+        ["Presence", 54],
+        ["Primitive.button", 54],
+        ["Primitive.div.Slot", 54],
+        ["DropdownMenu", 34],
+        ["DropdownMenuTrigger", 34],
+        ["MenuProvider", 34],
+        ["Tooltip", 30]
+      ],
+      "runs": [
+        {
+          "commits": 44,
+          "renders": 1568,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 46,
+          "taskMs": 162,
+          "errors": []
+        },
+        {
+          "commits": 44,
+          "renders": 1568,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 44,
+          "taskMs": 159,
+          "errors": []
+        },
+        {
+          "commits": 44,
+          "renders": 1568,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 44,
+          "taskMs": 159,
+          "errors": []
+        }
+      ]
+    },
+    "e-2000": {
+      "name": "expand/collapse 5 folders, toggle sidebar (2000 notes)",
+      "median": {
+        "commits": 21,
+        "renders": 10542,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 77,
+        "taskMs": 190
+      },
+      "top": [
+        ["ForwardRef", 665],
+        ["Popper", 616],
+        ["PopperAnchor", 616],
+        ["PopperProvider", 616],
+        ["Primitive.button", 616],
+        ["Primitive.div", 616],
+        ["Primitive.div.Slot", 616],
+        ["DropdownMenu", 504],
+        ["DropdownMenuTrigger", 504],
+        ["MenuProvider", 504],
+        ["Presence", 364],
+        ["Row", 330],
+        ["Ellipsis", 280],
+        ["DropdownMenuContent", 252],
+        ["DropdownMenuPortal", 252]
+      ],
+      "runs": [
+        {
+          "commits": 21,
+          "renders": 10542,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 80,
+          "taskMs": 189,
+          "errors": []
+        },
+        {
+          "commits": 21,
+          "renders": 10542,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 75,
+          "taskMs": 190,
+          "errors": []
+        },
+        {
+          "commits": 21,
+          "renders": 10542,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 77,
+          "taskMs": 191,
+          "errors": []
+        }
+      ]
+    },
+    "f": {
+      "name": "properties: add tag chip, change status",
+      "median": {
+        "commits": 36,
+        "renders": 631,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 30,
+        "taskMs": 103
+      },
+      "top": [
+        ["Primitive.div", 41],
+        ["MenuProvider", 28],
+        ["Primitive.div.Slot", 22],
+        ["Presence", 21],
+        ["Row", 18],
+        ["ContextMenu", 16],
+        ["Popper", 16],
+        ["PopperProvider", 16],
+        ["ForwardRef", 14],
+        ["Menu", 14],
+        ["MenuPortal", 14],
+        ["MenuPortalProvider", 14],
+        ["Primitive.span", 12],
+        ["Primitive.span.Slot", 12],
+        ["RovingFocusGroupCollectionItemSlot", 12]
+      ],
+      "runs": [
+        {
+          "commits": 36,
+          "renders": 631,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 32,
+          "taskMs": 107,
+          "errors": []
+        },
+        {
+          "commits": 36,
+          "renders": 631,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 30,
+          "taskMs": 103,
+          "errors": []
+        },
+        {
+          "commits": 36,
+          "renders": 631,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 28,
+          "taskMs": 101,
+          "errors": []
+        }
+      ]
+    },
+    "g": {
+      "name": "modes Live/Reading/Source, dark mode, palette",
+      "median": {
+        "commits": 193,
+        "renders": 7541,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 158,
+        "taskMs": 484
+      },
+      "top": [
+        ["ForwardRef", 1674],
+        ["Primitive.div", 1349],
+        ["CommandItem", 507],
+        ["Presence", 400],
+        ["Palette", 375],
+        ["Primitive.div.Slot", 282],
+        ["Portal", 196],
+        ["Dialog", 194],
+        ["DialogOverlay", 188],
+        ["DialogContent", 179],
+        ["CommandGroup", 101],
+        ["DialogPortal", 101],
+        ["DialogPortalProvider", 101],
+        ["DialogProvider", 101],
+        ["DismissableLayer", 95]
+      ],
+      "runs": [
+        {
+          "commits": 193,
+          "renders": 7541,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 160,
+          "taskMs": 491,
+          "errors": []
+        },
+        {
+          "commits": 193,
+          "renders": 7541,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 157,
+          "taskMs": 480,
+          "errors": []
+        },
+        {
+          "commits": 193,
+          "renders": 7541,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 158,
+          "taskMs": 484,
+          "errors": []
+        }
+      ]
+    },
+    "h": {
+      "name": "idle 5 s after load",
+      "median": {
+        "commits": 0,
+        "renders": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 0,
+        "taskMs": 0
+      },
+      "top": [],
+      "runs": [
+        {
+          "commits": 0,
+          "renders": 0,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 0,
+          "taskMs": 1,
+          "errors": []
+        },
+        {
+          "commits": 0,
+          "renders": 0,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 0,
+          "taskMs": 0,
+          "errors": []
+        },
+        {
+          "commits": 0,
+          "renders": 0,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 0,
+          "taskMs": 0,
+          "errors": []
+        }
+      ]
+    },
+    "i": {
+      "name": "5000-line note: open, scroll, type",
+      "median": {
+        "commits": 10,
+        "renders": 238,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 310,
+        "taskMs": 603
+      },
+      "top": [
+        ["Row", 32],
+        ["NoteRow", 18],
+        ["FolderRow", 14],
+        ["MenuProvider", 14],
+        ["ContextMenu", 8],
+        ["Popper", 8],
+        ["PopperProvider", 8],
+        ["Menu", 7],
+        ["DropdownMenu", 6],
+        ["DropdownMenuTrigger", 6],
+        ["ForwardRef", 6],
+        ["MenuPortal", 5],
+        ["MenuPortalProvider", 5],
+        ["Presence", 5],
+        ["ContextMenuContent", 4]
+      ],
+      "runs": [
+        {
+          "commits": 10,
+          "renders": 238,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 309,
+          "taskMs": 602,
+          "errors": []
+        },
+        {
+          "commits": 10,
+          "renders": 238,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 324,
+          "taskMs": 622,
+          "errors": []
+        },
+        {
+          "commits": 10,
+          "renders": 238,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 310,
+          "taskMs": 603,
+          "errors": []
+        }
+      ]
+    }
+  }
+}

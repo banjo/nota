@@ -131,7 +131,7 @@ func (s *Vault) watch(ctx context.Context) {
 func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 	var paths []string
 	views, plugs := false, false
-	var dirs []string
+	var dirs, images []string
 	for _, e := range evs {
 		for _, p := range []string{e.Path, e.OldPath} {
 			switch {
@@ -144,12 +144,17 @@ func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 				paths = append(paths, vault.NFC(p))
 			case e.IsDir && p != ".":
 				dirs = append(dirs, vault.NFC(p))
+			case !e.IsDir && vault.ImageType(p) != "":
+				images = append(images, vault.NFC(p))
 			}
 		}
 	}
 	// Folders made, removed or renamed by other programs change the tree
 	// even though no note (and so nothing in the index) did.
 	s.changes.add(dirs...)
+	// Images aren't indexed, but notes show them: the frontend reloads
+	// them (synced in, edited or replaced by another program).
+	s.changes.add(images...)
 	// Plugins don't touch the index: the frontend reads them again.
 	if plugs {
 		s.changes.add(pluginsDir)

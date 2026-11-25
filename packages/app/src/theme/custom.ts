@@ -45,6 +45,20 @@ export const THEME_TOKENS = [
   "md-tag",
   "md-code",
   "md-quote",
+  "md-table-border",
+  "md-table-header",
+  "md-syntax-keyword",
+  "md-syntax-string",
+  "md-syntax-number",
+  "md-syntax-comment",
+  "md-syntax-function",
+  "md-syntax-type",
+  "md-callout-note",
+  "md-callout-tip",
+  "md-callout-important",
+  "md-callout-warning",
+  "md-callout-caution",
+  "md-highlight",
 ] as const;
 
 export type ThemeToken = (typeof THEME_TOKENS)[number];
@@ -113,6 +127,37 @@ function readable(text: string, bg: string, weight: number, min: number): string
   return longHex(text);
 }
 
+/** color, moved toward `toward` until it has `min` contrast on bg. */
+function legible(color: string, toward: string, bg: string, min: number): string {
+  for (let w = 1; w > 0; w -= 0.02) {
+    const c = mix(color, toward, w);
+    if (contrast(c, bg) >= min) {
+      return c;
+    }
+  }
+  return longHex(toward);
+}
+
+/**
+ * warning at 30%, fainter until text reads on it at 4.5:1. Over white on
+ * a light page, so a greyish page doesn't darken the marker.
+ */
+function highlight(warning: string, text: string, bg: string, dark: boolean): string {
+  const under = dark ? bg : "#ffffff";
+  for (let w = 0.3; w > 0.06; w -= 0.02) {
+    const c = mix(warning, under, w);
+    if (contrast(text, c) >= 4.5) {
+      return c;
+    }
+  }
+  return mix(warning, under, 0.06);
+}
+
+// The status colours of tokens.css, for themes that don't set their own.
+const SUCCESS = "#37b26c";
+const WARNING = "#e2a93b";
+const DANGER = "#d4483b";
+
 /** Every token of one mode: what the theme sets, and the rest derived. */
 export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, string>> {
   const bg = longHex(input.background);
@@ -120,6 +165,12 @@ export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, stri
   const ink = longHex(input.ink);
   const dark = luminance(bg) < luminance(text);
   const toBg = (w: number) => mix(text, bg, w);
+  const code = toBg(dark ? 0.07 : 0.055);
+  const hex = (v: string | undefined, fallback: string) => (v && parseHex(v) ? v : fallback);
+  const codeBg = hex(input.code, code);
+  const extreme = dark ? "#ffffff" : "#000000";
+  const inkStrong = mix(ink, text, 0.7);
+  const muted = readable(text, bg, 0.6, 4.5);
   const inkForeground =
     [dark ? bg : "#ffffff", dark ? "#ffffff" : bg, "#ffffff", "#000000"].find(
       (c) => contrast(c, ink) >= 4.5,
@@ -130,7 +181,7 @@ export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, stri
     ink,
     foreground: mix(text, dark ? "#ffffff" : "#000000", 0.6),
     "text-soft": toBg(0.88),
-    "muted-foreground": readable(text, bg, 0.6, 4.5),
+    "muted-foreground": muted,
     faint: readable(text, bg, 0.4, 2.2),
     sidebar: toBg(0.035),
     hairline: toBg(0.11),
@@ -140,14 +191,38 @@ export function deriveTokens(input: TokenInput): Partial<Record<ThemeToken, stri
     chip: toBg(0.08),
     "chip-foreground": toBg(0.8),
     file: toBg(0.78),
-    code: toBg(dark ? 0.07 : 0.055),
+    code,
     surface: dark ? toBg(0.045) : bg,
     overlay: dark ? "rgba(0, 0, 0, 0.5)" : "rgba(20, 21, 24, 0.28)",
     "ink-soft": mix(ink, bg, 0.14),
     "ink-soft-hover": mix(ink, bg, 0.22),
-    "ink-strong": mix(ink, text, 0.7),
+    "ink-strong": inkStrong,
     "ink-foreground": inkForeground,
+    // Code colours, each moved toward black or white until it reads on
+    // code: strings and numbers like body text, the accents like ink.
+    "md-syntax-keyword": legible(hex(input["ink-strong"], inkStrong), extreme, codeBg, 3),
+    "md-syntax-string": legible(hex(input.success, SUCCESS), extreme, codeBg, 4.5),
+    "md-syntax-number": legible(hex(input.warning, WARNING), extreme, codeBg, 4.5),
+    "md-syntax-comment": legible(hex(input["muted-foreground"], muted), extreme, codeBg, 3),
+    "md-syntax-function": legible(ink, extreme, codeBg, 3),
+    "md-syntax-type": legible(
+      hex(input["md-tag"], hex(input["ink-strong"], inkStrong)),
+      extreme,
+      codeBg,
+      3,
+    ),
   };
+  // Callouts are accents on an 8% tint of their own colour over the page:
+  // ≥ 3:1 there, which 3.4:1 on the page leaves room for.
+  const callout = (c: string) => legible(c, extreme, bg, 3.4);
+  Object.assign(derived, {
+    "md-callout-note": callout(ink),
+    "md-callout-tip": callout(hex(input["md-syntax-string"], derived["md-syntax-string"]!)),
+    "md-callout-important": callout(hex(input["ink-strong"], inkStrong)),
+    "md-callout-warning": callout(hex(input["md-syntax-number"], derived["md-syntax-number"]!)),
+    "md-callout-caution": callout(hex(input.danger, DANGER)),
+    "md-highlight": highlight(hex(input.warning, WARNING), text, bg, dark),
+  });
   const out: Partial<Record<ThemeToken, string>> = { ...derived };
   for (const k of THEME_TOKENS) {
     const v = input[k];

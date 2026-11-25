@@ -329,6 +329,29 @@ export interface SaveResult {
   current?: Note;
 }
 
+/** SettingsPatch changes the account's settings key by key. */
+export interface SettingsPatch {
+  set: Record<string, string>;
+  unset: string[];
+}
+
+/** SettingsState is the layers of the settings that live outside the page. */
+export interface SettingsState {
+  /** File is what settings.toml sets: those keys are locked. */
+  file: Record<string, string>;
+  /**
+   * Account is what the account sets; null when not signed in, or
+   * signed in but not fetched yet (offline).
+   */
+  account: Record<string, string>;
+  /** SignedIn says whether changes go to the account. */
+  signedIn: boolean;
+  /** Path is where settings.toml is. */
+  path: string;
+  /** Warnings are problems with the file or the account, for Settings. */
+  warnings: string[];
+}
+
 /** SyncStatus describes the background sync of the open vault. */
 export interface SyncStatus {
   /** State is "off" (no .nota/sync.toml), "starting", "synced" or "error". */
@@ -679,6 +702,20 @@ export const Opener = {
   take: bind<[], Opened[]>("Opener.Take", () => []),
 } as const;
 
+/** Settings reads settings.toml and talks to the account's settings. */
+export const Settings = {
+  /**
+   * State returns the layers, fetching the account's settings the first
+   * time. Changes also arrive as "settings" events.
+   */
+  state: bind<[], SettingsState>("Settings.State", () => []),
+  /**
+   * Update changes the account's settings. Values the app does not know
+   * are refused; the file's locked keys are the frontend's business.
+   */
+  update: bind<[SettingsPatch], SettingsState>("Settings.Update", (p: SettingsPatch) => [p]),
+} as const;
+
 // ---- Events ----
 
 /** Events sent by the Go side. Subscribe with `events.name.on(listener)`. */
@@ -691,6 +728,8 @@ export const events = {
   opened: event<OpenedNudge>("opened"),
   /** externalChangedEvent says an outside file changed on disk: read it again. */
   externalChanged: event<ExternalChanged>("externalChanged"),
+  /** settingsEvent tells every window that a layer changed. */
+  settings: event<SettingsState>("settings"),
   /** syncStatusEvent tells the frontend about every sync pass. */
   syncStatus: event<SyncStatus>("syncStatus"),
   /**

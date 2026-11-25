@@ -85,6 +85,13 @@ export interface ThemeEnv {
   root?: { dataset: DOMStringMap } | null;
   /** For the storage event. */
   window?: WindowLike | null;
+  /**
+   * settings.toml sets the key: a change lasts this page and is not
+   * stored (the next reload brings the file's value back).
+   */
+  locked?: (key: "theme" | "palette") => boolean;
+  /** The user chose a value (stored already), for the account. */
+  onChange?: (key: "theme" | "palette", value: string) => void;
 }
 
 export interface ThemeStore {
@@ -94,6 +101,8 @@ export interface ThemeStore {
   setPalette: (id: string) => void;
   /** Switches to the opposite of the mode in effect (an explicit choice). */
   toggleDark: () => void;
+  /** Reads the stored choice again (the settings layers changed it). */
+  reload: () => void;
   dispose: () => void;
 }
 
@@ -115,7 +124,7 @@ function write(storage: Storage | null | undefined, key: string, value: string |
 }
 
 export function createThemeStore(env: ThemeEnv): ThemeStore {
-  const { storage, media, root, window: win } = env;
+  const { storage, media, root, window: win, locked, onChange } = env;
   const listeners = new Set<() => void>();
 
   const load = (): ThemeState => {
@@ -159,8 +168,11 @@ export function createThemeStore(env: ThemeEnv): ThemeStore {
   win?.addEventListener("storage", onStorage);
 
   const setMode = (mode: ThemeMode) => {
-    write(storage, THEME_KEY, mode === "system" ? null : mode);
+    const keep = !locked?.("theme");
+    const changed = mode !== state.mode;
+    if (keep) write(storage, THEME_KEY, mode === "system" ? null : mode);
     set({ ...state, mode, resolved: resolveMode(mode, !!media?.matches) });
+    if (keep && changed) onChange?.("theme", mode);
   };
 
   return {
@@ -172,10 +184,14 @@ export function createThemeStore(env: ThemeEnv): ThemeStore {
     setMode,
     setPalette: (id) => {
       const palette = readPalette(id);
-      write(storage, PALETTE_KEY, palette === DEFAULT_PALETTE ? null : palette);
+      const keep = !locked?.("palette");
+      const changed = palette !== state.palette;
+      if (keep) write(storage, PALETTE_KEY, palette === DEFAULT_PALETTE ? null : palette);
       set({ ...state, palette });
+      if (keep && changed) onChange?.("palette", palette);
     },
     toggleDark: () => setMode(state.resolved === "dark" ? "light" : "dark"),
+    reload: () => set(load()),
     dispose: () => {
       media?.removeEventListener("change", onMedia);
       win?.removeEventListener("storage", onStorage);
@@ -185,6 +201,15 @@ export function createThemeStore(env: ThemeEnv): ThemeStore {
 }
 
 let shared: ThemeStore | null = null;
+
+/** What the settings layers decide for the app's store (see settings/). */
+const hooks: Pick<ThemeEnv, "locked" | "onChange"> = {};
+
+/** Connects the app's store to the settings layers. */
+export function setThemeHooks(h: Pick<ThemeEnv, "locked" | "onChange">) {
+  hooks.locked = h.locked;
+  hooks.onChange = h.onChange;
+}
 
 /** The app's store over the real browser (one per window). */
 export function themeStore(): ThemeStore {
@@ -202,6 +227,8 @@ export function themeStore(): ThemeStore {
         browser && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null,
       root: browser ? document.documentElement : null,
       window: browser ? window : null,
+      locked: (k) => hooks.locked?.(k) ?? false,
+      onChange: (k, v) => hooks.onChange?.(k, v),
     });
   }
   return shared;

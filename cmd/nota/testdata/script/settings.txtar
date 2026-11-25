@@ -1,0 +1,74 @@
+# nota settings shows the settings and where each value comes from:
+# settings.toml over the account over Nota's defaults.
+
+# Without a file everything is a default.
+nota settings
+cmp stdout defaults.txt
+nota settings path
+stdout '\.config/nota/settings\.toml$'
+nota settings path --json
+stdout '"exists": false'
+
+# The file wins; unknown keys and bad values are warnings.
+mkdir .config/nota
+cp mine.toml .config/nota/settings.toml
+nota settings
+cmp stdout mine.txt
+stderr '^nota: settings.toml: note_mode = "sideways" is not valid \(want live, reading, source\); it is ignored$'
+stderr '^nota: settings.toml: unknown setting "font" is ignored$'
+nota settings --json
+stdout '"source": "file"'
+stdout '"warnings": \['
+
+# A file that is not TOML is an error.
+cp broken.toml .config/nota/settings.toml
+! nota settings
+stderr 'settings.toml'
+
+# edit makes a commented template when there is no file, then checks it.
+[windows] skip 'EDITOR=true'
+rm .config/nota/settings.toml
+env EDITOR=true
+nota settings edit
+grep '^#:schema https://nota.banjoanton.com/settings.schema.json$' .config/nota/settings.toml
+grep '^# theme = "system"$' .config/nota/settings.toml
+nota settings
+cmp stdout defaults.txt
+! stderr .
+
+# --account adds the account's values (none yet on a new account).
+exec nota serve --addr 127.0.0.1:0 --data data --addr-file addr &srv&
+waitaddr addr SERVER
+nota serve --data data user add anton@example.com
+nota serve --data data token create anton@example.com --device laptop
+envstdout TOK
+cp mine.toml .config/nota/settings.toml
+env NOTA_SERVER_URL=$SERVER
+env NOTA_TOKEN=$TOK
+nota settings --account
+cmp stdout mine.txt
+env NOTA_TOKEN=
+exitcode 3 nota settings --account
+stderr 'not signed in'
+kill -INT srv
+wait srv
+
+-- defaults.txt --
+theme       system  default
+palette     nota    default
+note_mode   live    default
+properties  hide    default
+backlinks   hide    default
+-- mine.txt --
+theme       dark   file
+palette     paper  file
+note_mode   live   default
+properties  hide   default
+backlinks   hide   default
+-- mine.toml --
+theme = "dark"
+palette = "paper"
+note_mode = "sideways"
+font = "Inter"
+-- broken.toml --
+theme = dark
