@@ -325,6 +325,24 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             for (const m of children(node, "HeaderMark")) hide(m.from, withSpace(m.to));
           return;
         }
+        const setext = /^SetextHeading(\d)$/.exec(name);
+        if (setext) {
+          // The text's lines are the heading; the ===/--- line under it
+          // shrinks to a gap once its marker is hidden.
+          const underline = children(node, "HeaderMark").at(-1);
+          const shown = [lineOf(ref.from), lineOf(ref.to)].some((l) => opts.activeLines.has(l));
+          for (let l = lineOf(ref.from); l <= lineOf(ref.to); l++) {
+            const at = doc.line(l).from;
+            if (underline && at === doc.lineAt(underline.from).from) {
+              if (!shown) line(at, "cm-setext-underline");
+            } else line(at, `cm-h cm-h${setext[1]}`);
+          }
+          if (underline) {
+            if (shown) mark(underline.from, underline.to, "cm-marker");
+            else hide(underline.from, underline.to);
+          }
+          return;
+        }
         const inline = INLINE[name];
         if (inline) {
           const marks = children(node, inline.mark);

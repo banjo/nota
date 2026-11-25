@@ -437,3 +437,22 @@ describe("highlight", () => {
     expect(syntaxTree(s).topNode.firstChild!.name).toBe("SetextHeading1");
   });
 });
+
+describe("setext headings", () => {
+  test("style the text as a heading and hide the underline", () => {
+    const doc = "Rubrik\növer två\n===\n\nUnder\n---\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(lines(sp, "cm-h1")).toEqual([0, doc.indexOf("över")]);
+    expect(lines(sp, "cm-h2")).toEqual([doc.indexOf("Under")]);
+    expect(lines(sp, "cm-setext-underline")).toEqual([doc.indexOf("==="), doc.indexOf("---")]);
+    expect(hidden(doc, sp)).toEqual(["===", "---"]);
+  });
+
+  test("show the underline while the cursor is in the heading", () => {
+    const doc = "Rubrik\n===\n\nslut";
+    const { specs: sp } = specs(doc, { cursor: 2 });
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-marker").map((m) => m.text)).toEqual(["==="]);
+    expect(lines(sp, "cm-setext-underline")).toEqual([]);
+  });
+});
