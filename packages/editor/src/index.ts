@@ -18,7 +18,7 @@ import {
   rememberHandlers,
   type EditorMode,
 } from "./mode.ts";
-import { type PreviewHandlers } from "./preview.ts";
+import { type PreviewHandlers, setEmbedMount } from "./preview.ts";
 import { notaSyntax } from "./syntax.ts";
 import { notaTheme } from "./theme.ts";
 
@@ -27,6 +27,7 @@ export {
   calloutKind,
   decodeEntity,
   findAnchor,
+  findSection,
   footnotes,
   headingSlug,
   previewSpecs,
@@ -47,7 +48,16 @@ export {
   sourceHighlight,
   type EditorMode,
 } from "./mode.ts";
-export { livePreview, revealAnchor, toDecorations, type PreviewHandlers } from "./preview.ts";
+export {
+  attachments,
+  livePreview,
+  refreshMedia,
+  revealAnchor,
+  toDecorations,
+  type EmbeddedNote,
+  type MediaContext,
+  type PreviewHandlers,
+} from "./preview.ts";
 export { findTags, notaSyntax, parseWikilink, tagLength, type Wikilink } from "./syntax.ts";
 export { notaTheme } from "./theme.ts";
 export type { EditorView } from "@codemirror/view";
@@ -134,6 +144,12 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
   rememberHandlers(view, handlers);
   return view;
 }
+
+// ![[Note]] shows the note in a read-only editor of its own.
+setEmbedMount(
+  (parent, doc, handlers) => createEditor(parent, { doc, mode: "reading", ...handlers }),
+  notaMarkdown(),
+);
 
 /**
  * Replaces the editor's text with text from outside (the file changed

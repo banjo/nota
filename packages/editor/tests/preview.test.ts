@@ -6,6 +6,7 @@ import {
   calloutKind,
   decodeEntity,
   findAnchor,
+  findSection,
   footnotes,
   headingSlug,
   extensions,
@@ -13,6 +14,7 @@ import {
   parseWikilink,
   previewSpecs,
   tableSpecs,
+  toDecorations,
   toggleTaskAt,
   type DecoSpec,
 } from "../src/index.ts";
@@ -27,9 +29,19 @@ function state(doc: string, cursor = doc.length) {
 }
 
 /** Specs with the cursor's line active (focused) or none (blurred). */
-function specs(doc: string, opts: { cursor?: number; focused?: boolean } = {}) {
+function specs(
+  doc: string,
+  opts: { cursor?: number; focused?: boolean; images?: boolean; embeds?: boolean } = {},
+) {
   const s = state(doc, opts.cursor);
-  return { s, specs: previewSpecs(s, { activeLines: activeLines(s, opts.focused ?? true) }) };
+  return {
+    s,
+    specs: previewSpecs(s, {
+      activeLines: activeLines(s, opts.focused ?? true),
+      images: opts.images,
+      embeds: opts.embeds,
+    }),
+  };
 }
 
 const text = (doc: string, sp: { from: number; to: number }) => doc.slice(sp.from, sp.to);
@@ -761,5 +773,145 @@ describe("anchors", () => {
     expect(findAnchor(s, "^P1")).toBe(at("- punkt"));
     expect(findAnchor(s, "^efter")).toBe(at("> citat"));
     expect(findAnchor(s, "^nej")).toBeUndefined();
+  });
+});
+
+const media = (doc: string, all: DecoSpec[]) =>
+  all
+    .filter(
+      (x): x is Extract<DecoSpec, { type: "widget" }> =>
+        x.type === "widget" && (x.widget === "image" || x.widget === "embed"),
+    )
+    .map((x) => {
+      const { type: _, from, to, ...rest } = x;
+      return { ...rest, text: doc.slice(from, to) };
+    });
+
+describe("images", () => {
+  const DOC = [
+    "![Skiss|300](bilder/skiss%201.png)",
+    "",
+    "Se ![liten](x.png) här och ![webb](https://example.com/y.png).",
+    "",
+    "![logo][l]",
+    "",
+    "- ![[foto.jpg|200]]",
+    "> ![[foto.jpg|Ett foto]]",
+    "",
+    "[l]: <logo.svg>",
+  ].join("\n");
+
+  test("of the vault replace their source; web images stay links", () => {
+    const { specs: sp } = specs(DOC, { images: true, focused: false });
+    expect(media(DOC, sp)).toEqual([
+      {
+        widget: "image",
+        src: "bilder/skiss%201.png",
+        alt: "Skiss",
+        width: 300,
+        block: true,
+        text: "![Skiss|300](bilder/skiss%201.png)",
+      },
+      { widget: "image", src: "x.png", alt: "liten", text: "![liten](x.png)" },
+      { widget: "image", src: "logo.svg", alt: "logo", block: true, text: "![logo][l]" },
+      {
+        widget: "image",
+        src: "foto.jpg",
+        wiki: true,
+        alt: "",
+        width: 200,
+        block: true,
+        text: "![[foto.jpg|200]]",
+      },
+      {
+        widget: "image",
+        src: "foto.jpg",
+        wiki: true,
+        alt: "Ett foto",
+        block: true,
+        text: "![[foto.jpg|Ett foto]]",
+      },
+    ]);
+    expect(marks(DOC, sp, "cm-link").map((m) => [m.text, m.attrs?.["data-href"]])).toEqual([
+      ["webb", "https://example.com/y.png"],
+      ["<logo.svg>", "logo.svg"],
+    ]);
+    expect(hidden(DOC, sp)).toEqual(["![", "](https://example.com/y.png)", "> "]);
+  });
+
+  test("show under their source on the line being edited", () => {
+    const { specs: sp } = specs(DOC, { images: true, cursor: 3 });
+    const first = media(DOC, sp)[0]!;
+    expect(first).toMatchObject({ after: true, text: "" });
+    expect(hidden(DOC, sp).some((h) => h.includes("Skiss"))).toBe(false);
+    expect(marks(DOC, sp, "cm-image-source").map((m) => m.text)).toEqual([DOC.split("\n")[0]]);
+  });
+
+  test("are links where the vault's files can't be shown", () => {
+    const { specs: sp } = specs(DOC, { focused: false });
+    expect(media(DOC, sp)).toEqual([]);
+    expect(marks(DOC, sp, "cm-link").map((m) => m.text)).toEqual([
+      "Skiss|300",
+      "liten",
+      "webb",
+      "logo",
+      "<logo.svg>",
+    ]);
+  });
+
+  test("load from the URL the app gives, again when files change", () => {
+    const { specs: sp } = specs("![a](x.png)", { images: true, focused: false });
+    const urls = (epoch: number) => {
+      const out: (string | null)[] = [];
+      toDecorations(sp, {
+        handlers: { resolveAsset: (src, wiki) => (wiki ? null : `notafile://vault/${src}`) },
+        epoch: { files: epoch, notes: 0 },
+      }).between(0, 20, (_f, _t, d) => {
+        out.push((d.spec.widget as { url: string | null }).url);
+      });
+      return out;
+    };
+    expect(urls(0)).toEqual(["notafile://vault/x.png"]);
+    expect(urls(2)).toEqual(["notafile://vault/x.png?v=2"]);
+  });
+});
+
+describe("embeds", () => {
+  test("![[Note]] and ![[Note#Heading]] embed the note; images and links don't", () => {
+    const doc = "![[Plan]]\n\n![[Plan#Mål]]\n\n[[Plan]] och ![[bild.png]]";
+    const { specs: sp } = specs(doc, { embeds: true, focused: false });
+    expect(media(doc, sp)).toEqual([
+      { widget: "embed", src: "Plan", block: true, text: "![[Plan]]" },
+      { widget: "embed", src: "Plan", heading: "Mål", block: true, text: "![[Plan#Mål]]" },
+    ]);
+  });
+
+  test("a section runs to the next heading of its level, a block is its block", () => {
+    const doc = [
+      "# Plan",
+      "",
+      "## Mål",
+      "",
+      "Bli klara.",
+      "",
+      "### Delmål",
+      "",
+      "Ett.",
+      "",
+      "## Risker",
+      "",
+      "- punkt ^p1",
+      "- annan",
+    ].join("\n");
+    const s = state(doc);
+    const slice = (a: string) => {
+      const r = findSection(s, a);
+      return r && doc.slice(r.from, r.to);
+    };
+    expect(slice("Mål")).toBe("## Mål\n\nBli klara.\n\n### Delmål\n\nEtt.");
+    expect(slice("Risker")).toBe("## Risker\n\n- punkt ^p1\n- annan");
+    expect(slice("Plan")).toBe(doc);
+    expect(slice("^p1")).toBe("- punkt ^p1");
+    expect(slice("Saknas")).toBeUndefined();
   });
 });

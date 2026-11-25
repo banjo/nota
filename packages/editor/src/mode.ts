@@ -2,7 +2,7 @@ import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
-import { livePreview, type PreviewHandlers } from "./preview.ts";
+import { attachments, livePreview, type PreviewHandlers } from "./preview.ts";
 
 // How a note is shown. Live hides markers away from the cursor (the
 // default); Reading is the finished page, read-only with every marker
@@ -71,7 +71,7 @@ export const codeHighlight = HighlightStyle.define([
 export function modeExtensions(mode: EditorMode, handlers: PreviewHandlers = {}): Extension {
   switch (mode) {
     case "live":
-      return livePreview(handlers);
+      return [livePreview(handlers), attachments(handlers)];
     case "reading":
       return [
         livePreview(handlers, { reading: true }),
@@ -81,6 +81,7 @@ export function modeExtensions(mode: EditorMode, handlers: PreviewHandlers = {})
       ];
     case "source":
       return [
+        attachments(handlers),
         syntaxHighlighting(sourceHighlight),
         EditorView.editorAttributes.of({ class: "cm-source" }),
       ];
