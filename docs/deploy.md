@@ -37,6 +37,7 @@ streams and gives running requests 10 s.
 | `NOTA_SERVER_TRUSTED_PROXIES` | none | reverse proxies whose `X-Forwarded-For` is believed for the client IP (rate limits): IPs, CIDRs or `private` (loopback + RFC 1918 + fc00::/7). Behind a reverse proxy on the same host or network (Traefik, Caddy, nginx) use `private`. Without it the client IP is the TCP peer. |
 | `NOTA_SERVER_HOOKS` | `off` | `on` runs each vault's `.nota/hooks.toml` on changes from clients. Hooks are shell commands that come from the synced vault and run inside the container with the server's permissions; only their timeouts limit them. Leave it off unless every account on the server is yours. |
 | `NOTA_SERVER_POLL_INTERVAL` | `5s` | minimum interval between `nota login` polls |
+| `NOTA_SERVER_BLOB_GC_INTERVAL` | `off` | run [blob garbage collection](#blob-garbage-collection) this often, e.g. `24h` or `7d` (at least `1m`); the first pass is one interval after start |
 | `NOTA_SERVER_BLOBS` | `/data/blobs` | `s3://bucket/prefix` keeps file contents in an S3-compatible bucket; see [Blobs in a bucket](#blobs-in-a-bucket) |
 | `NOTA_SERVER_S3_ENDPOINT` | AWS S3 | the bucket's service, e.g. `https://<account>.r2.cloudflarestorage.com` |
 | `NOTA_SERVER_S3_REGION` | `auto` with an endpoint, else `$AWS_REGION` or `us-east-1` | the region requests are signed for |
@@ -117,6 +118,12 @@ their content alive, so `nota history` and `nota restore` still work —
 and unreferenced files younger than `--min-age` (1h by default) are left
 alone so an upload in flight is never swept. The command prints the bytes
 reclaimed.
+
+To run it on a schedule, set `NOTA_SERVER_BLOB_GC_INTERVAL=24h` (or `7d`):
+the server then runs the same pass itself and logs a `blob gc` line with
+what it removed. It never runs at startup, so restarts stay cheap. A cron
+job (a Coolify scheduled task running `nota serve blobs gc`) works as
+well.
 
 It is deliberately not run at startup: walking the whole blob store on
 every boot costs time proportional to its size, to reclaim nothing most

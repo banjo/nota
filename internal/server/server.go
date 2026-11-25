@@ -87,6 +87,10 @@ type Config struct {
 	// hooks are shell commands from the synced vault, run by the server
 	// process with its permissions.
 	Hooks bool
+	// BlobGCInterval runs blob garbage collection (CollectBlobs) this
+	// often, the first pass one interval after start. 0 never runs it:
+	// "nota serve blobs gc" does it by hand.
+	BlobGCInterval time.Duration
 	// Version is the server's build version (shown to MCP clients).
 	Version string
 	// Now is the clock (time.Now if nil); tests move it.
@@ -106,6 +110,8 @@ type Server struct {
 
 	wsMu       gosync.Mutex
 	workspaces map[int64]*workspace // by vault id
+	gcStop     chan struct{}
+	gcDone     chan struct{}
 }
 
 // DBFile is the database file name inside the data directory.
@@ -184,6 +190,10 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 		s.limit = newLimiter(n, 20, cfg.Now)
 	}
 	s.routes()
+	if cfg.BlobGCInterval > 0 {
+		s.gcStop, s.gcDone = make(chan struct{}), make(chan struct{})
+		go s.collectBlobsEvery(cfg.BlobGCInterval)
+	}
 	return s, nil
 }
 
@@ -195,6 +205,10 @@ func (s *Server) Blobs() BlobStore { return s.blobs }
 
 // Close closes the database. Call it after the HTTP server has shut down.
 func (s *Server) Close() error {
+	if s.gcStop != nil {
+		close(s.gcStop)
+		<-s.gcDone
+	}
 	s.broker.close()
 	s.closeWorkspaces()
 	return s.store.Close()
