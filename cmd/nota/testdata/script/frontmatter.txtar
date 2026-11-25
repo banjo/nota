@@ -31,7 +31,7 @@ stdout '^Plan.md'
 nota ls --where aliases=q
 stdout '^Plan.md'
 
-# A note without frontmatter gets a block; dates stay strings.
+# A note without frontmatter gets a block; dates are written unquoted.
 nota set Plain status=new due=2026-12-01 count=3 ok=true
 cmp vault/Plain.md want/plain.md
 nota set --json Plain 'status=a: b'
@@ -151,7 +151,7 @@ No frontmatter.
 -- want/plain.md --
 ---
 status: new
-due: "2026-12-01"
+due: 2026-12-01
 count: 3
 ok: true
 ---

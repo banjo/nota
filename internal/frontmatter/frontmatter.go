@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/goccy/go-yaml"
 )
@@ -164,11 +165,15 @@ func topKey(l string) string {
 }
 
 // encodeLine renders "key: value" on one line, using flow style for lists
-// and maps (tags: [a, b]) as Obsidian writes them.
+// and maps (tags: [a, b]) as Obsidian writes them. A date or an RFC 3339
+// timestamp is written without quotes, like created and updated.
 func encodeLine(key string, value any) (string, error) {
 	k, err := yaml.Marshal(key)
 	if err != nil {
 		return "", err
+	}
+	if s, ok := value.(string); ok && isDate(s) {
+		return strings.TrimSpace(string(k)) + ": " + s, nil
 	}
 	v, err := yaml.MarshalWithOptions(value, yaml.Flow(true))
 	if err != nil {
@@ -179,6 +184,16 @@ func encodeLine(key string, value any) (string, error) {
 		return "", errors.New("frontmatter: value does not fit on one line")
 	}
 	return strings.TrimSpace(string(k)) + ": " + vs, nil
+}
+
+// isDate reports whether s is a YYYY-MM-DD date or an RFC 3339 timestamp,
+// which YAML reads as a date when it is not quoted.
+func isDate(s string) bool {
+	if _, err := time.Parse(time.DateOnly, s); err == nil {
+		return true
+	}
+	_, err := time.Parse(time.RFC3339Nano, s)
+	return err == nil && strings.Contains(s, "T")
 }
 
 // Set returns src with key set to value. Only the key's own lines change;
