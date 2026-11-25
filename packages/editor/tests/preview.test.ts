@@ -708,3 +708,17 @@ describe("inline footnotes", () => {
     }
   });
 });
+
+describe("block ids", () => {
+  test("^id ending a line, or alone on one, is hidden with its space", () => {
+    const doc = "Ett stycke ^abc-1\n\n- punkt ^p2\n\n> citat\n\n^q3\n\nx^2 och a ^b c\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(hidden(doc, sp).filter((h) => h.includes("^"))).toEqual([" ^abc-1", " ^p2", "^q3"]);
+  });
+
+  test("is faint on the line being edited", () => {
+    const doc = "Ett stycke ^abc";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(marks(doc, sp, "cm-block-id").map((m) => m.text)).toEqual(["^abc"]);
+  });
+});

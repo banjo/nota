@@ -247,6 +247,7 @@ export const notaTheme = EditorView.theme({
   ".cm-underline": { textDecoration: "underline", textUnderlineOffset: "3px" },
   ".cm-small": { fontSize: "0.85em" },
   ".cm-break": { display: "block" },
+  ".cm-block-id": { color: v("faint", "#9ca0a8"), fontSize: "0.85em" },
   ".cm-comment": { color: v("faint", "#9ca0a8") },
   ".cm-comment-hidden": { fontSize: "0", lineHeight: "0" },
   ".cm-setext-underline": { lineHeight: "0.6", fontSize: "0.6em" },

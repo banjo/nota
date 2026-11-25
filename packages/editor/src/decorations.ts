@@ -597,6 +597,16 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             }
             return false;
           }
+          case "BlockId": {
+            // A link target, not text: hidden with its space unless edited.
+            if (active(ref.from)) mark(ref.from, ref.to, "cm-block-id");
+            else {
+              const start = doc.lineAt(ref.from).from;
+              const space = /[ \t]*$/.exec(doc.sliceString(start, ref.from))![0].length;
+              hide(ref.from - space, ref.to);
+            }
+            return false;
+          }
           case "Escape":
             // "\*" shows as "*": the backslash is a marker.
             if (active(ref.from)) mark(ref.from, ref.from + 1, "cm-marker");

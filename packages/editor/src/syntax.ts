@@ -93,6 +93,7 @@ export const notaSyntax: MarkdownConfig = {
     { name: "CommentMark", style: t.processingInstruction },
     { name: "FootnoteRef", style: t.labelName },
     { name: "InlineFootnote" },
+    { name: "BlockId", style: t.labelName },
     { name: "InlineFootnoteMark", style: t.processingInstruction },
     { name: "FootnoteDefinition", block: true },
     { name: "FootnoteLabel", style: t.labelName },
@@ -191,6 +192,19 @@ export const notaSyntax: MarkdownConfig = {
           !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
           !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
         );
+      },
+    },
+    {
+      // Obsidian's block id: " ^id" ending a line, or "^id" alone on one.
+      name: "BlockId",
+      parse(cx, next, pos) {
+        if (next !== CARET) return -1;
+        const before = pos > cx.offset ? cx.char(pos - 1) : 10;
+        if (before !== 32 && before !== 9 && before !== 10) return -1;
+        let i = pos + 1;
+        while (i < cx.end && /[A-Za-z0-9-]/.test(String.fromCharCode(cx.char(i)))) i++;
+        if (i === pos + 1 || (i < cx.end && cx.char(i) !== 10)) return -1;
+        return cx.addElement(cx.elt("BlockId", pos, i));
       },
     },
     {
