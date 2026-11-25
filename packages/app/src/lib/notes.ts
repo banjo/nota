@@ -120,27 +120,25 @@ export function flattenTree(
   return rows;
 }
 
-/** Finds the note a [[wikilink]] target names: by path, file name or title. */
 /**
- * A [text](dest) link to a note: its vault path and heading, resolved
- * against the linking note's path as the index does
- * (internal/markdown.parseMarkdownLink). Null for web links, anchors in
- * the same note, other files and paths outside the vault.
+ * A link's destination as a vault path, resolved against the linking
+ * note's folder as the index does (internal/markdown.parseMarkdownLink):
+ * URL-decoded, "/" from the vault root. Null for web links, anchors and
+ * paths outside the vault.
  */
-export function noteLink(href: string, from: string): { target: string; heading?: string } | null {
+export function vaultPath(href: string, from: string): { path: string; hash?: string } | null {
   let dest = href.trim().replace(/^<(.*)>$/, "$1");
   if (/^[a-z][a-z0-9+.-]*:/i.test(dest) || dest.startsWith("#") || dest.startsWith("//"))
     return null;
-  let heading: string | undefined;
-  const hash = dest.indexOf("#");
-  if (hash >= 0) {
-    heading = dest.slice(hash + 1) || undefined;
-    dest = dest.slice(0, hash);
+  let hash: string | undefined;
+  const at = dest.indexOf("#");
+  if (at >= 0) {
+    hash = dest.slice(at + 1) || undefined;
+    dest = dest.slice(0, at);
   }
   try {
     dest = decodeURIComponent(dest);
   } catch {}
-  if (!/\.md$/i.test(dest)) return null;
   const parts = dest.startsWith("/") ? [] : folderOf(from).split("/").filter(Boolean);
   for (const p of dest.split("/")) {
     if (p === "" || p === ".") continue;
@@ -149,9 +147,51 @@ export function noteLink(href: string, from: string): { target: string; heading?
       parts.pop();
     } else parts.push(p);
   }
-  return { target: parts.join("/"), ...(heading ? { heading } : {}) };
+  if (!parts.length || dest.endsWith("/")) return null;
+  return { path: parts.join("/").normalize("NFC"), ...(hash ? { hash } : {}) };
 }
 
+/**
+ * A [text](dest) link to a note: its vault path and heading (see
+ * vaultPath). Null for anything but a .md file in the vault.
+ */
+export function noteLink(href: string, from: string): { target: string; heading?: string } | null {
+  const p = vaultPath(href, from);
+  if (!p || !/\.md$/i.test(p.path)) return null;
+  return { target: p.path, ...(p.hash ? { heading: p.hash } : {}) };
+}
+
+/**
+ * The relative href a note at `from` links the file at `to` with, each
+ * segment URL-encoded ("../Attachments/Pasted%20image.png"), so it works
+ * on GitHub and in any Markdown reader too.
+ */
+export function relativeHref(from: string, to: string): string {
+  const a = folderOf(from).split("/").filter(Boolean);
+  const b = to.split("/");
+  let i = 0;
+  while (i < a.length && i < b.length - 1 && a[i] === b[i]) i++;
+  return [...a.slice(i).map(() => ".."), ...b.slice(i)]
+    .map((s) => (s === ".." ? s : encodeURIComponent(s)))
+    .join("/");
+}
+
+/**
+ * The name a pasted image is saved under: its own, unless the browser
+ * made one up ("image.png"), then "Pasted image 20261125143012.png" as in
+ * Obsidian.
+ */
+export function attachmentName(file: { name: string; type: string }, now = new Date()): string {
+  const ext =
+    file.name.match(/\.[a-z0-9]+$/i)?.[0].toLowerCase() ??
+    `.${file.type.split("/")[1]?.replace("jpeg", "jpg").replace("svg+xml", "svg") ?? "png"}`;
+  if (file.name && !/^image\.[a-z0-9]+$/i.test(file.name)) return file.name;
+  const p = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+  return `Pasted image ${stamp}${ext}`;
+}
+
+/** Finds the note a [[wikilink]] target names: by path, file name or title. */
 export function resolveLink(
   target: string,
   notes: NoteInfo[],
