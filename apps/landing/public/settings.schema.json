@@ -3,6 +3,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "~/.config/nota/settings.toml. A key set here wins over the app and the account, and the app does not change it.",
   "properties": {
+    "backlinks": {
+      "default": "hide",
+      "description": "Whether \"Linked from\" (the notes that link here) shows under a note.",
+      "enum": [
+        "hide",
+        "show"
+      ],
+      "type": "string"
+    },
     "note_mode": {
       "default": "live",
       "description": "How notes open: live (editing with formatting), reading or source.",

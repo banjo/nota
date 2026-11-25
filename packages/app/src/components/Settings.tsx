@@ -26,7 +26,7 @@ import { useSession } from "../auth/session.ts";
 import { useClient } from "../context.ts";
 import { keys, usePlugins, useVaultInfo } from "../queries.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
-import type { PropertiesPref } from "../lib/propertiesPref.ts";
+import type { ShowPref } from "../lib/showPref.ts";
 import { useContributions } from "../registry.ts";
 import { settingsSync, useSettingSource, useSettingsLayers } from "../settings/index.ts";
 import { settingsToml } from "../settings/toml.ts";
@@ -79,7 +79,7 @@ const NOTE_MODES: { id: NoteMode; label: string }[] = [
   { id: "source", label: "Source" },
 ];
 
-const PROPERTIES: { id: PropertiesPref; label: string }[] = [
+const SHOWN: { id: ShowPref; label: string }[] = [
   { id: "hide", label: "Hidden" },
   { id: "show", label: "Shown" },
 ];
@@ -199,6 +199,9 @@ function Appearance() {
   const palette = useSettingSource("palette");
   const notes = useSettingSource("note_mode");
   const props = useSettingSource("properties");
+  const backlinks = useUI((s) => s.backlinks);
+  const setBacklinks = useUI((s) => s.setBacklinks);
+  const links = useSettingSource("backlinks");
   const description = !layers
     ? "Applies at once, on this device."
     : layers.signedIn
@@ -229,12 +232,22 @@ function Appearance() {
       <Field label="Properties">
         <Segmented
           label="Properties"
-          options={PROPERTIES}
+          options={SHOWN}
           value={properties}
           onChange={setProperties}
           disabled={props.locked}
         />
         <Locked show={props.locked} />
+      </Field>
+      <Field label="Linked from">
+        <Segmented
+          label="Linked from"
+          options={SHOWN}
+          value={backlinks}
+          onChange={setBacklinks}
+          disabled={links.locked}
+        />
+        <Locked show={links.locked} />
       </Field>
       <div className="grid grid-cols-[120px_1fr] gap-3 py-1.5 text-ui max-[520px]:grid-cols-1 max-[520px]:gap-1">
         <span className="pt-1 text-muted-foreground">Theme</span>

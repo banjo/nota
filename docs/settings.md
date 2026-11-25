@@ -25,6 +25,7 @@ theme = "dark"         # system, light or dark
 palette = "paper"      # a theme id: nota, paper, forest, dracula, … or one from .nota/plugins
 note_mode = "live"     # live, reading or source
 properties = "hide"    # hide or show
+backlinks = "hide"     # hide or show "Linked from" under a note
 ```
 
 The file is `$XDG_CONFIG_HOME/nota/settings.toml`, else `~/.config/nota/settings.toml`.

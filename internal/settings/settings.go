@@ -61,6 +61,8 @@ var Keys = []Key{
 		Default: "live", Values: []string{"live", "reading", "source"}},
 	{Name: "properties", Doc: "Whether a note's properties (frontmatter) show above it.",
 		Default: "hide", Values: []string{"hide", "show"}},
+	{Name: "backlinks", Doc: `Whether "Linked from" (the notes that link here) shows under a note.`,
+		Default: "hide", Values: []string{"hide", "show"}},
 }
 
 // Lookup returns the key named name.

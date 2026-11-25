@@ -81,6 +81,7 @@ describe("the settings layers", () => {
       palette: "paper",
       note_mode: "source",
       properties: "hide",
+      backlinks: "hide",
     });
 
     // The account's value going back to the default clears the device's.

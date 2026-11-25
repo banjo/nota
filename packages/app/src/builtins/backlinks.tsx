@@ -1,26 +1,36 @@
 import type { Note } from "@nota/client";
 import { Link2 } from "lucide-react";
+import { SectionChip } from "../components/SectionChip.tsx";
+import { backlinkSources } from "../lib/backlinksPref.ts";
 import { folderLabel } from "../lib/notes.ts";
 import { useTree } from "../queries.ts";
 import { useUI } from "../state.ts";
 
-/** "Linked from": the notes that link here (a built-in panel). */
+/**
+ * "Linked from": the notes that link here (a built-in panel). A chip with
+ * the count, like Properties, and the list only when the device preference
+ * says show. Nothing at all when no note links here.
+ */
 export function BacklinksPanel({ note }: { note: Note }) {
   const tree = useTree();
   const navigate = useUI((s) => s.navigate);
-  const from = [...new Set(note.backlinks.map((l) => l.from))].filter((p) => p !== note.path);
+  const shown = useUI((s) => s.backlinks === "show");
+  const toggle = useUI((s) => s.toggleBacklinks);
+  const from = backlinkSources(note.backlinks, note.path);
+  if (from.length === 0) return null;
   const byPath = new Map((tree.data?.notes ?? []).map((n) => [n.path, n]));
   return (
-    <section aria-labelledby="backlinks-title" className="mt-11 border-t border-divider pt-[18px]">
-      <h2 id="backlinks-title" className="mb-2 text-[12.5px] font-semibold text-muted-foreground">
-        Linked from
-      </h2>
-      {from.length === 0 ? (
-        <p className="text-ui text-faint">
-          No notes link here yet. Link one with [[{note.title}]].
-        </p>
-      ) : (
-        <ul className="flex flex-col">
+    <section aria-label="Linked from" className="mt-11 border-t border-divider pt-3">
+      <SectionChip
+        label="Linked from"
+        icon={Link2}
+        shown={shown}
+        count={from.length}
+        onToggle={toggle}
+        controls="backlinks-list"
+      />
+      {shown ? (
+        <ul id="backlinks-list" className="mt-1 flex flex-col">
           {from.map((p) => {
             const n = byPath.get(p);
             return (
@@ -43,7 +53,7 @@ export function BacklinksPanel({ note }: { note: Note }) {
             );
           })}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }

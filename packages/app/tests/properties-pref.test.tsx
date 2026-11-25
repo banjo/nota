@@ -11,6 +11,7 @@ import {
   toggledPropertiesPref,
   watchPropertiesPref,
 } from "../src/lib/propertiesPref.ts";
+import { backlinkSources, backlinksPref } from "../src/lib/backlinksPref.ts";
 import { createRegistry } from "../src/registry.ts";
 import { useUI } from "../src/state.ts";
 
@@ -109,6 +110,36 @@ describe("the store and ⌘K", () => {
     void cmd?.run({} as never);
     expect(useUI.getState().properties).toBe("hide");
     off();
+  });
+});
+
+describe("linked from", () => {
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", undefined);
+    useUI.setState({ backlinks: "hide" });
+  });
+
+  test("hidden by default, kept under its own key", () => {
+    const st = fakeStorage();
+    expect(backlinksPref.load(st)).toBe("hide");
+    backlinksPref.save(st, "show");
+    expect(st.data.get("nota:backlinks")).toBe("show");
+    expect(st.data.has(PROPERTIES_KEY)).toBe(false);
+  });
+
+  test("Toggle linked from flips its own state, not the properties", () => {
+    useUI.setState({ properties: "hide" });
+    const r = createRegistry();
+    const off = registerBuiltins(r);
+    void r.command("view.backlinks.toggle")?.run({} as never);
+    expect(useUI.getState().backlinks).toBe("show");
+    expect(useUI.getState().properties).toBe("hide");
+    off();
+  });
+
+  test("counts each linking note once, never the note itself", () => {
+    const links = [{ from: "a.md" }, { from: "a.md" }, { from: "b.md" }, { from: "self.md" }];
+    expect(backlinkSources(links, "self.md")).toEqual(["a.md", "b.md"]);
   });
 });
 

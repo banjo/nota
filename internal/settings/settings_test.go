@@ -84,6 +84,7 @@ func TestMerge(t *testing.T) {
 		{"palette", "nord", SourceFile},
 		{"note_mode", "source", SourceDevice}, // the account's value is not a mode
 		{"properties", "hide", SourceDefault},
+		{"backlinks", "hide", SourceDefault},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Merge = %v, want %v", got, want)

@@ -12,6 +12,7 @@ import {
   FolderOpen,
   FolderPlus,
   Inbox,
+  Link2,
   ListTree,
   PanelLeft,
   PenLine,
@@ -325,6 +326,14 @@ export function registerBuiltins(r: Registry): () => void {
       keywords: ["frontmatter", "metadata", "tags", "status", "hide", "show"],
       icon: ListTree,
       run: () => useUI.getState().toggleProperties(),
+    }),
+    r.register("command", {
+      id: "view.backlinks.toggle",
+      title: "Toggle linked from",
+      group: "View",
+      keywords: ["backlinks", "links", "references", "linked", "hide", "show"],
+      icon: Link2,
+      run: () => useUI.getState().toggleBacklinks(),
     }),
     // No shortcut: ⌘⇧L is CodeMirror's select-matches and Safari's
     // sidebar, ⌘⇧D bookmarks every tab in browsers.

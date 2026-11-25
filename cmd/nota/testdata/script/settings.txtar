@@ -58,11 +58,13 @@ theme       system  default
 palette     nota    default
 note_mode   live    default
 properties  hide    default
+backlinks   hide    default
 -- mine.txt --
 theme       dark   file
 palette     paper  file
 note_mode   live   default
 properties  hide   default
+backlinks   hide   default
 -- mine.toml --
 theme = "dark"
 palette = "paper"

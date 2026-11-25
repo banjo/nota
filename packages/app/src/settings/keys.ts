@@ -1,5 +1,7 @@
 import { NOTE_MODE_KEY, readNoteMode } from "../lib/noteMode.ts";
+import { backlinksPref } from "../lib/backlinksPref.ts";
 import { PROPERTIES_KEY, readPropertiesPref } from "../lib/propertiesPref.ts";
+import { readShowPref } from "../lib/showPref.ts";
 import { PALETTE_KEY, readMode, readPalette, THEME_KEY } from "../theme/store.ts";
 
 // The user's settings (internal/settings has the same keys; a test
@@ -22,9 +24,10 @@ export const SETTING_KEYS: readonly SettingKey[] = [
   { name: "palette", storage: PALETTE_KEY, default: "nota", read: readPalette },
   { name: "note_mode", storage: NOTE_MODE_KEY, default: "live", read: readNoteMode },
   { name: "properties", storage: PROPERTIES_KEY, default: "hide", read: readPropertiesPref },
+  { name: "backlinks", storage: backlinksPref.key, default: "hide", read: readShowPref },
 ];
 
-export type SettingName = "theme" | "palette" | "note_mode" | "properties";
+export type SettingName = "theme" | "palette" | "note_mode" | "properties" | "backlinks";
 
 /** Whether v is a value the key takes (not just something read() turns into one). */
 export const isValid = (k: SettingKey, v: string | null | undefined): v is string =>
