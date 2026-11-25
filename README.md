@@ -110,6 +110,12 @@ The full command list, configuration and exit codes are in [docs/cli.md](docs/cl
 With Claude Code: `claude mcp add nota -- nota mcp`. The tools, resources and the HTTP
 endpoint of the sync server are in [docs/agents.md](docs/agents.md).
 
+To teach your agent how to use Nota (CLI or MCP, views, hooks, themes, sync), add the skill:
+
+```sh
+npx skills add banjo/nota
+```
+
 ## Self-hosting
 
 A vault needs no account and no server. For sync, run `nota serve`: one container with its
