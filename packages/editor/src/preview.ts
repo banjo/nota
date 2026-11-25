@@ -18,6 +18,7 @@ import {
   activeLines,
   type CalloutKind,
   type DecoSpec,
+  findAnchor,
   footnotes,
   type InlineSpec,
   previewSpecs,
@@ -315,6 +316,17 @@ class BreakWidget extends WidgetType {
 }
 
 const br = Decoration.replace({ widget: new BreakWidget() });
+/**
+ * Scrolls to a heading ("Mål", "mål", GitHub's "#m%C3%A5l") or block
+ * ("^id") of the note and lights it up. False when there is none.
+ */
+export function revealAnchor(view: EditorView, anchor: string): boolean {
+  const pos = findAnchor(view.state, anchor);
+  if (pos === undefined) return false;
+  jumpTo(view, pos);
+  return true;
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
 const checkbox = (checked: boolean, status?: string) =>
@@ -441,6 +453,12 @@ export function livePreview(
       const onSourceLine = !reading && activeLines(view.state, view.hasFocus).has(lineNo);
       if (onSourceLine && !(event.metaKey || event.ctrlKey)) return false;
       const wl = target.closest<HTMLElement>("[data-wikilink]");
+      // [[#Heading]] and [[#^id]]: this note.
+      if (wl && !wl.dataset.wikilink && wl.dataset.heading) {
+        revealAnchor(view, wl.dataset.heading);
+        event.preventDefault();
+        return true;
+      }
       if (wl && handlers.onWikilink) {
         handlers.onWikilink(wl.dataset.wikilink!, wl.dataset.heading);
         event.preventDefault();
@@ -453,6 +471,12 @@ export function livePreview(
         return true;
       }
       const link = target.closest<HTMLElement>("[data-href]");
+      // [text](#heading): this note.
+      if (link?.dataset.href!.startsWith("#")) {
+        revealAnchor(view, link.dataset.href!.slice(1));
+        event.preventDefault();
+        return true;
+      }
       if (link && handlers.onLink) {
         handlers.onLink(link.dataset.href!);
         event.preventDefault();

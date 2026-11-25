@@ -5,7 +5,9 @@ import {
   activeLines,
   calloutKind,
   decodeEntity,
+  findAnchor,
   footnotes,
+  headingSlug,
   extensions,
   findTags,
   parseWikilink,
@@ -720,5 +722,44 @@ describe("block ids", () => {
     const doc = "Ett stycke ^abc";
     const { specs: sp } = specs(doc, { cursor: 0 });
     expect(marks(doc, sp, "cm-block-id").map((m) => m.text)).toEqual(["^abc"]);
+  });
+});
+
+describe("anchors", () => {
+  const DOC = [
+    "# Mål & plan!",
+    "",
+    "Text om det. ^stycke",
+    "",
+    "Underrubrik",
+    "---",
+    "",
+    "- punkt ^p1",
+    "",
+    "> citat",
+    "",
+    "^efter",
+    "",
+    "## Sista ## ",
+  ].join("\n");
+  const at = (t: string) => DOC.indexOf(t);
+
+  test("find headings by text, case or GitHub slug, and the last part of a path", () => {
+    const s = state(DOC);
+    expect(findAnchor(s, "Mål & plan!")).toBe(0);
+    expect(findAnchor(s, "mål & PLAN!")).toBe(0);
+    expect(findAnchor(s, "m%C3%A5l--plan")).toBe(0);
+    expect(findAnchor(s, "#underrubrik")).toBe(at("Underrubrik"));
+    expect(findAnchor(s, "Mål & plan!#Sista")).toBe(at("## Sista"));
+    expect(findAnchor(s, "Finns inte")).toBeUndefined();
+    expect(headingSlug("Mål & plan!")).toBe("mål--plan");
+  });
+
+  test("find blocks by id; an id alone on its line names the block above", () => {
+    const s = state(DOC);
+    expect(findAnchor(s, "^stycke")).toBe(at("Text om det"));
+    expect(findAnchor(s, "^P1")).toBe(at("- punkt"));
+    expect(findAnchor(s, "^efter")).toBe(at("> citat"));
+    expect(findAnchor(s, "^nej")).toBeUndefined();
   });
 });

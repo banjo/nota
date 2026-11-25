@@ -26,7 +26,9 @@ export {
   activeLines,
   calloutKind,
   decodeEntity,
+  findAnchor,
   footnotes,
+  headingSlug,
   previewSpecs,
   tableSpecs,
   toggleTaskAt,
@@ -45,7 +47,7 @@ export {
   sourceHighlight,
   type EditorMode,
 } from "./mode.ts";
-export { livePreview, toDecorations, type PreviewHandlers } from "./preview.ts";
+export { livePreview, revealAnchor, toDecorations, type PreviewHandlers } from "./preview.ts";
 export { findTags, notaSyntax, parseWikilink, tagLength, type Wikilink } from "./syntax.ts";
 export { notaTheme } from "./theme.ts";
 export type { EditorView } from "@codemirror/view";

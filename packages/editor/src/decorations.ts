@@ -1,4 +1,4 @@
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode, Tree } from "@lezer/common";
 import { parseWikilink } from "./syntax.ts";
@@ -430,6 +430,66 @@ export const calloutKind = (type: string): CalloutKind =>
 
 /** "> [!type]± title" on a quote's first line, from the quote's ">". */
 const CALLOUT = /^(>[ \t]?)\[!([\w-]+)\]([+-]?)([ \t]*)(.*)$/;
+
+/** A heading as GitHub makes it an anchor: "Mål & plan!" → "mål--plan". */
+export const headingSlug = (text: string) =>
+  text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}\s_-]/gu, "")
+    .replace(/\s/g, "-");
+
+/**
+ * Where an anchor points in the document: "^id" is a block id (its block),
+ * anything else a heading, by its text (as Obsidian) or its slug (as
+ * GitHub). "Mål#Delmål" is the last part, as in Obsidian.
+ */
+export function findAnchor(state: EditorState, anchor: string): number | undefined {
+  let a = anchor;
+  try {
+    a = decodeURIComponent(anchor);
+  } catch {}
+  a = a.replace(/^#/, "");
+  const tree = ensureSyntaxTree(state, state.doc.length, 200) ?? syntaxTree(state);
+  const doc = state.doc;
+  let found: number | undefined;
+  if (a.startsWith("^")) {
+    const id = a.slice(1).toLowerCase();
+    tree.iterate({
+      enter: (n) => {
+        if (found !== undefined) return false;
+        if (n.name !== "BlockId" || doc.sliceString(n.from + 1, n.to).toLowerCase() !== id) return;
+        // An id alone on its line names the block above it.
+        let block = n.node.parent;
+        if (block && doc.sliceString(block.from, block.to).trim() === `^${id}`)
+          block = block.prevSibling ?? block;
+        while (
+          block?.parent &&
+          !["Document", "BulletList", "OrderedList"].includes(block.parent.name)
+        )
+          block = block.parent;
+        found = block ? block.from : n.from;
+      },
+    });
+    return found;
+  }
+  const want = (a.split("#").pop() ?? "").trim().toLowerCase();
+  if (!want) return undefined;
+  tree.iterate({
+    enter: (n) => {
+      if (found !== undefined) return false;
+      if (!/^(ATX|Setext)Heading\d$/.test(n.name)) return;
+      let text = doc.sliceString(n.from, n.to);
+      text = n.name.startsWith("ATX")
+        ? text.replace(/^#+\s*/, "").replace(/\s+#+\s*$/, "")
+        : text.replace(/\n[=-]+\s*$/, "");
+      text = text.replace(/\s+\^[\w-]+$/, "").trim();
+      if (text.toLowerCase() === want || headingSlug(text) === headingSlug(want)) found = n.from;
+      return false;
+    },
+  });
+  return found;
+}
 
 /** Computes the live-preview decorations of a state. */
 export function previewSpecs(state: EditorState, opts: PreviewOptions): DecoSpec[] {
