@@ -380,6 +380,11 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             }
             return false;
           }
+          case "Escape":
+            // "\*" shows as "*": the backslash is a marker.
+            if (active(ref.from)) mark(ref.from, ref.from + 1, "cm-marker");
+            else hide(ref.from, ref.from + 1);
+            return false;
           case "Tag":
             mark(ref.from, ref.to, "cm-tag", { "data-tag": doc.sliceString(ref.from + 1, ref.to) });
             return false;

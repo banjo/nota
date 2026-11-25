@@ -456,3 +456,22 @@ describe("setext headings", () => {
     expect(lines(sp, "cm-setext-underline")).toEqual([]);
   });
 });
+
+describe("escapes", () => {
+  test("hide the backslash, and keep the character as text", () => {
+    const doc = "Inte \\*fet\\* och \\[[ingen länk]] här\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(hidden(doc, sp)).toEqual(["\\", "\\", "\\"]);
+    expect(marks(doc, sp, "cm-strong")).toEqual([]);
+    expect(marks(doc, sp, "cm-em")).toEqual([]);
+    expect(marks(doc, sp, "cm-wikilink")).toEqual([]);
+  });
+
+  test("show the backslash on the line being edited, and in code", () => {
+    const doc = "a \\* b\n\n`c \\* d`";
+    expect(marks(doc, specs(doc, { cursor: 0 }).specs, "cm-marker").map((m) => m.text)).toEqual([
+      "\\",
+    ]);
+    expect(hidden(doc, specs(doc, { cursor: 0 }).specs)).toEqual(["`", "`"]);
+  });
+});
