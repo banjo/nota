@@ -1,0 +1,28 @@
+# The blob store: <data>/blobs by default, or a bucket named by
+# $NOTA_SERVER_BLOBS. Configuration errors stop a command before it
+# changes anything.
+env NOTA_SERVER_DATA=$WORK/data
+nota serve user add anton@example.com
+
+nota serve blobs gc --dry-run
+stdout 'would reclaim nothing'
+
+# migrate needs a bucket to copy into.
+exitcode 2 nota serve blobs migrate
+stderr 'set \$NOTA_SERVER_BLOBS to the bucket'
+
+env NOTA_SERVER_BLOBS=r2://notes
+exitcode 2 nota serve blobs gc
+stderr 'NOTA_SERVER_BLOBS: want s3://bucket/prefix, got "r2://notes"'
+
+env NOTA_SERVER_BLOBS=s3://notes/nota
+exitcode 2 nota serve blobs migrate
+stderr 'no credentials \(AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY\)'
+# Checked before anything is deleted (the vault doesn't exist: that
+# would be exit 3).
+exitcode 2 nota serve vault rm anton@example.com main --yes
+stderr 'no credentials'
+
+env AWS_ACCESS_KEY_ID=key AWS_SECRET_ACCESS_KEY=secret NOTA_SERVER_S3_ENDPOINT=ftp://r2.example.com
+exitcode 2 nota serve blobs gc
+stderr 'endpoint "ftp://r2.example.com": want an http\(s\) URL'

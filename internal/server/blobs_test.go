@@ -124,3 +124,69 @@ func TestBlobStores(t *testing.T) {
 		})
 	}
 }
+
+// Moving <data>/blobs into a bucket: everything is copied once, a second
+// run copies only what is new, --delete empties the source, and a file
+// whose bytes do not match its name stops the copy.
+func TestCopyBlobs(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	disk, err := NewDiskBlobs(filepath.Join(dir, "blobs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bucket := newFakeS3(t).store(t, "nota")
+	var want []string
+	for i := range 20 {
+		h, _, err := disk.Put(ctx, strings.NewReader(fmt.Sprint("blob ", i)), 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, h)
+	}
+	res, err := CopyBlobs(ctx, disk, bucket, CopyOptions{Workers: 3})
+	if err != nil || res.Copied != 20 || res.Present != 0 || res.Deleted != 0 {
+		t.Fatalf("first copy: %+v %v", res, err)
+	}
+	if _, _, err := disk.Put(ctx, strings.NewReader("new"), 0); err != nil {
+		t.Fatal(err)
+	}
+	res, err = CopyBlobs(ctx, disk, bucket, CopyOptions{Delete: true})
+	if err != nil || res.Copied != 1 || res.Present != 20 || res.Deleted != 21 || res.Bytes != 3 {
+		t.Fatalf("second copy: %+v %v", res, err)
+	}
+	var left int
+	_ = disk.Walk(ctx, func(BlobInfo) error { left++; return nil })
+	if left != 0 {
+		t.Fatalf("%d blobs left on disk", left)
+	}
+	for _, h := range want {
+		rc, err := bucket.Open(ctx, h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := io.ReadAll(rc)
+		rc.Close()
+		if hashOf(string(data)) != h {
+			t.Fatalf("%s: %q", h, data)
+		}
+	}
+
+	bad := hashOf("what the name says")
+	p := BlobPath(filepath.Join(dir, "blobs"), bad)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("something else"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CopyBlobs(ctx, disk, bucket, CopyOptions{Delete: true}); err == nil || !strings.Contains(err.Error(), bad) {
+		t.Fatalf("corrupt blob: %v", err)
+	}
+	if _, err := os.Stat(p); err != nil {
+		t.Fatalf("corrupt blob deleted from the source: %v", err)
+	}
+	if _, err := bucket.Stat(ctx, bad); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("corrupt blob stored under its name: %v", err)
+	}
+}
