@@ -641,3 +641,37 @@ describe("inline HTML", () => {
     expect(marks(doc, sp, "cm-kbd").map((m) => m.text)).toEqual(["K"]);
   });
 });
+
+describe("task statuses", () => {
+  const boxes = (doc: string, all: DecoSpec[]) =>
+    all.flatMap((x) =>
+      x.type === "widget" && x.widget === "checkbox" ? [[text(doc, x), x.status ?? x.checked]] : [],
+    );
+
+  test("Obsidian's statuses are checkboxes; cancelled is struck", () => {
+    const doc =
+      "- [/] pågår\n- [-] avbruten\n- [!] viktig\n- [a] inte en status\n- [x] klar\n\nslut";
+    const { specs: sp } = specs(doc);
+    expect(boxes(doc, sp)).toEqual([
+      ["[/]", "/"],
+      ["[-]", "-"],
+      ["[!]", "!"],
+      ["[x]", true],
+    ]);
+    expect(marks(doc, sp, "cm-task-done").map((m) => m.text)).toEqual(["avbruten", "klar"]);
+    expect(hidden(doc, sp)).toEqual(["- ", "- ", "- ", "- "]);
+  });
+
+  test("a click marks one done", () => {
+    const doc = "- [/] pågår";
+    expect(toggleTaskAt(state(doc), 2)).toEqual({ from: 3, to: 4, insert: "x" });
+  });
+
+  test("show their source on the line being edited", () => {
+    const doc = "- [/] pågår";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(hidden(doc, sp)).toEqual([]);
+    expect(boxes(doc, sp)).toEqual([["[/]", "/"]]);
+    expect(boxes(doc, specs(doc, { cursor: 3 }).specs)).toEqual([]);
+  });
+});

@@ -330,5 +330,32 @@ export const notaTheme = EditorView.theme({
     WebkitMaskPosition: "center",
     WebkitMaskRepeat: "no-repeat",
   },
+  // Other statuses: in progress is half filled, the rest show their sign.
+  ".cm-task-checkbox[data-status]": {
+    position: "relative",
+    borderColor: v("ink", "#1e7363"),
+    color: v("ink", "#1e7363"),
+    fontSize: "11px",
+    fontWeight: "700",
+    lineHeight: "12px",
+    textAlign: "center",
+  },
+  '.cm-task-checkbox[data-status="/"]': {
+    backgroundImage: `linear-gradient(to right, ${v("ink", "#1e7363")} 50%, transparent 50%)`,
+  },
+  '.cm-task-checkbox[data-status="-"]': {
+    borderColor: v("faint", "#9ca0a8"),
+    color: v("faint", "#9ca0a8"),
+  },
+  '.cm-task-checkbox[data-status="-"]::after': { content: '"–"' },
+  '.cm-task-checkbox[data-status=">"]::after': { content: '"›"' },
+  '.cm-task-checkbox[data-status="<"]::after': { content: '"‹"' },
+  '.cm-task-checkbox[data-status="!"]': {
+    borderColor: v("danger", "#d4483b"),
+    color: v("danger", "#d4483b"),
+  },
+  '.cm-task-checkbox[data-status="!"]::after': { content: '"!"' },
+  '.cm-task-checkbox[data-status="?"]::after': { content: '"?"' },
+  '.cm-task-checkbox[data-status="*"]::after': { content: '"★"', fontSize: "9px" },
   ".cm-task-done": { color: v("faint", "#9ca0a8"), textDecoration: "line-through" },
 });

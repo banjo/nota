@@ -37,6 +37,8 @@ export type DecoSpec =
       to: number;
       widget: WidgetKind;
       checked?: boolean;
+      /** A task's status besides done and open ("/", "-", …). */
+      status?: string;
       callout?: CalloutKind;
       /** A callout's title when it has none of its own; a footnote's number; a text widget's text. */
       label?: string;
@@ -340,6 +342,14 @@ function htmlTag(source: string): { name: string; close: boolean } | null {
   if (name === "br") return m[1] ? null : { name, close: false };
   return HTML_CLASSES[name] ? { name, close: !!m[1] } : null;
 }
+
+/**
+ * Obsidian's task statuses besides [ ] and [x]: in progress, cancelled,
+ * forwarded, scheduled, important, question, star.
+ */
+export const TASK_STATUSES = ["/", "-", ">", "<", "!", "?", "*"];
+/** "[/] " after a list marker: a task with another status. */
+const STATUS_TASK = /^\[([^\]\n])\][ \t]/;
 
 /** "[Some  Label]" → "some label", as CommonMark matches reference labels. */
 const refLabel = (source: string) =>
@@ -788,6 +798,17 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
                 });
               if (checked) mark(withSpace(marker.to), task!.to, "cm-task-done");
               prefix = isActive ? indent + (marker.to - lm.from) + 1 : indent + 3;
+            } else if (
+              STATUS_TASK.test(doc.sliceString(withSpace(lm.to), l.to)) &&
+              TASK_STATUSES.includes(doc.sliceString(withSpace(lm.to) + 1, withSpace(lm.to) + 2))
+            ) {
+              const from = withSpace(lm.to);
+              const status = doc.sliceString(from + 1, from + 2);
+              if (!isActive) hide(lm.from, from);
+              if (!touched(from, from + 3))
+                specs.push({ type: "widget", from, to: from + 3, widget: "checkbox", status });
+              if (status === "-") mark(withSpace(from + 3), node.to, "cm-task-done");
+              prefix = isActive ? indent + (from + 3 - lm.from) + 1 : indent + 3;
             } else if (bullet && !isActive) {
               specs.push({ type: "widget", from: lm.from, to: lm.to, widget: "bullet" });
             } else {
@@ -809,6 +830,11 @@ export function toggleTaskAt(
   state: EditorState,
   pos: number,
 ): { from: number; to: number; insert: string } | null {
+  // Another status ([/], [-] …) is a list item's text, not a TaskMarker:
+  // a click marks it done.
+  const status = state.doc.sliceString(pos, pos + 3);
+  if (/^\[.\]$/.test(status) && TASK_STATUSES.includes(status[1]!))
+    return { from: pos + 1, to: pos + 2, insert: "x" };
   let found: { from: number; to: number } | null = null;
   syntaxTree(state).iterate({
     from: pos,

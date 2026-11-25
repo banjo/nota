@@ -27,19 +27,36 @@ import {
   toggleTaskAt,
 } from "./decorations.ts";
 
+const STATUS_LABELS: Record<string, string> = {
+  "/": "In progress",
+  "-": "Cancelled",
+  ">": "Forwarded",
+  "<": "Scheduled",
+  "!": "Important",
+  "?": "Question",
+  "*": "Star",
+};
+
 class CheckboxWidget extends WidgetType {
-  constructor(readonly checked: boolean) {
+  constructor(
+    readonly checked: boolean,
+    readonly status?: string,
+  ) {
     super();
   }
   eq(other: CheckboxWidget) {
-    return other.checked === this.checked;
+    return other.checked === this.checked && other.status === this.status;
   }
   toDOM() {
     const box = document.createElement("span");
     box.className = "cm-task-checkbox";
     box.setAttribute("role", "checkbox");
-    box.setAttribute("aria-checked", String(this.checked));
     box.dataset.checked = String(this.checked);
+    if (this.status) {
+      box.dataset.status = this.status;
+      box.setAttribute("aria-checked", this.status === "/" ? "mixed" : "false");
+      box.title = STATUS_LABELS[this.status] ?? "";
+    } else box.setAttribute("aria-checked", String(this.checked));
     return box;
   }
   ignoreEvent() {
@@ -286,7 +303,8 @@ class BreakWidget extends WidgetType {
 const br = Decoration.replace({ widget: new BreakWidget() });
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
-const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
+const checkbox = (checked: boolean, status?: string) =>
+  Decoration.replace({ widget: new CheckboxWidget(checked, status) });
 
 /** Turns specs into a sorted decoration set. */
 export function toDecorations(specs: DecoSpec[]): DecorationSet {
@@ -325,7 +343,9 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
           const widget = new CalloutWidget(s.callout ?? "note", s.label);
           ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
         } else {
-          ranges.push((s.widget === "bullet" ? bullet : checkbox(!!s.checked)).range(s.from, s.to));
+          ranges.push(
+            (s.widget === "bullet" ? bullet : checkbox(!!s.checked, s.status)).range(s.from, s.to),
+          );
         }
         break;
     }
