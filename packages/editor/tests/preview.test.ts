@@ -475,3 +475,33 @@ describe("escapes", () => {
     expect(hidden(doc, specs(doc, { cursor: 0 }).specs)).toEqual(["`", "`"]);
   });
 });
+
+describe("reference links", () => {
+  const DOC = [
+    "Se [docs][D], [Docs][] och [docs] men [okänd] och [a](<https://z.se/a b>).",
+    "",
+    '[d]: https://x.se "Titel"',
+    "[docs]: <https://y.se>",
+  ].join("\n");
+
+  test("[text][label], [text][] and [text] link to their definition", () => {
+    const { specs: sp } = specs(DOC, { cursor: DOC.length });
+    const links = marks(DOC, sp, "cm-link").map((m) => [m.text, m.attrs?.["data-href"]]);
+    expect(links).toEqual([
+      ["docs", "https://x.se"],
+      ["Docs", "https://y.se"],
+      ["docs", "https://y.se"],
+      ["a", "https://z.se/a b"],
+      ["https://x.se", "https://x.se"],
+      ["<https://y.se>", "https://y.se"],
+    ]);
+    expect(hidden(DOC, sp)).toContain("][D]");
+    expect(hidden(DOC, sp)).toContain("][]");
+    expect(hidden(DOC, sp).some((h) => h.includes("okänd"))).toBe(false);
+  });
+
+  test("definitions are quiet lines", () => {
+    const { specs: sp } = specs(DOC, { cursor: 0 });
+    expect(lines(sp, "cm-linkref")).toEqual([DOC.indexOf("[d]:"), DOC.indexOf("[docs]:")]);
+  });
+});

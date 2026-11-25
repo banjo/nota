@@ -130,6 +130,8 @@ export const notaTheme = EditorView.theme({
     padding: "0 0.1em",
     cursor: "pointer",
   },
+  // [label]: url definitions, quiet like footnote definitions.
+  ".cm-linkref": { fontSize: "0.9em", color: v("muted-foreground", "#6b6f78") },
   ".cm-footnote-source": { color: v("faint", "#9ca0a8") },
   ".cm-footnote-def": {
     fontSize: "0.9em",

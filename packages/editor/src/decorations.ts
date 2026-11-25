@@ -232,6 +232,40 @@ export function footnotes(state: EditorState): Footnotes {
   return out;
 }
 
+/** "[Some  Label]" → "some label", as CommonMark matches reference labels. */
+const refLabel = (source: string) =>
+  source
+    .replace(/^\[|\]$/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+/** A link destination without its optional <angle brackets>. */
+const destination = (source: string) => source.replace(/^<(.*)>$/, "$1");
+
+const linkRefCache = new WeakMap<Tree, Map<string, string>>();
+
+/** The document's link reference definitions: label → destination (first wins). */
+export function linkRefs(state: EditorState): Map<string, string> {
+  const tree = syntaxTree(state);
+  const cached = linkRefCache.get(tree);
+  if (cached) return cached;
+  const out = new Map<string, string>();
+  tree.iterate({
+    enter: (n) => {
+      if (n.name !== "LinkReference") return;
+      const label = n.node.getChild("LinkLabel");
+      const url = n.node.getChild("URL");
+      if (!label || !url) return false;
+      const key = refLabel(state.doc.sliceString(label.from, label.to));
+      if (!out.has(key)) out.set(key, destination(state.doc.sliceString(url.from, url.to)));
+      return false;
+    },
+  });
+  linkRefCache.set(tree, out);
+  return out;
+}
+
 const CALLOUT_KINDS: Record<string, CalloutKind> = {
   note: "note",
   info: "note",
@@ -439,8 +473,20 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             const url = children(node, "URL")[0];
             const openMark = linkMarks[0];
             const textEnd = linkMarks[1];
-            if (!openMark || !textEnd || !url) return false; // [text] without a target: plain text
-            const href = doc.sliceString(url.from, url.to);
+            if (!openMark || !textEnd) return false;
+            let href: string | undefined;
+            if (url) href = destination(doc.sliceString(url.from, url.to));
+            else {
+              // [text][label], [text][] or [text]: a reference, when defined.
+              const label = node.getChild("LinkLabel");
+              const key = refLabel(
+                label && label.to - label.from > 2
+                  ? doc.sliceString(label.from, label.to)
+                  : doc.sliceString(openMark.to, textEnd.from),
+              );
+              href = linkRefs(state).get(key);
+            }
+            if (href === undefined) return; // [text] without a target: plain text
             mark(openMark.to, textEnd.from, "cm-link", { "data-href": href });
             if (!active(ref.from)) {
               hide(openMark.from, openMark.to);
@@ -451,9 +497,15 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             return false;
           }
           case "URL":
-            // A bare or <autolink> URL (link targets returned above).
-            mark(ref.from, ref.to, "cm-link", { "data-href": doc.sliceString(ref.from, ref.to) });
+            // A bare or <autolink> URL, or a reference's destination (link
+            // targets returned above).
+            mark(ref.from, ref.to, "cm-link", {
+              "data-href": destination(doc.sliceString(ref.from, ref.to)),
+            });
             return false;
+          case "LinkReference":
+            line(ref.from, "cm-linkref");
+            return;
           case "Blockquote": {
             const first = doc.lineAt(ref.from);
             const m = CALLOUT.exec(doc.sliceString(ref.from, first.to));
