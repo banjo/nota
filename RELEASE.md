@@ -9,8 +9,9 @@
  review "Release Nota"  ◄───────────────────────┘
  merge it  ────────────►  main  ──► changesets.yml tags v<version>
                                                └──► release.yml builds and publishes
-                                                    the GitHub release
- by hand: Homebrew cask + landing page
+                                                    the GitHub release, then has
+                                                    Cloudflare rebuild the landing page
+ by hand: Homebrew cask
 ```
 
 ## 1. Add a changeset to your pull request
@@ -33,14 +34,13 @@ new merge.
 
 That's the release. The workflow tags `v<version>` and starts `release.yml`, which builds the
 CLI, the macOS app and the Linux packages and publishes them as a GitHub release. The notes are
-the CHANGELOG section followed by the merged pull requests. It takes about 10 minutes.
+the CHANGELOG section followed by the merged pull requests. It takes about 10 minutes. Then it
+asks Cloudflare Pages to rebuild the landing page, which picks up the new version.
 
-## 4. Finish by hand
+## 4. Bump the Homebrew cask
 
 ```sh
-scripts/bump-cask.sh <version>                  # Homebrew cask
-rm -rf dist && bunx vp run site:build           # landing page, then deploy dist
-bunx -y wrangler@4 pages deploy dist --project-name nota --branch main
+scripts/bump-cask.sh <version>
 ```
 
 Prereleases, failure recovery and what each job checks: [docs/release.md](docs/release.md).

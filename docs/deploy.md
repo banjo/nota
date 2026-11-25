@@ -209,7 +209,8 @@ or every passkey is invalidated.
 without extra flags, after `rm -rf dist`). On Cloudflare Pages, `apps/landing/public/_worker.js`
 (copied to `dist/_worker.js`) does the fallback: a `_redirects` rule for `/app/*` would also
 swallow `/app/assets/*` and serve HTML as JavaScript. Check `test -f dist/app/index.html` before
-you deploy.
+you deploy. nota.banjoanton.com is the Cloudflare Pages project `nota-web`, which builds `main`
+on every push (see [release.md](release.md#the-landing-page)).
 
 The landing page (`apps/landing`) is Astro, prerendered to `dist/index.html` and
 `dist/llms.txt`. Its build reads the latest GitHub release of `banjo/nota`
