@@ -675,3 +675,36 @@ describe("task statuses", () => {
     expect(boxes(doc, specs(doc, { cursor: 3 }).specs)).toEqual([]);
   });
 });
+
+describe("inline footnotes", () => {
+  const notes = (all: DecoSpec[]) =>
+    all.flatMap((x) =>
+      x.type === "widget" && x.widget === "footnote" ? [[x.footnote, x.label, x.note]] : [],
+    );
+
+  test("are numbered along with the others, and carry their text", () => {
+    const doc = "Först[^a], sen^[en **inline** [x] not] och [^a].\n\n[^a]: Def";
+    const { specs: sp } = specs(doc, { cursor: doc.length });
+    expect(notes(sp)).toEqual([
+      ["a", "1", undefined],
+      [`^${doc.indexOf("^[")}`, "2", "en **inline** [x] not"],
+      ["a", "1", undefined],
+    ]);
+    // Inline footnotes have no definition to jump to.
+    expect(footnotes(state(doc)).defs.has(`^${doc.indexOf("^[")}`)).toBe(false);
+  });
+
+  test("show their source, formatted, on the line being edited", () => {
+    const doc = "a ^[b **c**] d";
+    const { specs: sp } = specs(doc, { cursor: 0 });
+    expect(notes(sp)).toEqual([]);
+    expect(marks(doc, sp, "cm-footnote-inline").map((m) => m.text)).toEqual(["^[b **c**]"]);
+    expect(marks(doc, sp, "cm-strong").map((m) => m.text)).toEqual(["c"]);
+  });
+
+  test("^ without [ or an empty ^[] is text", () => {
+    for (const doc of ["x^2 och ^[]", "a^ [b]"]) {
+      expect(notes(specs(doc, { cursor: doc.length }).specs), doc).toEqual([]);
+    }
+  });
+});

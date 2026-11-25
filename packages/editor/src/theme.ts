@@ -132,6 +132,31 @@ export const notaTheme = EditorView.theme({
   },
   // [label]: url definitions, quiet like footnote definitions.
   ".cm-linkref": { fontSize: "0.9em", color: v("muted-foreground", "#6b6f78") },
+  // ^[inline footnotes]: the number, and the text in a bubble above it.
+  ".cm-footnote-inline": { color: v("muted-foreground", "#6b6f78") },
+  ".cm-footnote-ref[tabindex]": { position: "relative", outline: "none" },
+  ".cm-footnote-pop": {
+    display: "none",
+    position: "absolute",
+    bottom: "calc(100% + 4px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "max-content",
+    maxWidth: "280px",
+    padding: "6px 10px",
+    borderRadius: "6px",
+    backgroundColor: v("surface", "#ffffff"),
+    boxShadow: v("shadow-pop", "0 4px 16px rgba(0,0,0,0.15)"),
+    color: v("text", "#2a2c31"),
+    fontSize: "13px",
+    lineHeight: "1.45",
+    fontWeight: "400",
+    whiteSpace: "normal",
+    zIndex: "10",
+  },
+  ".cm-footnote-ref:hover .cm-footnote-pop, .cm-footnote-ref:focus .cm-footnote-pop": {
+    display: "block",
+  },
   ".cm-footnote-source": { color: v("faint", "#9ca0a8") },
   ".cm-footnote-def": {
     fontSize: "0.9em",

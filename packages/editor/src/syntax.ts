@@ -92,6 +92,8 @@ export const notaSyntax: MarkdownConfig = {
     { name: "CommentBlock", block: true, style: t.comment },
     { name: "CommentMark", style: t.processingInstruction },
     { name: "FootnoteRef", style: t.labelName },
+    { name: "InlineFootnote" },
+    { name: "InlineFootnoteMark", style: t.processingInstruction },
     { name: "FootnoteDefinition", block: true },
     { name: "FootnoteLabel", style: t.labelName },
   ],
@@ -189,6 +191,31 @@ export const notaSyntax: MarkdownConfig = {
           !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
           !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
         );
+      },
+    },
+    {
+      // Obsidian's "^[text]": a footnote written where it is used.
+      name: "InlineFootnote",
+      before: "Link",
+      parse(cx, next, pos) {
+        if (next !== CARET || cx.char(pos + 1) !== OPEN) return -1;
+        let depth = 0;
+        for (let i = pos + 2; i < cx.end; i++) {
+          const c = cx.char(i);
+          if (c === 92) i++; // \] doesn't close it
+          else if (c === OPEN) depth++;
+          else if (c === CLOSE && depth-- === 0) {
+            if (i === pos + 2) return -1;
+            return cx.addElement(
+              cx.elt("InlineFootnote", pos, i + 1, [
+                cx.elt("InlineFootnoteMark", pos, pos + 2),
+                ...cx.parser.parseInline(cx.slice(pos + 2, i), pos + 2),
+                cx.elt("InlineFootnoteMark", i, i + 1),
+              ]),
+            );
+          }
+        }
+        return -1;
       },
     },
     {

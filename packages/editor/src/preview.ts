@@ -218,12 +218,17 @@ class FootnoteWidget extends WidgetType {
     readonly id: string,
     readonly label: string,
     readonly definition: boolean,
+    /** An inline footnote's text, shown in a bubble on hover or focus. */
+    readonly note?: string,
   ) {
     super();
   }
   eq(other: FootnoteWidget) {
     return (
-      other.id === this.id && other.label === this.label && other.definition === this.definition
+      other.id === this.id &&
+      other.label === this.label &&
+      other.definition === this.definition &&
+      other.note === this.note
     );
   }
   toDOM() {
@@ -238,6 +243,15 @@ class FootnoteWidget extends WidgetType {
     el.className = "cm-footnote-ref";
     el.dataset.footnote = this.id;
     el.textContent = this.label;
+    if (this.note !== undefined) {
+      el.tabIndex = 0;
+      el.setAttribute("aria-label", `Footnote ${this.label}: ${this.note}`);
+      const pop = document.createElement("span");
+      pop.className = "cm-footnote-pop";
+      pop.setAttribute("aria-hidden", "true");
+      pop.textContent = this.note;
+      el.append(pop);
+    }
     return el;
   }
   ignoreEvent() {
@@ -337,6 +351,7 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
             s.footnote ?? "",
             s.label ?? "",
             s.widget === "footnote-label",
+            s.note,
           );
           ranges.push(Decoration.replace({ widget }).range(s.from, s.to));
         } else if (s.widget === "callout") {

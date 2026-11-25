@@ -42,8 +42,10 @@ export type DecoSpec =
       callout?: CalloutKind;
       /** A callout's title when it has none of its own; a footnote's number; a text widget's text. */
       label?: string;
-      /** A footnote's id, lower-cased. */
+      /** A footnote's id, lower-cased ("^<pos>" for an inline footnote). */
       footnote?: string;
+      /** An inline footnote's text. */
+      note?: string;
     };
 
 export type InlineSpec = Extract<DecoSpec, { type: "hide" | "mark" }>;
@@ -196,7 +198,10 @@ export function tableSpecs(state: EditorState, opts: PreviewOptions): TableSpec[
 }
 
 export interface Footnotes {
-  /** id → number, in the order of the first reference (as on GitHub). */
+  /**
+   * id → number, in the order of the first reference (as on GitHub);
+   * inline footnotes (^[text]) are numbered along, as "^<pos>".
+   */
   numbers: Map<string, number>;
   /** id → where its first reference starts. */
   refs: Map<string, number>;
@@ -223,7 +228,10 @@ export function footnotes(state: EditorState): Footnotes {
   const order: string[] = [];
   tree.iterate({
     enter: (n) => {
-      if (n.name === "FootnoteRef") {
+      if (n.name === "InlineFootnote") {
+        order.push(`^${n.from}`);
+        defs.set(`^${n.from}`, n.from);
+      } else if (n.name === "FootnoteRef") {
         const id = footnoteId(state.doc.sliceString(n.from, n.to));
         if (!refs.has(id)) {
           refs.set(id, n.from);
@@ -238,6 +246,7 @@ export function footnotes(state: EditorState): Footnotes {
   const numbers = new Map<string, number>();
   for (const id of order) if (defs.has(id)) numbers.set(id, numbers.size + 1);
   for (const id of refs.keys()) if (!defs.has(id)) refs.delete(id);
+  for (const id of order) if (id.startsWith("^")) defs.delete(id);
   const out = { numbers, refs, defs };
   footnoteCache.set(tree, out);
   return out;
@@ -617,6 +626,29 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
                 widget: "footnote",
                 footnote: id,
                 label: String(n),
+              });
+            }
+            return false;
+          }
+          case "InlineFootnote": {
+            const id = `^${ref.from}`;
+            const n = String(footnotes(state).numbers.get(id) ?? "");
+            if (active(ref.from)) {
+              for (const m of children(node, "InlineFootnoteMark")) mark(m.from, m.to, "cm-marker");
+              mark(ref.from, ref.to, "cm-footnote-inline");
+              return;
+            }
+            if (inTable) {
+              mark(ref.from, ref.to, "cm-footnote-ref", { "data-text": n });
+            } else {
+              specs.push({
+                type: "widget",
+                from: ref.from,
+                to: ref.to,
+                widget: "footnote",
+                footnote: id,
+                label: n,
+                note: doc.sliceString(ref.from + 2, ref.to - 1),
               });
             }
             return false;
