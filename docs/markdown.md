@@ -40,7 +40,22 @@ mode hides them all, and Source shows the file as it is.
 | `^[inline footnote]` | A numbered footnote, its text shown on hover or tap |
 | `- [/]`, `[-]`, `[>]`, `[<]`, `[!]`, `[?]`, `[*]` | Tasks in progress, cancelled, forwarded, scheduled, important, a question, starred |
 
+## Images and embedded notes
+
+| Write | Shows |
+|---|---|
+| `![alt](../Attachments/skiss.png)`, `![alt\|300](skiss.png)` | The image, 300 px wide; the path is relative to the note |
+| `![[skiss.png]]`, `![[skiss.png\|300]]` | The image, found by name as Obsidian does: the note's folder, `Attachments/`, then anywhere |
+| `![[Note]]`, `![[Note#Heading]]`, `![[Note#^id]]` | The note, or that section or block, read-only. An embed in an embedded note is a link |
+
+Pasting or dropping an image saves it in **`Attachments/`** at the vault root (or an existing
+`attachments/`), as `Pasted image 20261125143012.png` (a dropped file keeps its name), and inserts
+`![](../Attachments/Pasted%20image%2020261125143012.png)`. Images sync like notes.
+
+Nota shows png, jpg, gif, webp, avif, svg and bmp files from the vault. Images from the web
+(`![](https://…)`) are never loaded: they show as links. Previews of files outside the vault show
+no images.
+
 ## Not yet
 
-Images and embedded notes (`![](image.png)`, `![[Note]]`) show as links for now (#38). Maths and
-Mermaid diagrams show as code.
+Maths and Mermaid diagrams show as code.
