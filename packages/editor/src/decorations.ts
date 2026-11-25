@@ -9,7 +9,14 @@ import { parseWikilink } from "./syntax.ts";
 // computed from the editor state alone, so they can be tested without
 // a DOM; livePreview() turns them into CodeMirror decorations.
 
-export type WidgetKind = "checkbox" | "bullet" | "callout" | "footnote" | "footnote-label";
+export type WidgetKind =
+  | "checkbox"
+  | "bullet"
+  | "callout"
+  | "footnote"
+  | "footnote-label"
+  /** Text in place of the source: label. */
+  | "text";
 
 /** GitHub's five alert kinds; Obsidian's callout types map onto them. */
 export type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
@@ -29,7 +36,7 @@ export type DecoSpec =
       widget: WidgetKind;
       checked?: boolean;
       callout?: CalloutKind;
-      /** A callout's title when it has none of its own; a footnote's number. */
+      /** A callout's title when it has none of its own; a footnote's number; a text widget's text. */
       label?: string;
       /** A footnote's id, lower-cased. */
       footnote?: string;
@@ -232,6 +239,78 @@ export function footnotes(state: EditorState): Footnotes {
   return out;
 }
 
+// The named entities people type; others stay as written.
+const ENTITIES: Record<string, string> = {
+  nbsp: "\u00a0",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  copy: "©",
+  reg: "®",
+  trade: "™",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  laquo: "«",
+  raquo: "»",
+  lsquo: "‘",
+  rsquo: "’",
+  ldquo: "“",
+  rdquo: "”",
+  larr: "←",
+  rarr: "→",
+  uarr: "↑",
+  darr: "↓",
+  harr: "↔",
+  lArr: "⇐",
+  rArr: "⇒",
+  hArr: "⇔",
+  times: "×",
+  divide: "÷",
+  plusmn: "±",
+  minus: "−",
+  ne: "≠",
+  le: "≤",
+  ge: "≥",
+  asymp: "≈",
+  infin: "∞",
+  deg: "°",
+  micro: "µ",
+  middot: "·",
+  bull: "•",
+  sect: "§",
+  para: "¶",
+  euro: "€",
+  pound: "£",
+  yen: "¥",
+  cent: "¢",
+  half: "½",
+  frac12: "½",
+  frac14: "¼",
+  frac34: "¾",
+  sup2: "²",
+  sup3: "³",
+  check: "✓",
+  shy: "\u00ad",
+  ensp: "\u2002",
+  emsp: "\u2003",
+  thinsp: "\u2009",
+  zwj: "\u200d",
+  zwnj: "\u200c",
+};
+
+/** The character of "&copy;" or "&#8594;" or "&#x2192;", or undefined. */
+export function decodeEntity(source: string): string | undefined {
+  const m = /^&(?:#(\d{1,7})|#[xX]([\da-fA-F]{1,6})|(\w+));$/.exec(source);
+  if (!m) return undefined;
+  if (m[3]) return ENTITIES[m[3]];
+  const code = m[1] ? Number(m[1]) : Number.parseInt(m[2]!, 16);
+  if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return "\ufffd";
+  return String.fromCodePoint(code);
+}
+
 /** "[Some  Label]" → "some label", as CommonMark matches reference labels. */
 const refLabel = (source: string) =>
   source
@@ -429,6 +508,14 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             }
             mark(ref.from, ref.to, "cm-comment");
             for (const m of children(node, "CommentMark")) mark(m.from, m.to, "cm-marker");
+            return false;
+          }
+          case "Entity": {
+            const ch = decodeEntity(doc.sliceString(ref.from, ref.to));
+            if (ch === undefined || active(ref.from)) return false;
+            if (inTable) mark(ref.from, ref.to, "cm-entity", { "data-text": ch });
+            else
+              specs.push({ type: "widget", from: ref.from, to: ref.to, widget: "text", label: ch });
             return false;
           }
           case "Escape":

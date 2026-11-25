@@ -256,6 +256,22 @@ function jumpTo(view: EditorView, pos: number) {
   }, 1200);
 }
 
+/** Text in place of its source, such as an entity's character. */
+class TextWidget extends WidgetType {
+  constructor(readonly text: string) {
+    super();
+  }
+  eq(other: TextWidget) {
+    return other.text === this.text;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-text-widget";
+    el.textContent = this.text;
+    return el;
+  }
+}
+
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const hidden = Decoration.replace({});
 const checkbox = (checked: boolean) => Decoration.replace({ widget: new CheckboxWidget(checked) });
@@ -280,7 +296,11 @@ export function toDecorations(specs: DecoSpec[]): DecorationSet {
         );
         break;
       case "widget":
-        if (s.widget === "footnote" || s.widget === "footnote-label") {
+        if (s.widget === "text") {
+          ranges.push(
+            Decoration.replace({ widget: new TextWidget(s.label ?? "") }).range(s.from, s.to),
+          );
+        } else if (s.widget === "footnote" || s.widget === "footnote-label") {
           const widget = new FootnoteWidget(
             s.footnote ?? "",
             s.label ?? "",

@@ -25,6 +25,7 @@ import { notaTheme } from "./theme.ts";
 export {
   activeLines,
   calloutKind,
+  decodeEntity,
   footnotes,
   previewSpecs,
   tableSpecs,

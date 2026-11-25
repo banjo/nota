@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   activeLines,
   calloutKind,
+  decodeEntity,
   footnotes,
   extensions,
   findTags,
@@ -557,5 +558,37 @@ describe("comments", () => {
       const { specs: sp } = specs(doc, { cursor: 0 });
       expect(marks(doc, sp, "cm-comment"), doc).toEqual([]);
     }
+  });
+});
+
+describe("entities", () => {
+  test("decode named and numeric entities; unknown ones stay", () => {
+    expect(
+      ["&copy;", "&nbsp;", "&#8594;", "&#x2192;", "&rArr;", "&bogus;", "&#0;", "&#x110000;"].map(
+        decodeEntity,
+      ),
+    ).toEqual(["©", "\u00a0", "→", "→", "⇒", undefined, "\ufffd", "\ufffd"]);
+  });
+
+  test("show their character, and their source on the line being edited", () => {
+    const doc = "a &copy; b &bogus; c &#8594;\n\nslut";
+    const texts = (all: DecoSpec[]) =>
+      all.flatMap((x) =>
+        x.type === "widget" && x.widget === "text" ? [[text(doc, x), x.label]] : [],
+      );
+    expect(texts(specs(doc).specs)).toEqual([
+      ["&copy;", "©"],
+      ["&#8594;", "→"],
+    ]);
+    expect(texts(specs(doc, { cursor: 0 }).specs)).toEqual([]);
+  });
+
+  test("in a table cell, they stand in as data-text", () => {
+    const doc = "| a |\n| - |\n| x &rarr; y |\n\nslut";
+    const [t] = tableSpecs(state(doc, doc.length), { activeLines: new Set() });
+    const cell = t!.rows[0]![0]!;
+    expect(cell.specs.map((x) => (x.type === "mark" ? x.attrs?.["data-text"] : x.type))).toEqual([
+      "→",
+    ]);
   });
 });
