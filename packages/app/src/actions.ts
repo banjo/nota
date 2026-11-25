@@ -2,7 +2,14 @@ import { type NotesClient, NotaError } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { rememberFolder } from "./lib/folders.ts";
-import { folderLabel, folderOf, joinTitle, resolveLink, splitTitle } from "./lib/notes.ts";
+import {
+  folderLabel,
+  folderOf,
+  joinTitle,
+  noteLink,
+  resolveLink,
+  splitTitle,
+} from "./lib/notes.ts";
 import { followedPath, remapFolder } from "./lib/rename.ts";
 import { keys, noteWritten, setNoteBase } from "./queries.ts";
 import { type Route, useUI } from "./state.ts";
@@ -236,15 +243,42 @@ export async function openWikilink(
   qc: QueryClient,
   target: string,
   from?: string,
+  heading?: string,
 ) {
   const tree = await qc.ensureQueryData({ queryKey: keys.tree, queryFn: () => client.tree() });
   const hit = resolveLink(target, tree.notes, from);
   if (hit) {
-    useUI.getState().navigate({ kind: "note", path: hit.path });
+    useUI
+      .getState()
+      .navigate({ kind: "note", path: hit.path, ...(heading ? { anchor: heading } : {}) });
     return;
   }
   const folder = from ? folderOf(from) || "/" : undefined;
   await createNote(client, qc, folder, target);
+}
+
+/**
+ * A [text](dest) link in a note: another note ("Plan.md", "../a/b.md#Mål")
+ * opens in Nota, a web or mail link in the browser. Other files can't be
+ * opened yet.
+ */
+export async function openLink(client: NotesClient, qc: QueryClient, href: string, from: string) {
+  const link = noteLink(href, from);
+  if (!link) {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href.trim()) || /^www\./i.test(href.trim()))
+      return openExternal(href);
+    toast("Only links to notes and web pages open from a note.");
+    return;
+  }
+  const tree = await qc.ensureQueryData({ queryKey: keys.tree, queryFn: () => client.tree() });
+  const hit = resolveLink(link.target, tree.notes, from);
+  if (!hit) {
+    toast(`No note at “${link.target}”`);
+    return;
+  }
+  useUI
+    .getState()
+    .navigate({ kind: "note", path: hit.path, ...(link.heading ? { anchor: link.heading } : {}) });
 }
 
 export function openExternal(href: string) {

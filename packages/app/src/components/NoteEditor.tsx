@@ -1,10 +1,16 @@
 import type { Base, Note } from "@nota/client";
-import { createEditor, type EditorView, replaceDoc, setEditorMode } from "@nota/editor";
+import {
+  createEditor,
+  type EditorView,
+  replaceDoc,
+  revealAnchor,
+  setEditorMode,
+} from "@nota/editor";
 import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
-import { fail, openExternal, openWikilink } from "../actions.ts";
+import { fail, openLink, openWikilink } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { label } from "../lib/shortcuts.ts";
 import { filename, joinTitle, splitTitle, stem, type TitleParts } from "../lib/notes.ts";
@@ -207,9 +213,9 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
         }
         schedule();
       },
-      onWikilink: (target) => void openWikilink(client, qc, target, path),
+      onWikilink: (target, heading) => void openWikilink(client, qc, target, path, heading),
       onTag: (tag) => useUI.getState().navigate({ kind: "list", list: { type: "tag", tag } }),
-      onLink: openExternal,
+      onLink: (href) => void openLink(client, qc, href, path),
     });
     view.current = v;
     const flush = () => void save();
@@ -234,6 +240,23 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     };
     // The editor is keyed by path; later note updates arrive below.
   }, [path]);
+
+  // A link asked for a heading or block of this note: scroll there once
+  // the editor has it, then forget it (a reload starts at the top).
+  const anchor = useUI((s) =>
+    s.route.kind === "note" && s.route.path === path ? s.route.anchor : undefined,
+  );
+  useEffect(() => {
+    const v = view.current;
+    if (!v || !anchor) return;
+    const id = requestAnimationFrame(() => {
+      if (!revealAnchor(v, anchor)) toast(`No heading or block “${anchor}” in this note`);
+      const r = useUI.getState().route;
+      if (r.kind === "note" && r.path === path)
+        useUI.setState({ route: { ...r, anchor: undefined } });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [anchor, path]);
 
   // The mode changed (⌘E, ⌘K, the top bar): same editor, other extensions.
   // Source holds the title line too, so the text swaps when entering or

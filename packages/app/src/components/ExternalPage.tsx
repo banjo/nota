@@ -228,14 +228,17 @@ function PreviewEditor({ doc, draft }: { doc: ExternalDoc; draft: string | undef
         shown.current = text;
         useOpened.setState((s) => ({ drafts: { ...s.drafts, [id]: text } }));
       },
-      onWikilink: (target) => {
+      onWikilink: (target, heading) => {
         void (async () => {
           const tree = await qc.ensureQueryData({
             queryKey: keys.tree,
             queryFn: () => client.tree(),
           });
           const hit = resolveLink(target, tree.notes);
-          if (hit) useUI.getState().navigate({ kind: "note", path: hit.path });
+          if (hit)
+            useUI
+              .getState()
+              .navigate({ kind: "note", path: hit.path, ...(heading ? { anchor: heading } : {}) });
           else toast(`No note named “${target}” in your vault`);
         })();
       },

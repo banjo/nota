@@ -5,6 +5,7 @@ import {
   filename,
   flattenTree,
   joinTitle,
+  noteLink,
   resolveLink,
   splitTitle,
 } from "../src/lib/notes.ts";
@@ -161,5 +162,32 @@ describe("relative time", () => {
     expect(relativeTime(new Date(2026, 10, 21, 9, 5).toISOString(), now)).toBe("Yesterday 09:05");
     expect(relativeTime(new Date(2026, 10, 18).toISOString(), now)).toBe("18 Nov");
     expect(relativeTime(new Date(2025, 0, 2).toISOString(), now)).toBe("2 Jan 2025");
+  });
+});
+
+describe("noteLink", () => {
+  test("resolves like the index: against the note's folder, decoded, inside the vault", () => {
+    const from = "Projekt/Nota/Plan.md";
+    expect(noteLink("Annan.md", from)).toEqual({ target: "Projekt/Nota/Annan.md" });
+    expect(noteLink("./sub/M%C3%B6te%20i%20dag.md#M%C3%A5l", from)).toEqual({
+      target: "Projekt/Nota/sub/Möte i dag.md",
+      heading: "M%C3%A5l",
+    });
+    expect(noteLink("../../Inbox.md#^abc", from)).toEqual({ target: "Inbox.md", heading: "^abc" });
+    expect(noteLink("/Arkiv/Gammal.MD", from)).toEqual({ target: "Arkiv/Gammal.MD" });
+    expect(noteLink("<Med mellanslag.md>", "A.md")).toEqual({ target: "Med mellanslag.md" });
+  });
+
+  test("is null for web links, anchors, other files and paths out of the vault", () => {
+    for (const href of [
+      "https://x.se/a.md",
+      "mailto:a@b.se",
+      "#rubrik",
+      "//cdn/x.md",
+      "bild.png",
+      "mapp/",
+      "../../../ut.md",
+    ])
+      expect(noteLink(href, "Projekt/Nota/Plan.md"), href).toBeNull();
   });
 });
