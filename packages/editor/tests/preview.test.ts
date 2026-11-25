@@ -505,3 +505,25 @@ describe("reference links", () => {
     expect(lines(sp, "cm-linkref")).toEqual([DOC.indexOf("[d]:"), DOC.indexOf("[docs]:")]);
   });
 });
+
+describe("nested quotes", () => {
+  test("get one border per level", () => {
+    // "> d" right under c would continue c (lazily), at depth 3.
+    const doc = "> a\n> > b\n> > > c\n>\n> d\n\nslut";
+    const { specs: sp } = specs(doc);
+    const quotes = sp
+      .filter(
+        (x): x is Extract<DecoSpec, { type: "line" }> =>
+          x.type === "line" && x.class === "cm-quote",
+      )
+      .map((x) => [doc.slice(x.from, doc.indexOf("\n", x.from)), x.style]);
+    expect(quotes).toEqual([
+      ["> a", undefined],
+      ["> > b", "--quote-depth:2"],
+      ["> > > c", "--quote-depth:3"],
+      [">", undefined],
+      ["> d", undefined],
+    ]);
+    expect(hidden(doc, sp).filter((h) => h === "> ")).toHaveLength(7);
+  });
+});

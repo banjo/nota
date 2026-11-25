@@ -511,7 +511,19 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
             const m = CALLOUT.exec(doc.sliceString(ref.from, first.to));
             const last = lineOf(ref.to);
             if (!m) {
-              for (let l = first.number; l <= last; l++) line(doc.line(l).from, "cm-quote");
+              // A quote in a quote: the outer one draws a border per level.
+              if (node.parent?.name === "Blockquote") return;
+              const depth = new Map<number, number>();
+              const nest = (q: SyntaxNode, d: number) => {
+                for (let l = lineOf(q.from); l <= lineOf(q.to); l++) depth.set(l, d);
+                for (let c = q.firstChild; c; c = c.nextSibling)
+                  if (c.name === "Blockquote") nest(c, d + 1);
+              };
+              nest(node, 1);
+              for (let l = first.number; l <= last; l++) {
+                const d = depth.get(l) ?? 1;
+                line(doc.line(l).from, "cm-quote", d > 1 ? `--quote-depth:${d}` : undefined);
+              }
               return;
             }
             const [, lead = "", type = "", fold = "", gap = "", title = ""] = m;

@@ -148,9 +148,12 @@ export const notaTheme = EditorView.theme({
     transition: "background-color 0.3s",
   },
 
+  // One 3px border per level (--quote-depth, 1 when unset), 14px apart.
   ".cm-quote": {
-    borderLeft: `3px solid ${v("hairline", "#e7e7e4")}`,
-    paddingLeft: "14px !important",
+    backgroundImage: `repeating-linear-gradient(to right, ${v("hairline", "#e7e7e4")} 0 3px, transparent 3px 14px)`,
+    backgroundSize: "calc(var(--quote-depth, 1) * 14px - 11px) 100%",
+    backgroundRepeat: "no-repeat",
+    paddingLeft: "calc(var(--quote-depth, 1) * 14px + 3px) !important",
     color: md("quote", "muted-foreground", "#6b6f78"),
   },
   // Callouts: a quote with "[!type]" on its first line. The colour is
