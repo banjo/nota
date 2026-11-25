@@ -111,6 +111,32 @@ export const notaTheme = EditorView.theme({
     cursor: "pointer",
   },
 
+  // Footnotes: references are raised numbers in the link colour, and
+  // definitions are quiet, smaller lines.
+  ".cm-footnote-ref": {
+    color: md("link", "ink", "#1e7363"),
+    fontSize: "0.75em",
+    lineHeight: "0",
+    verticalAlign: "super",
+    padding: "0 0.1em",
+    cursor: "pointer",
+  },
+  ".cm-footnote-source": { color: v("faint", "#9ca0a8") },
+  ".cm-footnote-def": {
+    fontSize: "0.9em",
+    color: v("muted-foreground", "#6b6f78"),
+  },
+  ".cm-footnote-label": {
+    color: md("link", "ink", "#1e7363"),
+    fontVariantNumeric: "tabular-nums",
+    marginRight: "0.4em",
+    cursor: "pointer",
+  },
+  ".cm-footnote-flash": {
+    backgroundColor: v("ink-soft", "#e6f3f0"),
+    transition: "background-color 0.3s",
+  },
+
   ".cm-quote": {
     borderLeft: `3px solid ${v("hairline", "#e7e7e4")}`,
     paddingLeft: "14px !important",

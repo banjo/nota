@@ -4,6 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   activeLines,
   calloutKind,
+  footnotes,
   extensions,
   findTags,
   parseWikilink,
@@ -324,5 +325,86 @@ describe("callouts", () => {
     const { specs: sp } = specs(doc);
     expect(lines(sp, "cm-quote")).toEqual([0, doc.indexOf("> rad")]);
     expect(widgets(sp)).toEqual([]);
+  });
+});
+
+describe("footnotes", () => {
+  const notes = (all: DecoSpec[], kind: "footnote" | "footnote-label") =>
+    all
+      .filter(
+        (x): x is Extract<DecoSpec, { type: "widget" }> => x.type === "widget" && x.widget === kind,
+      )
+      .map((x) => [x.footnote, x.label]);
+  const DOC = [
+    "Andra[^b] och första[^A], igen[^b], okänd[^x].",
+    "",
+    "[^a]: Om **a**",
+    "    fortsätter",
+    "[^b]: Om b",
+    "[^c]: Aldrig använd",
+  ].join("\n");
+
+  test("references are numbered by first use, case-insensitive", () => {
+    const { s, specs: sp } = specs(DOC, { cursor: DOC.indexOf("fortsätter") });
+    expect(notes(sp, "footnote")).toEqual([
+      ["b", "1"],
+      ["a", "2"],
+      ["b", "1"],
+    ]);
+    // An undefined footnote stays text.
+    expect(sp.some((x) => x.type !== "line" && text(DOC, x).includes("[^x]"))).toBe(false);
+    expect(footnotes(s).numbers).toEqual(
+      new Map([
+        ["b", 1],
+        ["a", 2],
+      ]),
+    );
+    expect(footnotes(s).defs.get("a")).toBe(DOC.indexOf("[^a]:"));
+    expect(footnotes(s).refs.get("b")).toBe(DOC.indexOf("[^b]"));
+  });
+
+  test("definitions are quiet lines with their number", () => {
+    const { specs: sp } = specs(DOC, { cursor: 0 });
+    const at = (t: string) => DOC.indexOf(t);
+    expect(lines(sp, "cm-footnote-def")).toEqual([
+      at("[^a]:"),
+      at("    fortsätter"),
+      at("[^b]:"),
+      at("[^c]:"),
+    ]);
+    expect(notes(sp, "footnote-label")).toEqual([
+      ["a", "2"],
+      ["b", "1"],
+      ["c", "c"],
+    ]);
+    expect(marks(DOC, sp, "cm-strong").map((m) => m.text)).toEqual(["a"]);
+  });
+
+  test("show their source on the line being edited", () => {
+    const { specs: sp } = specs(DOC, { cursor: 2 });
+    expect(notes(sp, "footnote")).toEqual([]);
+    expect(marks(DOC, sp, "cm-footnote-source").map((m) => m.text)).toEqual([
+      "[^b]",
+      "[^A]",
+      "[^b]",
+    ]);
+    const def = specs(DOC, { cursor: DOC.indexOf("Om b") });
+    expect(marks(DOC, def.specs, "cm-marker").map((m) => m.text)).toContain("[^b]:");
+  });
+
+  test("a definition right after a paragraph line starts its own block", () => {
+    const doc = "Text[^1]\n[^1]: Not";
+    expect(notes(specs(doc, { cursor: 0 }).specs, "footnote-label")).toEqual([["1", "1"]]);
+  });
+
+  test("in a table cell, a reference is a mark that stands for its number", () => {
+    const doc = "| a |\n| - |\n| x[^n] |\n\nslut\n\n[^n]: Not";
+    const s = state(doc, doc.length);
+    const [t] = tableSpecs(s, { activeLines: new Set() });
+    const cell = t!.rows[0]![0]!;
+    const [m, ...rest] = cell.specs;
+    expect(rest).toEqual([]);
+    expect([m!.type, cell.text.slice(m!.from, m!.to)]).toEqual(["mark", "[^n]"]);
+    expect(m!.type === "mark" && m!.attrs).toEqual({ "data-footnote": "n", "data-text": "1" });
   });
 });

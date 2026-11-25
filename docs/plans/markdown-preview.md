@@ -113,8 +113,10 @@ it only looks at `Table` nodes, so it stays cheap.
 ### 4. Footnotes
 
 * A Lezer extension in `syntax.ts`: `[^id]` (inline) and `[^id]: text` (definition).
-* References render as a superscript number. A click jumps to the definition. Definitions get a
-  small, quiet line style.
+* References render as a superscript number, numbered by first use as on GitHub, and only when
+  the footnote is defined. A click jumps to the definition and a click on the definition's number
+  jumps back; the target line lights up briefly and the cursor stays put. Definitions get a
+  small, quiet line style; indented lines below one continue it.
 * `internal/markdown` (the index) needs no change.
 
 ### 5. `==highlight==`

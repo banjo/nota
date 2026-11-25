@@ -1,6 +1,6 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
-import type { SyntaxNode } from "@lezer/common";
+import type { SyntaxNode, Tree } from "@lezer/common";
 import { parseWikilink } from "./syntax.ts";
 
 // Live preview: markdown stays plain text in the document, and
@@ -9,7 +9,7 @@ import { parseWikilink } from "./syntax.ts";
 // computed from the editor state alone, so they can be tested without
 // a DOM; livePreview() turns them into CodeMirror decorations.
 
-export type WidgetKind = "checkbox" | "bullet" | "callout";
+export type WidgetKind = "checkbox" | "bullet" | "callout" | "footnote" | "footnote-label";
 
 /** GitHub's five alert kinds; Obsidian's callout types map onto them. */
 export type CalloutKind = "note" | "tip" | "important" | "warning" | "caution";
@@ -29,8 +29,10 @@ export type DecoSpec =
       widget: WidgetKind;
       checked?: boolean;
       callout?: CalloutKind;
-      /** The callout's title when it has none of its own: its type. */
+      /** A callout's title when it has none of its own; a footnote's number. */
       label?: string;
+      /** A footnote's id, lower-cased. */
+      footnote?: string;
     };
 
 export type InlineSpec = Extract<DecoSpec, { type: "hide" | "mark" }>;
@@ -181,6 +183,54 @@ export function tableSpecs(state: EditorState, opts: PreviewOptions): TableSpec[
   return out;
 }
 
+export interface Footnotes {
+  /** id → number, in the order of the first reference (as on GitHub). */
+  numbers: Map<string, number>;
+  /** id → where its first reference starts. */
+  refs: Map<string, number>;
+  /** id → where its definition starts. */
+  defs: Map<string, number>;
+}
+
+/** "[^Id]" or "[^Id]:" → "id". */
+export const footnoteId = (source: string) =>
+  source.replace(/^\[\^/, "").replace(/\]:?$/, "").toLowerCase();
+
+const footnoteCache = new WeakMap<Tree, Footnotes>();
+
+/**
+ * The document's footnotes. A reference only counts, and gets a number,
+ * when its footnote is defined somewhere.
+ */
+export function footnotes(state: EditorState): Footnotes {
+  const tree = syntaxTree(state);
+  const cached = footnoteCache.get(tree);
+  if (cached) return cached;
+  const refs = new Map<string, number>();
+  const defs = new Map<string, number>();
+  const order: string[] = [];
+  tree.iterate({
+    enter: (n) => {
+      if (n.name === "FootnoteRef") {
+        const id = footnoteId(state.doc.sliceString(n.from, n.to));
+        if (!refs.has(id)) {
+          refs.set(id, n.from);
+          order.push(id);
+        }
+      } else if (n.name === "FootnoteLabel") {
+        const id = footnoteId(state.doc.sliceString(n.from, n.to));
+        if (!defs.has(id)) defs.set(id, n.from);
+      }
+    },
+  });
+  const numbers = new Map<string, number>();
+  for (const id of order) if (defs.has(id)) numbers.set(id, numbers.size + 1);
+  for (const id of refs.keys()) if (!defs.has(id)) refs.delete(id);
+  const out = { numbers, refs, defs };
+  footnoteCache.set(tree, out);
+  return out;
+}
+
 const CALLOUT_KINDS: Record<string, CalloutKind> = {
   note: "note",
   info: "note",
@@ -314,6 +364,52 @@ function collect(state: EditorState, opts: PreviewOptions, inTable: boolean): De
           case "Tag":
             mark(ref.from, ref.to, "cm-tag", { "data-tag": doc.sliceString(ref.from + 1, ref.to) });
             return false;
+          case "FootnoteRef": {
+            const id = footnoteId(doc.sliceString(ref.from, ref.to));
+            const n = footnotes(state).numbers.get(id);
+            if (n === undefined) return false; // never defined: plain text
+            if (active(ref.from)) {
+              mark(ref.from, ref.to, "cm-footnote-source");
+            } else if (inTable) {
+              // A cell is rendered from inline specs only: a mark that the
+              // table widget draws as its data-text.
+              mark(ref.from, ref.to, "cm-footnote-ref", {
+                "data-footnote": id,
+                "data-text": String(n),
+              });
+            } else {
+              specs.push({
+                type: "widget",
+                from: ref.from,
+                to: ref.to,
+                widget: "footnote",
+                footnote: id,
+                label: String(n),
+              });
+            }
+            return false;
+          }
+          case "FootnoteDefinition":
+            for (let l = lineOf(ref.from); l <= lineOf(ref.to); l++)
+              line(doc.line(l).from, "cm-footnote-def");
+            return;
+          case "FootnoteLabel": {
+            const id = footnoteId(doc.sliceString(ref.from, ref.to));
+            if (active(ref.from)) {
+              mark(ref.from, ref.to, "cm-marker");
+              return false;
+            }
+            const n = footnotes(state).numbers.get(id);
+            specs.push({
+              type: "widget",
+              from: ref.from,
+              to: withSpace(ref.to),
+              widget: "footnote-label",
+              footnote: id,
+              label: n === undefined ? id : String(n),
+            });
+            return false;
+          }
           case "Link": {
             const linkMarks = children(node, "LinkMark");
             const url = children(node, "URL")[0];

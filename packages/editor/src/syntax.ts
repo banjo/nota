@@ -1,14 +1,21 @@
-import type { MarkdownConfig } from "@lezer/markdown";
+import type { Element, MarkdownConfig } from "@lezer/markdown";
 import { tags as t } from "@lezer/highlight";
 
 // Nota's dialect on top of CommonMark + GFM (decision 4): Obsidian's
-// [[wikilinks]], ![[embeds]] and #tags (nested #a/b). The Go index
-// (internal/markdown) reads the same syntax.
+// [[wikilinks]], ![[embeds]] and #tags (nested #a/b), and footnotes
+// ([^id] and [^id]: text) as on GitHub. The Go index (internal/markdown)
+// reads the same links and tags.
 
 const OPEN = 91; // [
 const CLOSE = 93; // ]
 const BANG = 33; // !
 const HASH = 35; // #
+const CARET = 94; // ^
+
+/** "[^id]:" at the start of a footnote definition. */
+const FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
+/** A line that continues a footnote definition: indented, not blank. */
+const FOOTNOTE_MORE = /^(?: {2,}|\t)\S/;
 
 /** A parsed [[target#heading|alias]]. */
 export interface Wikilink {
@@ -62,14 +69,62 @@ export function findTags(text: string): string[] {
   return out;
 }
 
-/** Lezer markdown extension: WikiLink (with WikiLinkMark) and Tag nodes. */
+/**
+ * Lezer markdown extension: WikiLink (with WikiLinkMark), Tag, FootnoteRef,
+ * and FootnoteDefinition (a FootnoteLabel, then the text's inline nodes).
+ */
 export const notaSyntax: MarkdownConfig = {
   defineNodes: [
     { name: "WikiLink", style: t.link },
     { name: "WikiLinkMark", style: t.processingInstruction },
     { name: "Tag", style: t.labelName },
+    { name: "FootnoteRef", style: t.labelName },
+    { name: "FootnoteDefinition", block: true },
+    { name: "FootnoteLabel", style: t.labelName },
+  ],
+  parseBlock: [
+    {
+      name: "FootnoteDefinition",
+      before: "LinkReference",
+      parse(cx, line) {
+        const m = FOOTNOTE_DEF.exec(line.text.slice(line.pos));
+        if (!m || line.indent - line.baseIndent >= 4) return false;
+        const from = cx.lineStart + line.pos;
+        const children: Element[] = [cx.elt("FootnoteLabel", from, from + m[0].length)];
+        const text = (start: number) =>
+          children.push(...cx.parser.parseInline(line.text.slice(start), cx.lineStart + start));
+        text(line.pos + m[0].length);
+        let to = cx.lineStart + line.text.length;
+        // Indented lines below continue it (top-level only: inside a quote
+        // or list the next line carries that container's markers).
+        while (line.baseIndent === 0 && FOOTNOTE_MORE.test(cx.peekLine())) {
+          cx.nextLine();
+          text(line.pos);
+          to = cx.lineStart + line.text.length;
+        }
+        cx.nextLine();
+        cx.addElement(cx.elt("FootnoteDefinition", from, to, children));
+        return true;
+      },
+      // A definition right after a paragraph line starts its own block.
+      endLeaf: (_, line) => FOOTNOTE_DEF.test(line.text.slice(line.pos)),
+    },
   ],
   parseInline: [
+    {
+      name: "FootnoteRef",
+      before: "Link",
+      parse(cx, next, pos) {
+        if (next !== OPEN || cx.char(pos + 1) !== CARET) return -1;
+        for (let i = pos + 2; i < cx.end; i++) {
+          const c = cx.char(i);
+          if (c === CLOSE)
+            return i > pos + 2 ? cx.addElement(cx.elt("FootnoteRef", pos, i + 1)) : -1;
+          if (c === OPEN || c === 32 || c === 9 || c === 10) return -1;
+        }
+        return -1;
+      },
+    },
     {
       name: "WikiLink",
       before: "Link",

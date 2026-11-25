@@ -270,7 +270,12 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     const onClick = (e: MouseEvent) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       const t = e.target as HTMLElement | null;
-      if (t?.closest(".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], a")) return;
+      if (
+        t?.closest(
+          ".cm-task-checkbox, [data-wikilink], [data-tag], [data-href], [data-footnote], [data-footnote-def], a",
+        )
+      )
+        return;
       if (!(window.getSelection()?.isCollapsed ?? true)) return;
       editAt.current = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
       useUI.getState().setNoteMode("live");
