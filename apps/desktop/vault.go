@@ -19,6 +19,7 @@ import (
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
+	"github.com/banjo/nota/internal/relink"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -153,10 +154,12 @@ type SaveResult struct {
 	Current  *Note `json:"current,omitempty"`
 }
 
-// MoveResult is where a moved note went.
+// MoveResult is where a moved note (or folder) went, and the links in
+// other notes that were rewritten to follow it.
 type MoveResult struct {
-	From string `json:"from"`
-	Path string `json:"path"`
+	From  string        `json:"from"`
+	Path  string        `json:"path"`
+	Links relink.Result `json:"links"`
 }
 
 // HistoryEntry is one server version of a note.
@@ -664,13 +667,35 @@ func (s *Vault) Move(path, folder string) (MoveResult, error) {
 	if folder == "/" {
 		folder = ""
 	}
-	where, stop := s.bus.Follow()
-	defer stop()
-	to, err := s.v.Move(path, folder)
+	clean, err := vault.CleanPath(folder)
 	if err != nil {
 		return MoveResult{}, err
 	}
-	return MoveResult{From: path, Path: where(to)}, nil
+	from, err := vault.NotePath(path)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	return s.move(from, intoFolder(clean, from))
+}
+
+// move renames a note and rewrites the links to it. The caller holds s.mu.
+func (s *Vault) move(from, to string) (MoveResult, error) {
+	pending, err := relink.Prepare(s.v, s.ix, map[string]string{from: to})
+	if err != nil {
+		return MoveResult{}, err
+	}
+	where, stop := s.bus.Follow()
+	defer stop()
+	p, err := s.v.Rename(from, to)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	p = where(p)
+	links, err := pending.Apply(map[string]string{from: p})
+	if err != nil {
+		return MoveResult{}, err
+	}
+	return MoveResult{From: from, Path: p, Links: links}, nil
 }
 
 // RenameFolder renames a folder, or moves it, to a new vault path: every
@@ -681,12 +706,28 @@ func (s *Vault) RenameFolder(path, to string) (MoveResult, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var pending *relink.Pending
+	from, err := vault.CleanPath(path)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	if planned, err := vault.CleanPath(to); err == nil && from != "" {
+		if pending, err = relink.PrepareFolder(s.v, s.ix, from, planned); err != nil {
+			return MoveResult{}, err
+		}
+	}
 	p, err := s.v.RenameFolder(path, to)
 	if err != nil {
 		return MoveResult{}, err
 	}
 	s.changes.add(path, p)
-	return MoveResult{From: path, Path: p}, nil
+	res := MoveResult{From: path, Path: p, Links: relink.Result{Notes: []relink.Changed{}}}
+	if pending != nil {
+		if res.Links, err = pending.Apply(nil); err != nil {
+			return MoveResult{}, err
+		}
+	}
+	return res, nil
 }
 
 // Rename gives a note a new path (a new name, a new folder, or both).
@@ -696,13 +737,15 @@ func (s *Vault) Rename(path, to string) (MoveResult, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	where, stop := s.bus.Follow()
-	defer stop()
-	p, err := s.v.Rename(path, to)
+	from, err := vault.NotePath(path)
 	if err != nil {
 		return MoveResult{}, err
 	}
-	return MoveResult{From: path, Path: where(p)}, nil
+	dest, err := vault.NotePath(to)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	return s.move(from, dest)
 }
 
 // Delete moves a note to .trash/ and returns where it went.
@@ -759,3 +802,6 @@ func (s *Vault) SyncStatus() SyncStatus {
 	}
 	return s.syn.Load().get()
 }
+
+// intoFolder is the path of the note p moved into folder.
+func intoFolder(folder, p string) string { return path.Join(folder, path.Base(p)) }

@@ -155,9 +155,16 @@ export type WriteResult =
   | { conflict: false; note: Note }
   | { conflict: true; current: Note | null };
 
+/** The links rewritten so they keep pointing at a moved note. */
+export interface LinksUpdated {
+  count: number;
+  notes: { path: string; links: number }[];
+}
+
 export interface MoveResult {
   from: string;
   path: string;
+  links: LinksUpdated;
 }
 
 export interface HistoryEntry {

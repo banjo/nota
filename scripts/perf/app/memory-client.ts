@@ -251,7 +251,7 @@ export function createMemoryClient(
       n.path = to;
       notes.set(to, n);
       emit([path, to]);
-      return wait<MoveResult>({ from: path, path: to });
+      return wait<MoveResult>({ from: path, path: to, links: { count: 0, notes: [] } });
     },
     createFolder: async (path) => {
       if (allFolders().includes(path)) throw new NotaError("exists", "exists", 409);
@@ -268,7 +268,7 @@ export function createMemoryClient(
           notes.set(n.path, n);
         }
       emit([path, to]);
-      return wait<MoveResult>({ from: path, path: to });
+      return wait<MoveResult>({ from: path, path: to, links: { count: 0, notes: [] } });
     },
     rename: async (path, to) => {
       const n = need(path);
@@ -277,7 +277,7 @@ export function createMemoryClient(
       n.path = to;
       notes.set(to, n);
       emit([path, to]);
-      return wait<MoveResult>({ from: path, path: to });
+      return wait<MoveResult>({ from: path, path: to, links: { count: 0, notes: [] } });
     },
     remove: async (path) => {
       notes.delete(path);

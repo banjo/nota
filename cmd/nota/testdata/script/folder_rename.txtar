@@ -16,10 +16,22 @@ nota folder ls
 stdout '^Arbete\s+2$'
 stdout '^Arbete/Tom\s+0$'
 
-# It can move the folder under another one, and --json says from and to.
+# Links that name a note or a file by its path follow the folder.
+cmp vault/Andra/Annan.md annan-1.md
+
+# It can move the folder under another one, and --json says from and to
+# and which links changed ([[Arbete/Plan]] still names the note by the end
+# of its path, so it stays).
 nota folder rename --json Arbete Arkiv/2027/Arbete
 stdout '"from": "Arbete"'
 stdout '"path": "Arkiv/2027/Arbete"'
+stdout '"count": 2'
+cmp vault/Andra/Annan.md annan-2.md
+
+# --no-update-links leaves them.
+nota folder rename --no-update-links Arkiv/2027/Arbete Arkiv/2027/Jobb
+cmp vault/Andra/Annan.md annan-2.md
+nota folder rename Arkiv/2027/Jobb Arkiv/2027/Arbete
 exists vault/Arkiv/2027/Arbete/Plan.md
 ! exists vault/Arbete
 
@@ -45,3 +57,13 @@ exists vault/Arkiv/2027/Arbete/Plan.md
 png
 -- vault/Andra/Annan.md --
 # Annan
+
+[[Projekt/Plan]], [[Djup]], [djup](../Projekt/Under/Djup.md) and ![](../Projekt/Under/bild.png).
+-- annan-1.md --
+# Annan
+
+[[Arbete/Plan]], [[Djup]], [djup](../Arbete/Under/Djup.md) and ![](../Arbete/Under/bild.png).
+-- annan-2.md --
+# Annan
+
+[[Arbete/Plan]], [[Djup]], [djup](../Arkiv/2027/Arbete/Under/Djup.md) and ![](../Arkiv/2027/Arbete/Under/bild.png).

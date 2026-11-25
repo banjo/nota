@@ -485,3 +485,28 @@ func TestWebAPIEventStream(t *testing.T) {
 		t.Fatalf("after web write %q", got)
 	}
 }
+
+func TestWebAPIMoveRewritesLinks(t *testing.T) {
+	e, _ := authEnv(t, Config{Signup: SignupOpen})
+	b, tok := webUser(t, e, "anton@example.com")
+	if st, _, err := e.put(tok, "Projekt/Plan.md", 0, "# Plan\n"); st != 200 {
+		t.Fatalf("put: %d %v", st, err)
+	}
+	if st, _, err := e.put(tok, "Länk.md", 0, "[[Projekt/Plan]] [p](Projekt/Plan.md)\n"); st != 200 {
+		t.Fatalf("put: %d %v", st, err)
+	}
+	var mv MoveResponse
+	if st, m := b.call("POST", api+"/move", MoveRequest{Path: "Projekt/Plan.md", To: "Projekt/Roadmap.md"}, &mv); st != 200 ||
+		mv.Links.Count != 2 || len(mv.Links.Notes) != 1 || mv.Links.Notes[0].Path != "Länk.md" {
+		t.Fatalf("move: %d %v %+v", st, m, mv)
+	}
+	var rf RenameFolderResponse
+	if st, m := b.call("POST", api+"/folders/rename", RenameFolderRequest{Path: "Projekt", To: "Arbete"}, &rf); st != 200 || rf.Links.Count != 2 {
+		t.Fatalf("rename folder: %d %v %+v", st, m, rf)
+	}
+	// The rewrite is a version of the web device, like any edit.
+	res, body := e.do(tok, "GET", protocol.FilePath("main", "Länk.md"), nil, "")
+	if res.StatusCode != 200 || string(body) != "[[Arbete/Roadmap]] [p](Arbete/Roadmap.md)\n" || res.Header.Get(protocol.HeaderDevice) != DeviceWeb {
+		t.Fatalf("Länk.md: %d %q", res.StatusCode, body)
+	}
+}

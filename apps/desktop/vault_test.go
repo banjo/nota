@@ -331,3 +331,26 @@ func TestWatchIgnored(t *testing.T) {
 		}
 	}
 }
+
+func TestRenameAndMoveRewriteLinks(t *testing.T) {
+	s, dir, _ := testVault(t, map[string]string{
+		"Projekt/Plan.md": "# Plan\n",
+		"Länk.md":         "[[Plan]] and [[Projekt/Plan|planen]]\n",
+	})
+	r, err := s.Rename("Projekt/Plan.md", "Projekt/Roadmap.md")
+	if err != nil || r.Links.Count != 2 {
+		t.Fatalf("rename %+v %v", r, err)
+	}
+	if got := read(t, dir, "Länk.md"); got != "[[Roadmap]] and [[Projekt/Roadmap|planen]]\n" {
+		t.Fatalf("after rename: %q", got)
+	}
+	if r, err = s.Move("Projekt/Roadmap.md", "/"); err != nil || r.Path != "Roadmap.md" || r.Links.Count != 1 {
+		t.Fatalf("move %+v %v", r, err)
+	}
+	if r, err = s.RenameFolder("Projekt", "Arbete"); err != nil || r.Links.Count != 0 {
+		t.Fatalf("folder %+v %v", r, err)
+	}
+	if got := read(t, dir, "Länk.md"); got != "[[Roadmap]] and [[Roadmap|planen]]\n" {
+		t.Fatalf("after move: %q", got)
+	}
+}

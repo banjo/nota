@@ -11,12 +11,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/index"
+	"github.com/banjo/nota/internal/relink"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -447,12 +449,14 @@ type MoveInput struct {
 
 // MoveOutput is the result of move_note.
 type MoveOutput struct {
-	From string `json:"from"`
-	Path string `json:"path"`
-	URI  string `json:"uri"`
+	From  string        `json:"from"`
+	Path  string        `json:"path"`
+	URI   string        `json:"uri"`
+	Links relink.Result `json:"links" jsonschema:"links in other notes (and the note's own relative links) rewritten to keep pointing at the same notes"`
 }
 
-// Move moves a note to another folder, keeping its file name.
+// Move moves a note to another folder, keeping its file name, and
+// rewrites the links that would otherwise break.
 func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -463,14 +467,30 @@ func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 	if err != nil {
 		return MoveOutput{}, err
 	}
+	folder, err := vault.CleanPath(in.Folder)
+	if err != nil {
+		return MoveOutput{}, err
+	}
+	planned := path.Join(folder, path.Base(p))
+	pending, err := relink.Prepare(s.v, s.ix, map[string]string{p: planned})
+	if err != nil {
+		return MoveOutput{}, err
+	}
 	where, stop := s.v.Bus().Follow()
 	defer stop()
-	to, err := s.v.Move(p, in.Folder)
+	to, err := s.v.Move(p, folder)
 	if err != nil {
 		return MoveOutput{}, err
 	}
 	to = where(to)
-	return MoveOutput{From: p, Path: to, URI: URI(to)}, nil
+	if err := s.sync(); err != nil {
+		return MoveOutput{}, err
+	}
+	links, err := pending.Apply(map[string]string{p: to})
+	if err != nil {
+		return MoveOutput{}, err
+	}
+	return MoveOutput{From: p, Path: to, URI: URI(to), Links: links}, nil
 }
 
 // FolderInput are the arguments of create_folder.

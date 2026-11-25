@@ -16,6 +16,7 @@ import (
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
+	"github.com/banjo/nota/internal/relink"
 	nvault "github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -703,11 +704,13 @@ type MoveRequest struct {
 	BaseVersion *int64 `json:"base_version,omitempty"`
 }
 
-// MoveResponse is where the note went.
+// MoveResponse is where the note went, and the links in other notes
+// rewritten to follow it.
 type MoveResponse struct {
-	From    string `json:"from"`
-	Path    string `json:"path"`
-	Version int64  `json:"version"`
+	From    string        `json:"from"`
+	Path    string        `json:"path"`
+	Version int64         `json:"version"`
+	Links   relink.Result `json:"links"`
 }
 
 func (s *Server) apiMove(w http.ResponseWriter, r *http.Request, p Principal) error {
@@ -740,28 +743,40 @@ func (s *Server) apiMove(w http.ResponseWriter, r *http.Request, p Principal) er
 	if err != nil {
 		return err
 	}
-	where, stop := ws.bus.Follow()
-	defer stop()
-	var to string
+	var planned string
 	if req.Folder != "" {
 		folder := req.Folder
 		if folder == "/" {
 			folder = ""
 		}
-		to, err = ed.Move(from, folder)
-	} else {
-		to, err = ed.Rename(from, req.To)
+		if folder, err = nvault.CleanPath(folder); err != nil {
+			return vaultErr(err)
+		}
+		planned = path.Join(folder, path.Base(from))
+	} else if planned, err = nvault.NotePath(req.To); err != nil {
+		return vaultErr(err)
 	}
+	pending, err := relink.Prepare(ed, ws.ix, map[string]string{from: planned})
+	if err != nil {
+		return err
+	}
+	where, stop := ws.bus.Follow()
+	defer stop()
+	to, err := ed.Rename(from, planned)
 	if err != nil {
 		return vaultErr(err)
 	}
 	to = where(to)
+	links, err := pending.Apply(map[string]string{from: to})
+	if err != nil {
+		return vaultErr(err)
+	}
 	cur, _, err := ws.current(ctx, to)
 	if err != nil {
 		return err
 	}
-	info(r).attrs = append(info(r).attrs, "file", to, "from", from, "version", cur.Version)
-	writeJSON(w, http.StatusOK, MoveResponse{From: from, Path: to, Version: cur.Version})
+	info(r).attrs = append(info(r).attrs, "file", to, "from", from, "version", cur.Version, "links_updated", links.Count)
+	writeJSON(w, http.StatusOK, MoveResponse{From: from, Path: to, Version: cur.Version, Links: links})
 	return nil
 }
 
@@ -932,10 +947,12 @@ type RenameFolderRequest struct {
 	To   string `json:"to"`
 }
 
-// RenameFolderResponse is where the folder went.
+// RenameFolderResponse is where the folder went, and the links rewritten
+// to follow it.
 type RenameFolderResponse struct {
-	From string `json:"from"`
-	Path string `json:"path"`
+	From  string        `json:"from"`
+	Path  string        `json:"path"`
+	Links relink.Result `json:"links"`
 }
 
 // apiRenameFolder renames a folder by moving the files in it one by one,
@@ -955,12 +972,26 @@ func (s *Server) apiRenameFolder(w http.ResponseWriter, r *http.Request, p Princ
 	if err != nil {
 		return err
 	}
+	var pending *relink.Pending
+	from, ferr := nvault.CleanPath(req.Path)
+	planned, terr := nvault.CleanPath(req.To)
+	if ferr == nil && terr == nil && from != "" {
+		if pending, err = relink.PrepareFolder(ed, ws.ix, from, planned); err != nil {
+			return err
+		}
+	}
 	to, err := ed.RenameFolder(req.Path, req.To)
 	if err != nil {
 		return vaultErr(err)
 	}
-	info(r).attrs = append(info(r).attrs, "folder", to, "from", req.Path)
-	writeJSON(w, http.StatusOK, RenameFolderResponse{From: req.Path, Path: to})
+	links := relink.Result{Notes: []relink.Changed{}}
+	if pending != nil {
+		if links, err = pending.Apply(nil); err != nil {
+			return vaultErr(err)
+		}
+	}
+	info(r).attrs = append(info(r).attrs, "folder", to, "from", req.Path, "links_updated", links.Count)
+	writeJSON(w, http.StatusOK, RenameFolderResponse{From: req.Path, Path: to, Links: links})
 	return nil
 }
 

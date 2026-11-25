@@ -178,7 +178,12 @@ describe("createHttpClient", () => {
   test("creates, moves, renames and deletes", async () => {
     const f = mockFetch(
       json(note({ path: "Inbox/Ringa elbolaget.md" }), 201),
-      json({ from: "Inbox/Ringa elbolaget.md", path: "Hem/Ringa elbolaget.md", version: 12 }),
+      json({
+        from: "Inbox/Ringa elbolaget.md",
+        path: "Hem/Ringa elbolaget.md",
+        version: 12,
+        links: { count: 1, notes: [{ path: "Att göra.md", links: 1 }] },
+      }),
       json({ from: "Hem/Ringa elbolaget.md", path: "Hem/Elbolaget.md", version: 13 }),
       json({}, 204),
     );
@@ -188,6 +193,7 @@ describe("createHttpClient", () => {
     expect(await c.move("Inbox/Ringa elbolaget.md", "Hem")).toEqual({
       from: "Inbox/Ringa elbolaget.md",
       path: "Hem/Ringa elbolaget.md",
+      links: { count: 1, notes: [{ path: "Att göra.md", links: 1 }] },
     });
     expect(f.call(1).body).toEqual({ path: "Inbox/Ringa elbolaget.md", folder: "Hem" });
     await c.rename("Hem/Ringa elbolaget.md", "Hem/Elbolaget.md");
@@ -199,7 +205,12 @@ describe("createHttpClient", () => {
   test("renames a folder through its own route", async () => {
     const f = mockFetch(json({ from: "Hem", path: "Hus" }));
     const c = client(f);
-    expect(await c.renameFolder("Hem", "Hus")).toEqual({ from: "Hem", path: "Hus" });
+    // A server from before link updates sends no links.
+    expect(await c.renameFolder("Hem", "Hus")).toEqual({
+      from: "Hem",
+      path: "Hus",
+      links: { count: 0, notes: [] },
+    });
     expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/folders/rename");
     expect(f.call(0).body).toEqual({ path: "Hem", to: "Hus" });
   });

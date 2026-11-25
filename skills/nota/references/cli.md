@@ -34,8 +34,9 @@ nota set Plan status=done priority=2 --json             # Values are YAML: 2, tr
 nota set Plan "aliases=[plan, planen]" --unset draft --json
 nota tag --json Plan +nota -draft                       # Without changes: prints the tags.
 nota mv Plan Archive --json                             # Folder is created; / is the root.
+nota mv Plan Projects/Roadmap.md                        # Renames; --no-update-links keeps links.
 nota folder add Projects/Ideas                          # Empty folders, parents too.
-nota folder rename Projects Work                        # Moves every note in it.
+nota folder rename Projects Work                        # Moves every note in it; links follow.
 nota rm Plan                                            # To .trash/; confirm with the user first.
 nota index --rebuild                                    # Only after big outside changes.
 ```

@@ -367,14 +367,8 @@ func (ix *Index) Backlinks(p string) ([]Link, error) {
 	}
 	// Every key a link to p could use: path suffixes, title, aliases.
 	keys := map[string]bool{key(e.Title): true}
-	pk := pathKey(p)
-	for {
-		keys[pk] = true
-		i := strings.IndexByte(pk, '/')
-		if i < 0 {
-			break
-		}
-		pk = pk[i+1:]
+	for _, k := range PathKeys(p) {
+		keys[k] = true
 	}
 	arows, err := ix.db.Query(`SELECT a.alias_key FROM aliases a JOIN notes n ON n.id = a.note_id WHERE n.path = ?`, p)
 	if err != nil {
@@ -431,6 +425,84 @@ func (ix *Index) Backlinks(p string) ([]Link, error) {
 // Resolve resolves a wikilink target as written in the note at from.
 func (ix *Index) Resolve(target, from string) (string, error) {
 	return ix.resolveLink(pathKey(target), from, true)
+}
+
+// ResolveLink resolves a link target as written in the note at from: a
+// wikilink the way Obsidian does, a markdown link (its target already a
+// vault path) only by exact path. It returns "" when no note matches.
+func (ix *Index) ResolveLink(target, from string, wiki bool) (string, error) {
+	return ix.resolveLink(pathKey(target), from, wiki)
+}
+
+// PathKeys returns the lookup keys a wikilink can name the note at p by:
+// the whole path and each of its suffixes, down to the file name.
+func PathKeys(p string) []string {
+	var out []string
+	pk := pathKey(p)
+	for {
+		out = append(out, pk)
+		i := strings.IndexByte(pk, '/')
+		if i < 0 {
+			return out
+		}
+		pk = pk[i+1:]
+	}
+}
+
+// LinkKey is the lookup key of a link target: PathKeys of the note it
+// names by path or file name contain it.
+func LinkKey(target string) string { return pathKey(target) }
+
+// Referrers returns the notes with a link whose target could name a note
+// at any of paths, by path, file name, or (for notes in the index) title
+// or alias, whether or not it resolves there now. It finds the links a
+// move can break or redirect.
+func (ix *Index) Referrers(paths ...string) ([]string, error) {
+	keys := map[string]bool{}
+	for _, p := range paths {
+		for _, k := range PathKeys(p) {
+			keys[k] = true
+		}
+		var title string
+		if err := ix.db.QueryRow(`SELECT title_key FROM notes WHERE path = ?`, p).Scan(&title); err == nil && title != "" {
+			keys[title] = true
+		}
+		rows, err := ix.db.Query(`SELECT a.alias_key FROM aliases a JOIN notes n ON n.id = a.note_id WHERE n.path = ?`, p)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var a string
+			if err := rows.Scan(&a); err == nil {
+				keys[a] = true
+			}
+		}
+		rows.Close()
+	}
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	ph := make([]string, 0, len(keys))
+	args := make([]any, 0, len(keys))
+	for k := range keys {
+		ph = append(ph, "?")
+		args = append(args, k)
+	}
+	rows, err := ix.db.Query(`SELECT DISTINCT n.path FROM links l JOIN notes n ON n.id = l.note_id
+		WHERE l.target_key IN (`+strings.Join(ph, ",")+`) ORDER BY n.path`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // resolveLink finds the note a link points to, the way Obsidian does: an

@@ -16,10 +16,11 @@ nota open --app Plan                           # In the desktop app, in Reading 
 nota open --app ~/Downloads/README.md          # Any .md file: a read-only preview.
 nota set Plan status=done priority=2           # Frontmatter, edited line by line.
 nota tag Plan +nota -draft                     # Flags go before the note.
-nota mv Plan Archive
+nota mv Plan Archive                           # Links to it that would break are rewritten.
+nota mv Plan Projects/Roadmap.md               # A path ending in .md renames.
 nota folder add Projects/Ideas                  # Empty folders, nested paths too.
 nota folder ls                                 # Every folder with its note count.
-nota folder rename Projects Work                # Moves every note in it; links name notes, so none change.
+nota folder rename Projects Work                # Moves every note in it; path links follow.
 nota inbox
 nota ls --view drafts                          # .nota/views/drafts.yaml
 nota plugins                                   # .nota/plugins: themes, or why one is broken
@@ -72,6 +73,25 @@ without the CLI; Nota is offered there but never made the default app for `.md`.
 
 Edits through Nota (`set`, `tag`, the app, MCP, hooks) set `updated` in the frontmatter to the
 current local time, but only in notes that already have frontmatter; `created` is written once
-by `nota add`/`create_note`. `mv` does not touch the file. `nota tag -x` edits the frontmatter
+by `nota add`/`create_note`. `mv` does not touch the moved file, except for its own relative
+links. `nota tag -x` edits the frontmatter
 only: an inline `#x` in the body stays. Frontmatter keys Nota does not know are kept byte for
 byte.
+
+## Moving and renaming
+
+`nota mv`, `nota folder rename`, `move_note` and a rename or move in the app keep every link
+pointing at the same note:
+
+- A link that names the note by its file name (`[[Plan]]`) changes only when the name does.
+- A link with a path (`[[Projects/Plan]]`, `[plan](Projects/Plan.md)`) follows the note, and a
+  moved note's own relative links (`[x](../Other.md)`, `![](img/a.png)`) are rewritten from
+  its new folder. `[[Projects/Plan]]` stays when it still names the note by the end of its path.
+- A link that meant another note with the same name keeps meaning it: when the moved note is now
+  the closer match, `[[Plan]]` becomes `[[Other/Plan]]`.
+- Only the target changes: `#heading`, `#^block`, `|alias` and the `!` of an embed stay as
+  written; a Markdown path keeps its `<…>`, or gets `%20` for spaces without them. Links in code are left alone. Each changed note is saved like an
+  edit, so `updated` moves and sync and hooks see it.
+
+`--no-update-links` turns this off for one command. Without it, the command says on stderr how
+many links changed, and `--json` lists them under `links`.

@@ -11,7 +11,7 @@ import { toast } from "@nota/ui/sonner";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
-import { fail } from "../actions.ts";
+import { fail, reportLinks } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { noteHandlers } from "../editorHandlers.ts";
 import { label } from "../lib/shortcuts.ts";
@@ -171,6 +171,11 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
       const r = await client.rename(path, to);
       useUI.getState().moved(r.from, r.path);
       void qc.invalidateQueries({ queryKey: keys.tree });
+      if (r.links?.count) {
+        // Other notes changed on disk: their cached copies are stale.
+        void qc.invalidateQueries({ queryKey: ["note"] });
+        reportLinks(r.links);
+      }
     } catch {
       // Taken: keep the file name.
     }

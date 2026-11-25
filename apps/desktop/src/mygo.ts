@@ -52,6 +52,12 @@ export interface Appearance {
   captureBackground?: string;
 }
 
+/** Changed is one note whose links were rewritten. */
+export interface Changed {
+  path: string;
+  links: number;
+}
+
 /**
  * Changes tells the frontend which notes changed: by the app itself,
  * the sync engine, a hook, or another program editing the files.
@@ -185,10 +191,14 @@ export interface ListQuery {
   limit?: number;
 }
 
-/** MoveResult is where a moved note went. */
+/**
+ * MoveResult is where a moved note (or folder) went, and the links in
+ * other notes that were rewritten to follow it.
+ */
 export interface MoveResult {
   from: string;
   path: string;
+  links: Result;
 }
 
 /** Note is one note with its content and links. */
@@ -284,6 +294,14 @@ export interface RemoteVault {
   name: string;
   cursor: number;
   created: string;
+}
+
+/** Result says which notes Apply changed. */
+export interface Result {
+  /** Count is the number of links rewritten. */
+  count: number;
+  /** Notes are the changed notes, by their path after the move. */
+  notes: Changed[];
 }
 
 /** SaveOutcome is where a saved file went. */

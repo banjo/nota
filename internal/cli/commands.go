@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"slices"
 	"strconv"
@@ -22,6 +23,7 @@ import (
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/markdown"
 	"github.com/banjo/nota/internal/plugins"
+	"github.com/banjo/nota/internal/relink"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -391,12 +393,22 @@ func firstNonEmpty(ss ...string) string {
 }
 
 func (a *app) mvCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "mv <note> <folder>",
-		Short: "Move a note to another folder",
-		Long: `Move a note into a folder, keeping its file name. Use / for the vault root.
-The file's content is not touched, so its "updated" timestamp stays.`,
-		Args: exactArgs(2, "a note and a folder"),
+	var keepLinks bool
+	cmd := &cobra.Command{
+		Use:   "mv <note> <folder|new-path.md>",
+		Short: "Move or rename a note, and update the links to it",
+		Long: `Move a note into a folder, keeping its file name; use / for the vault root.
+A second argument that ends in .md is the note's new path instead, which
+renames it: nota mv Plan Projects/Roadmap.md.
+
+Links to the note in other notes are rewritten so they still point to it,
+and so are the note's own relative links; only the link targets change.
+The moved file's content is otherwise not touched, so its "updated"
+timestamp stays. --no-update-links leaves every other note as it is.`,
+		Example: `  nota mv Plan Archive
+  nota mv Plan Projects/Roadmap.md
+  nota mv --no-update-links Plan /`,
+		Args: exactArgs(2, "a note and a folder or new path"),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, prefix string) ([]string, cobra.ShellCompDirective) {
 			return a.completeNotes(cmd, args, prefix)
 		},
@@ -405,20 +417,79 @@ The file's content is not touched, so its "updated" timestamp stays.`,
 			if err != nil {
 				return err
 			}
+			var planned string
+			if vault.IsNote(args[1]) {
+				if planned, err = vault.NotePath(args[1]); err != nil {
+					return err
+				}
+			} else {
+				folder, err := vault.CleanPath(args[1])
+				if err != nil {
+					return err
+				}
+				planned = path.Join(folder, path.Base(p))
+			}
+			var pending *relink.Pending
+			if !keepLinks {
+				ix, err := a.index()
+				if err != nil {
+					return err
+				}
+				if pending, err = relink.Prepare(a.vault, ix, map[string]string{p: planned}); err != nil {
+					return err
+				}
+			}
 			where, stop := a.bus.Follow() // moving into the inbox runs inbox.added hooks
-			to, err := a.vault.Move(p, args[1])
+			to, err := a.vault.Rename(p, planned)
 			stop()
 			if err != nil {
 				return err
 			}
 			to = where(to)
+			links, err := a.relink(pending, map[string]string{p: to})
+			if err != nil {
+				return err
+			}
 			if a.json {
-				return a.printJSON(map[string]string{"from": p, "path": to})
+				return a.printJSON(moveOutput{From: p, Path: to, Links: links})
 			}
 			fmt.Fprintln(a.stdout, to)
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&keepLinks, "no-update-links", false, "leave links to the note as they are")
+	return cmd
+}
+
+// moveOutput is the JSON of nota mv and nota folder rename.
+type moveOutput struct {
+	From  string         `json:"from"`
+	Path  string         `json:"path"`
+	Links *relink.Result `json:"links,omitempty"`
+}
+
+// relink rewrites the links a move recorded in pending (nil when links
+// are kept) and tells the user on stderr how many changed.
+func (a *app) relink(pending *relink.Pending, moved map[string]string) (*relink.Result, error) {
+	if pending == nil {
+		return nil, nil
+	}
+	res, err := pending.Apply(moved)
+	if err != nil {
+		return nil, err
+	}
+	a.attrs = append(a.attrs, "links_updated", res.Count, "notes_relinked", len(res.Notes))
+	if !a.json && res.Count > 0 {
+		fmt.Fprintf(a.stderr, "Updated %s in %s.\n", plural(res.Count, "link"), plural(len(res.Notes), "note"))
+	}
+	return &res, nil
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return strconv.Itoa(n) + " " + word + "s"
 }
 
 func (a *app) folderCmd() *cobra.Command {
@@ -483,11 +554,14 @@ into folders with "nota mv", and folders renamed with "nota folder rename".`,
 			return table(a.stdout, rows)
 		},
 	}
+	var keepLinks bool
 	rename := &cobra.Command{
 		Use:   "rename <folder> <new-path>",
 		Short: "Rename a folder, or move it under another one",
 		Long: `Rename a folder by moving every file in it to the new path, so each note
-moves like with "nota mv" (links name notes, not folders, so none change).
+moves like with "nota mv". Links that name a note or a file by its path
+([[Work/Plan]], [plan](Work/Plan.md), ![](Work/img.png)) are rewritten
+to the new path; --no-update-links leaves them as they are.
 The new path is a full vault path: nota folder rename Work Projects, or
 nota folder rename Work Archive/2026 to move it as well.`,
 		Example: `  nota folder rename Projects Work
@@ -501,17 +575,32 @@ nota folder rename Work Archive/2026 to move it as well.`,
 			if err != nil {
 				return err
 			}
+			var pending *relink.Pending
+			if planned, err := vault.CleanPath(args[1]); err == nil && !keepLinks && from != "" {
+				ix, err := a.index()
+				if err != nil {
+					return err
+				}
+				if pending, err = relink.PrepareFolder(a.vault, ix, from, planned); err != nil {
+					return err
+				}
+			}
 			to, err := a.vault.RenameFolder(from, args[1])
 			if err != nil {
 				return err
 			}
+			links, err := a.relink(pending, nil)
+			if err != nil {
+				return err
+			}
 			if a.json {
-				return a.printJSON(map[string]string{"from": from, "path": to})
+				return a.printJSON(moveOutput{From: from, Path: to, Links: links})
 			}
 			fmt.Fprintln(a.stdout, to)
 			return nil
 		},
 	}
+	rename.Flags().BoolVar(&keepLinks, "no-update-links", false, "leave links into the folder as they are")
 	cmd.AddCommand(add, ls, rename)
 	return cmd
 }

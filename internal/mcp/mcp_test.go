@@ -260,6 +260,22 @@ func TestTools(t *testing.T) {
 	}
 }
 
+func TestMoveRewritesLinks(t *testing.T) {
+	cs, m := connect(t, map[string]string{
+		"Projekt/Plan.md": "# Plan\n",
+		"Länk.md":         "[[Projekt/Plan#Mål]] and [plan](Projekt/Plan.md)\n",
+	})
+	var mv MoveOutput
+	call(t, cs, "move_note", map[string]any{"note": "Projekt/Plan.md", "folder": "Arkiv"}, &mv)
+	if mv.Links.Count != 2 || len(mv.Links.Notes) != 1 || mv.Links.Notes[0].Path != "Länk.md" {
+		t.Fatalf("links %+v", mv.Links)
+	}
+	b, err := m.ReadFile("Länk.md")
+	if err != nil || string(b) != "[[Arkiv/Plan#Mål]] and [plan](Arkiv/Plan.md)\n" {
+		t.Fatalf("Länk.md = %q, %v", b, err)
+	}
+}
+
 func TestResources(t *testing.T) {
 	cs, _ := connect(t, map[string]string{"Möten/Möte.md": "---\na: 1\n---\nMöte\n", "Projekt/Plan.md": "---\na: 1\n---\nMöte\n"})
 	ctx := context.Background()

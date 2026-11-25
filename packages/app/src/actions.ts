@@ -1,4 +1,4 @@
-import { type NotesClient, NotaError } from "@nota/client";
+import { type LinksUpdated, type NotesClient, NotaError } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { rememberFolder } from "./lib/folders.ts";
@@ -21,6 +21,20 @@ const message = (e: unknown) =>
 
 export function fail(action: string, e: unknown) {
   toast.error(action, { description: message(e) });
+}
+
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "Updated 3 links in 2 notes", or undefined when a move changed no links. */
+export function linksMessage(links: LinksUpdated | undefined): string | undefined {
+  if (!links?.count) return undefined;
+  return `Updated ${count(links.count, "link")} in ${count(links.notes.length, "note")}`;
+}
+
+/** Tells the user which links a rename or move rewrote, if any. */
+export function reportLinks(links: LinksUpdated | undefined) {
+  const m = linksMessage(links);
+  if (m) toast(m);
 }
 
 /** Where a new note goes: the folder on screen, else the inbox. */
@@ -70,7 +84,11 @@ export async function moveNote(
     useUI.getState().moved(r.from, r.path);
     qc.removeQueries({ queryKey: keys.note(r.from) });
     void qc.invalidateQueries();
-    if (!opts.quiet) toast.success(`Moved to ${folderLabel(folderOf(r.path))}`);
+    if (!opts.quiet)
+      toast.success(`Moved to ${folderLabel(folderOf(r.path))}`, {
+        description: linksMessage(r.links),
+      });
+    else reportLinks(r.links);
     return r;
   } catch (e) {
     fail("Couldn't move the note", e);
@@ -132,6 +150,7 @@ export async function renameFolder(
     useUI.setState({ expanded, route });
     qc.removeQueries({ queryKey: ["note"] });
     void qc.invalidateQueries();
+    reportLinks(r.links);
     return r.path;
   } catch (e) {
     if (inline) inline.onError(message(e));
@@ -172,6 +191,7 @@ export async function renameNote(
       const m = await client.rename(path, to);
       useUI.getState().moved(m.from, m.path);
       qc.removeQueries({ queryKey: keys.note(m.from) });
+      reportLinks(m.links);
       at = m.path;
     }
     void qc.invalidateQueries();

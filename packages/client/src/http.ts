@@ -51,6 +51,9 @@ export interface HttpClientOptions {
 /** The protocol version the client speaks (docs/sync-protocol.md). */
 export const PROTOCOL = "1";
 
+/** What a server that predates link updates answers for a move. */
+const noLinks = { count: 0, notes: [] };
+
 /** Escapes a vault path segment by segment, as protocol.EscapePath does. */
 export function escapePath(p: string): string {
   return p
@@ -251,25 +254,25 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       ),
     create: (input: CreateInput) => request<Note>("POST", "/notes", { body: input }),
     async move(path: string, folder: string): Promise<MoveResult> {
-      const r = await request<{ from: string; path: string }>("POST", "/move", {
+      const r = await request<MoveResult>("POST", "/move", {
         body: { path, folder: folder || "/" },
       });
-      return { from: r.from, path: r.path };
+      return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
     async createFolder(path: string): Promise<string> {
       return (await request<{ path: string }>("POST", "/folders", { body: { path } })).path;
     },
     async renameFolder(path: string, to: string): Promise<MoveResult> {
-      const r = await request<{ from: string; path: string }>("POST", "/folders/rename", {
+      const r = await request<MoveResult>("POST", "/folders/rename", {
         body: { path, to },
       });
-      return { from: r.from, path: r.path };
+      return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
     async rename(path: string, to: string): Promise<MoveResult> {
-      const r = await request<{ from: string; path: string }>("POST", "/move", {
+      const r = await request<MoveResult>("POST", "/move", {
         body: { path, to },
       });
-      return { from: r.from, path: r.path };
+      return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
     async remove(path: string) {
       await request("DELETE", `/notes/${escapePath(path)}`);
