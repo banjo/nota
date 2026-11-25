@@ -1,4 +1,4 @@
-import type { Base, ListQuery, Note, NotesClient } from "@nota/client";
+import type { Base, ListQuery, Note, NotesClient, Tree } from "@nota/client";
 import {
   keepPreviousData,
   type QueryClient,
@@ -33,6 +33,18 @@ export const useTree = () => {
   const c = useClient();
   return useQuery({ queryKey: keys.tree, queryFn: () => c.tree() });
 };
+/**
+ * One value from the tree, e.g. the inbox's name. The component re-renders
+ * when that value changes, not on every tree refetch (each save, rename
+ * and change event refetches the tree).
+ */
+export const useTreeValue = <T>(select: (tree: Tree) => T) => {
+  const c = useClient();
+  return useQuery({ queryKey: keys.tree, queryFn: () => c.tree(), select }).data;
+};
+/** The inbox folder's name, "Inbox" until the tree is in. */
+export const useInboxName = () => useTreeValue(inboxOf) ?? "Inbox";
+const inboxOf = (t: Tree) => t.inbox;
 export const useInbox = () => {
   const c = useClient();
   return useQuery({ queryKey: keys.inbox, queryFn: () => c.inbox() });

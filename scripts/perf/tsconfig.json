@@ -1,0 +1,14 @@
+{
+  "extends": "../../packages/app/tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "paths": {
+      "@nota/app": ["../../packages/app/src/index.ts"],
+      "@nota/client": ["../../packages/client/src/index.ts"],
+      "react": ["../../apps/web/node_modules/@types/react"],
+      "react/*": ["../../apps/web/node_modules/@types/react/*"],
+      "react-dom/client": ["../../apps/web/node_modules/@types/react-dom/client"]
+    }
+  },
+  "include": ["app"]
+}

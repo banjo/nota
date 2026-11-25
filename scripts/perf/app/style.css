@@ -1,0 +1,8 @@
+@import "@nota/ui/styles.css";
+@source "./";
+
+html,
+body,
+#root {
+  height: 100%;
+}

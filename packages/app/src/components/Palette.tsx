@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@nota/ui/
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Folder, FolderPlus, FolderRoot, Inbox, Plus } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   addFolder,
   addFolderThenNote,
@@ -32,9 +32,13 @@ import {
 } from "../lib/folders.ts";
 import { folderLabel, folderOf } from "../lib/notes.ts";
 import { label } from "../lib/shortcuts.ts";
-import { useList, useSearch, useTree } from "../queries.ts";
-import { type CommandContext, useContributions } from "../registry.ts";
-import { currentPath, useUI } from "../state.ts";
+import { useList, useSearch, useTree, useTreeValue } from "../queries.ts";
+import {
+  type Command as RegisteredCommand,
+  type CommandContext,
+  useContributions,
+} from "../registry.ts";
+import { currentPath, type PaletteMode, useUI } from "../state.ts";
 
 // ⌘K (the "Fokus" prototype): search notes, run commands, move notes.
 // It opens instantly: keyboard-driven, used all day, so no animation.
@@ -49,23 +53,48 @@ function useDebounced(value: string, ms: number) {
   return v;
 }
 
-function NoteItem({
+// Rows are memoised: a keystroke re-renders the rows whose note or
+// command changed, not every row in the list.
+
+const NoteItem = memo(function NoteItem({
   note,
-  onSelect,
-  value,
+  open,
 }: {
   note: NoteInfo;
-  onSelect: () => void;
-  value: string;
+  open: (path: string) => void;
 }) {
   return (
-    <CommandItem value={value} onSelect={onSelect}>
+    <CommandItem value={`note:${note.path}`} onSelect={() => open(note.path)}>
       <FileText className="size-[15px]" strokeWidth={1.75} />
       <span className="min-w-0 flex-1 truncate">{note.title}</span>
       <span className="ml-3 shrink-0 text-small text-faint">{folderLabel(note.folder)}</span>
     </CommandItem>
   );
-}
+});
+
+const CommandRow = memo(function CommandRow({
+  command: c,
+  ctx,
+  close,
+}: {
+  command: RegisteredCommand;
+  ctx: CommandContext;
+  close: () => void;
+}) {
+  return (
+    <CommandItem
+      value={`cmd:${c.id}`}
+      onSelect={() => {
+        close();
+        void c.run(ctx);
+      }}
+    >
+      {c.icon ? <c.icon className="size-[15px]" strokeWidth={1.75} /> : null}
+      <span className="flex-1 truncate">{c.title}</span>
+      {c.shortcut ? <CommandShortcut>{label(c.shortcut)}</CommandShortcut> : null}
+    </CommandItem>
+  );
+});
 
 function SearchMode({ query, close }: { query: string; close: () => void }) {
   const client = useClient();
@@ -79,17 +108,20 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
   const route = useUI((s) => s.route);
   const q = fold(query.trim());
 
-  const ctx: CommandContext = {
-    client,
-    queryClient: qc,
-    route,
-    notePath: currentPath(route),
-    navigate,
-  };
-  const open = (path: string) => {
-    close();
-    navigate({ kind: "note", path });
-  };
+  // Stable between keystrokes, so the memoised rows skip re-rendering.
+  // Spelled out rather than left to the React Compiler: measured, the rows
+  // re-rendered on every keystroke without it.
+  const ctx = useMemo<CommandContext>(
+    () => ({ client, queryClient: qc, route, notePath: currentPath(route), navigate }),
+    [client, qc, route, navigate],
+  );
+  const open = useCallback(
+    (path: string) => {
+      close();
+      navigate({ kind: "note", path });
+    },
+    [close, navigate],
+  );
 
   // Titles match instantly from the tree; full text follows from the index.
   const notes = useMemo(() => {
@@ -111,30 +143,14 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
       {notes.length ? (
         <CommandGroup heading={q ? "Notes" : "Recent"}>
           {notes.map((n) => (
-            <NoteItem
-              key={n.path}
-              note={n}
-              value={`note:${n.path}`}
-              onSelect={() => open(n.path)}
-            />
+            <NoteItem key={n.path} note={n} open={open} />
           ))}
         </CommandGroup>
       ) : null}
       {cmds.length ? (
         <CommandGroup heading="Commands">
           {cmds.map((c) => (
-            <CommandItem
-              key={c.id}
-              value={`cmd:${c.id}`}
-              onSelect={() => {
-                close();
-                void c.run(ctx);
-              }}
-            >
-              {c.icon ? <c.icon className="size-[15px]" strokeWidth={1.75} /> : null}
-              <span className="flex-1 truncate">{c.title}</span>
-              {c.shortcut ? <CommandShortcut>{label(c.shortcut)}</CommandShortcut> : null}
-            </CommandItem>
+            <CommandRow key={c.id} command={c} ctx={ctx} close={close} />
           ))}
         </CommandGroup>
       ) : null}
@@ -297,13 +313,12 @@ function NewFolderMode({ query, base, close }: { query: string; base: string; cl
 export function Palette() {
   const palette = useUI((s) => s.palette);
   const closePalette = useUI((s) => s.closePalette);
-  const tree = useTree();
-  const [query, setQuery] = useState("");
-  const deferred = useDeferredValue(query);
   const moving = palette.mode === "move" && palette.path ? palette.path : undefined;
-  const movingTitle = moving
-    ? (tree.data?.notes.find((n) => n.path === moving)?.title ?? moving)
-    : "";
+  // Only the moved note's title: the closed palette ignores tree refetches.
+  const movingTitle =
+    useTreeValue((t) => (moving ? t.notes.find((n) => n.path === moving)?.title : undefined)) ??
+    moving ??
+    "";
   // A "move" palette without a note has nothing to move: fall back to search.
   const mode = palette.mode === "move" && !moving ? "all" : palette.mode;
   const fileName = useOpened(
@@ -326,10 +341,6 @@ export function Palette() {
     moveExternal: `Move “${fileName}” into folder…`,
   }[mode];
 
-  useEffect(() => {
-    if (palette.open) setQuery("");
-  }, [palette.open, palette.mode]);
-
   return (
     <Dialog open={palette.open} onOpenChange={(o) => !o && closePalette()}>
       <DialogContent
@@ -346,47 +357,76 @@ export function Palette() {
         <DialogDescription id="palette-help" className="sr-only">
           Type to search; arrow keys select, Enter opens, Escape closes.
         </DialogDescription>
-        <Command shouldFilter={false} loop className="max-[720px]:min-h-0 max-[720px]:flex-1">
-          <CommandInput
-            value={query}
-            onValueChange={setQuery}
-            placeholder={placeholder}
-            enterKeyHint="go"
-            trailing={
-              <button
-                type="button"
-                onClick={closePalette}
-                className="-mr-2 hidden h-11 shrink-0 px-2 text-[16px] text-ink outline-none active:opacity-60 max-[720px]:block"
-              >
-                Cancel
-              </button>
-            }
-          />
-          <CommandList className="max-[720px]:max-h-none max-[720px]:min-h-0 max-[720px]:flex-1">
-            {mode === "newFolder" ? null : <CommandEmpty>Nothing found</CommandEmpty>}
-            {mode === "saveExternal" || mode === "moveExternal" ? (
-              <FolderMode
-                query={deferred}
-                external={{ id: palette.path ?? "", move: mode === "moveExternal" }}
-                close={closePalette}
-              />
-            ) : mode === "move" ? (
-              <FolderMode query={deferred} path={moving} close={closePalette} />
-            ) : mode === "noteIn" ? (
-              <FolderMode query={deferred} close={closePalette} />
-            ) : mode === "newFolder" ? (
-              <NewFolderMode query={deferred} base={palette.path ?? ""} close={closePalette} />
-            ) : (
-              <SearchMode query={deferred} close={closePalette} />
-            )}
-          </CommandList>
-          <div className="flex gap-3.5 border-t border-divider px-3.5 py-[9px] text-micro text-faint max-[720px]:hidden">
-            <span>↑↓ select</span>
-            <span>↵ open</span>
-            <span>esc close</span>
-          </div>
-        </Command>
+        {/* Mounted while open, once per mode: each open starts from an
+            empty query, and typing re-renders this, not the dialog. */}
+        <PaletteBody
+          key={palette.mode}
+          mode={mode}
+          path={palette.path}
+          moving={moving}
+          placeholder={placeholder}
+          close={closePalette}
+        />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PaletteBody({
+  mode,
+  path,
+  moving,
+  placeholder,
+  close,
+}: {
+  mode: PaletteMode;
+  path?: string;
+  moving?: string;
+  placeholder: string;
+  close: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query);
+  return (
+    <Command shouldFilter={false} loop className="max-[720px]:min-h-0 max-[720px]:flex-1">
+      <CommandInput
+        value={query}
+        onValueChange={setQuery}
+        placeholder={placeholder}
+        enterKeyHint="go"
+        trailing={
+          <button
+            type="button"
+            onClick={close}
+            className="-mr-2 hidden h-11 shrink-0 px-2 text-[16px] text-ink outline-none active:opacity-60 max-[720px]:block"
+          >
+            Cancel
+          </button>
+        }
+      />
+      <CommandList className="max-[720px]:max-h-none max-[720px]:min-h-0 max-[720px]:flex-1">
+        {mode === "newFolder" ? null : <CommandEmpty>Nothing found</CommandEmpty>}
+        {mode === "saveExternal" || mode === "moveExternal" ? (
+          <FolderMode
+            query={deferred}
+            external={{ id: path ?? "", move: mode === "moveExternal" }}
+            close={close}
+          />
+        ) : mode === "move" ? (
+          <FolderMode query={deferred} path={moving} close={close} />
+        ) : mode === "noteIn" ? (
+          <FolderMode query={deferred} close={close} />
+        ) : mode === "newFolder" ? (
+          <NewFolderMode query={deferred} base={path ?? ""} close={close} />
+        ) : (
+          <SearchMode query={deferred} close={close} />
+        )}
+      </CommandList>
+      <div className="flex gap-3.5 border-t border-divider px-3.5 py-[9px] text-micro text-faint max-[720px]:hidden">
+        <span>↑↓ select</span>
+        <span>↵ open</span>
+        <span>esc close</span>
+      </div>
+    </Command>
   );
 }

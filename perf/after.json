@@ -1,0 +1,622 @@
+{
+  "meta": {
+    "date": "2026-11-24T23:11:14.180Z",
+    "commit": "f8b4bbe",
+    "runs": 3,
+    "chromium": "159.0.8154.6",
+    "react": "production build (react-dom production bundle), app code unminified, React Compiler on",
+    "client": "in-memory NotesClient (scripts/perf/app/memory-client.ts), desktop-style change events",
+    "viewport": "1440x900 @1x, headless"
+  },
+  "scenarios": {
+    "a": {
+      "name": "cold load → first note visible",
+      "median": {
+        "commits": 10,
+        "renders": 357,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 106,
+        "taskMs": 168,
+        "readyMs": 186
+      },
+      "top": [
+        ["ForwardRef", 60],
+        ["Row", 15],
+        ["IconButton", 13],
+        ["ChevronRight", 11],
+        ["Ellipsis", 10],
+        ["Presence", 9],
+        ["Primitive.div", 8],
+        ["FolderPlus", 7],
+        ["Dialog", 6],
+        ["FilePlusCorner", 6],
+        ["FolderRow", 6],
+        ["MenuProvider", 6],
+        ["Folder", 5],
+        ["FolderActions", 5],
+        ["FolderRowActions", 5]
+      ],
+      "runs": [
+        {
+          "commits": 10,
+          "renders": 357,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 106,
+          "taskMs": 168,
+          "readyMs": 199,
+          "errors": []
+        },
+        {
+          "commits": 10,
+          "renders": 357,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 108,
+          "taskMs": 170,
+          "readyMs": 186,
+          "errors": []
+        },
+        {
+          "commits": 10,
+          "renders": 357,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 104,
+          "taskMs": 162,
+          "readyMs": 178,
+          "errors": []
+        }
+      ]
+    },
+    "b": {
+      "name": "open 10 notes via sidebar",
+      "median": {
+        "commits": 30,
+        "renders": 600,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 64,
+        "taskMs": 188
+      },
+      "top": [
+        ["ForwardRef", 70],
+        ["NoteMenu", 30],
+        ["DropdownMenu", 20],
+        ["DropdownMenuTrigger", 20],
+        ["MenuProvider", 20],
+        ["NotePage", 20],
+        ["NoteRow", 20],
+        ["Popper", 20],
+        ["PopperAnchor", 20],
+        ["PopperProvider", 20],
+        ["Primitive.button", 20],
+        ["Primitive.div", 20],
+        ["Primitive.div.Slot", 20],
+        ["Row", 20],
+        ["TopBar", 20]
+      ],
+      "runs": [
+        {
+          "commits": 30,
+          "renders": 600,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 64,
+          "taskMs": 188,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 600,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 64,
+          "taskMs": 188,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 600,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 65,
+          "taskMs": 196,
+          "errors": []
+        }
+      ]
+    },
+    "b-2000": {
+      "name": "open 10 notes via sidebar (2000 notes)",
+      "median": {
+        "commits": 30,
+        "renders": 597,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 58,
+        "taskMs": 176
+      },
+      "top": [
+        ["ForwardRef", 70],
+        ["NoteMenu", 29],
+        ["DropdownMenu", 20],
+        ["DropdownMenuTrigger", 20],
+        ["MenuProvider", 20],
+        ["NotePage", 20],
+        ["Popper", 20],
+        ["PopperAnchor", 20],
+        ["PopperProvider", 20],
+        ["Primitive.button", 20],
+        ["Primitive.div", 20],
+        ["Primitive.div.Slot", 20],
+        ["TopBar", 20],
+        ["NoteRow", 19],
+        ["Row", 19]
+      ],
+      "runs": [
+        {
+          "commits": 30,
+          "renders": 597,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 58,
+          "taskMs": 177,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 597,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 57,
+          "taskMs": 176,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 597,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 58,
+          "taskMs": 176,
+          "errors": []
+        }
+      ]
+    },
+    "c": {
+      "name": "type 60 chars in a note",
+      "median": {
+        "commits": 4,
+        "renders": 11,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 137,
+        "taskMs": 371
+      },
+      "top": [
+        ["BacklinksPanel", 2],
+        ["NavSection", 2],
+        ["FolderTree", 1],
+        ["NoteEditor", 1],
+        ["NotePage", 1],
+        ["NoteRow", 1],
+        ["PropertiesSection", 1],
+        ["Row", 1],
+        ["TopBar", 1]
+      ],
+      "runs": [
+        {
+          "commits": 4,
+          "renders": 11,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 138,
+          "taskMs": 371,
+          "errors": []
+        },
+        {
+          "commits": 4,
+          "renders": 11,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 137,
+          "taskMs": 371,
+          "errors": []
+        },
+        {
+          "commits": 4,
+          "renders": 11,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 133,
+          "taskMs": 367,
+          "errors": []
+        }
+      ]
+    },
+    "d": {
+      "name": "⌘K: open, type query, ↓×5, close",
+      "median": {
+        "commits": 49,
+        "renders": 865,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 48,
+        "taskMs": 117
+      },
+      "top": [
+        ["ForwardRef", 269],
+        ["Primitive.div", 194],
+        ["CommandItem", 63],
+        ["CommandRow", 31],
+        ["NoteItem", 25],
+        ["FileText", 24],
+        ["CommandGroup", 22],
+        ["Primitive.input", 20],
+        ["Presence", 18],
+        ["Palette", 17],
+        ["CommandShortcut", 14],
+        ["Command", 13],
+        ["PaletteBody", 13],
+        ["SearchMode", 10],
+        ["Primitive.div.Slot", 9]
+      ],
+      "runs": [
+        {
+          "commits": 52,
+          "renders": 910,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 49,
+          "taskMs": 117,
+          "errors": []
+        },
+        {
+          "commits": 49,
+          "renders": 865,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 46,
+          "taskMs": 115,
+          "errors": []
+        },
+        {
+          "commits": 49,
+          "renders": 865,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 48,
+          "taskMs": 119,
+          "errors": []
+        }
+      ]
+    },
+    "e": {
+      "name": "expand/collapse 5 folders, toggle sidebar",
+      "median": {
+        "commits": 36,
+        "renders": 394,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 40,
+        "taskMs": 155
+      },
+      "top": [
+        ["ForwardRef", 80],
+        ["Row", 32],
+        ["Ellipsis", 22],
+        ["Primitive.div", 22],
+        ["FileText", 17],
+        ["NoteMenu", 17],
+        ["NoteRow", 17],
+        ["Presence", 17],
+        ["ChevronRight", 15],
+        ["FolderRow", 15],
+        ["ScrollAreaScrollbarImpl", 13],
+        ["ScrollAreaScrollbarProvider", 13],
+        ["ScrollAreaScrollbarVisible", 13],
+        ["ScrollAreaScrollbarY", 13],
+        ["FolderTree", 12]
+      ],
+      "runs": [
+        {
+          "commits": 36,
+          "renders": 394,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 40,
+          "taskMs": 157,
+          "errors": []
+        },
+        {
+          "commits": 36,
+          "renders": 394,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 38,
+          "taskMs": 153,
+          "errors": []
+        },
+        {
+          "commits": 36,
+          "renders": 394,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 40,
+          "taskMs": 155,
+          "errors": []
+        }
+      ]
+    },
+    "e-2000": {
+      "name": "expand/collapse 5 folders, toggle sidebar (2000 notes)",
+      "median": {
+        "commits": 11,
+        "renders": 2286,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 45,
+        "taskMs": 155
+      },
+      "top": [
+        ["ForwardRef", 665],
+        ["Row", 290],
+        ["Ellipsis", 280],
+        ["FileText", 252],
+        ["NoteMenu", 252],
+        ["NoteRow", 252],
+        ["IconButton", 56],
+        ["ChevronRight", 38],
+        ["FolderRow", 38],
+        ["Folder", 29],
+        ["FilePlusCorner", 28],
+        ["FolderActions", 28],
+        ["FolderPlus", 28],
+        ["FolderRowActions", 28],
+        ["FolderTree", 10]
+      ],
+      "runs": [
+        {
+          "commits": 11,
+          "renders": 2286,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 48,
+          "taskMs": 157,
+          "errors": []
+        },
+        {
+          "commits": 11,
+          "renders": 2286,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 45,
+          "taskMs": 155,
+          "errors": []
+        },
+        {
+          "commits": 11,
+          "renders": 2286,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 45,
+          "taskMs": 148,
+          "errors": []
+        }
+      ]
+    },
+    "f": {
+      "name": "properties: add tag chip, change status",
+      "median": {
+        "commits": 30,
+        "renders": 445,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 27,
+        "taskMs": 101
+      },
+      "top": [
+        ["Primitive.div", 41],
+        ["Primitive.div.Slot", 22],
+        ["ForwardRef", 14],
+        ["Presence", 13],
+        ["MenuProvider", 12],
+        ["Primitive.span", 12],
+        ["Primitive.span.Slot", 12],
+        ["RovingFocusGroupCollectionItemSlot", 12],
+        ["RovingFocusGroupCollectionItemSlot.Slot", 12],
+        ["RovingFocusGroupItem", 12],
+        ["MenuCollectionItemSlot", 9],
+        ["MenuCollectionItemSlot.Slot", 9],
+        ["MenuItemImpl", 9],
+        ["AddInline", 8],
+        ["DropdownMenuItem", 8]
+      ],
+      "runs": [
+        {
+          "commits": 30,
+          "renders": 445,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 30,
+          "taskMs": 112,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 445,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 27,
+          "taskMs": 100,
+          "errors": []
+        },
+        {
+          "commits": 30,
+          "renders": 445,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 26,
+          "taskMs": 101,
+          "errors": []
+        }
+      ]
+    },
+    "g": {
+      "name": "modes Live/Reading/Source, dark mode, palette",
+      "median": {
+        "commits": 191,
+        "renders": 3337,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 132,
+        "taskMs": 484
+      },
+      "top": [
+        ["ForwardRef", 995],
+        ["Primitive.div", 725],
+        ["CommandItem", 203],
+        ["CommandRow", 124],
+        ["CommandGroup", 91],
+        ["Primitive.input", 88],
+        ["Command", 86],
+        ["PaletteBody", 86],
+        ["Presence", 72],
+        ["Palette", 68],
+        ["CommandShortcut", 65],
+        ["SearchMode", 46],
+        ["CommandInput", 45],
+        ["CommandList", 45],
+        ["NoteItem", 42]
+      ],
+      "runs": [
+        {
+          "commits": 193,
+          "renders": 3337,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 134,
+          "taskMs": 487,
+          "errors": []
+        },
+        {
+          "commits": 190,
+          "renders": 3287,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 129,
+          "taskMs": 481,
+          "errors": []
+        },
+        {
+          "commits": 191,
+          "renders": 3337,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 132,
+          "taskMs": 484,
+          "errors": []
+        }
+      ]
+    },
+    "h": {
+      "name": "idle 5 s after load",
+      "median": {
+        "commits": 0,
+        "renders": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 0,
+        "taskMs": 0
+      },
+      "top": [],
+      "runs": [
+        {
+          "commits": 0,
+          "renders": 0,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 0,
+          "taskMs": 0,
+          "errors": []
+        },
+        {
+          "commits": 0,
+          "renders": 0,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 0,
+          "taskMs": 0,
+          "errors": []
+        },
+        {
+          "commits": 0,
+          "renders": 0,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 0,
+          "taskMs": 0,
+          "errors": []
+        }
+      ]
+    },
+    "i": {
+      "name": "5000-line note: open, scroll, type",
+      "median": {
+        "commits": 7,
+        "renders": 69,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "scriptMs": 316,
+        "taskMs": 611
+      },
+      "top": [
+        ["ForwardRef", 6],
+        ["BacklinksPanel", 3],
+        ["NoteMenu", 3],
+        ["NotePage", 3],
+        ["NoteRow", 3],
+        ["Row", 3],
+        ["TopBar", 3],
+        ["DropdownMenu", 2],
+        ["DropdownMenuTrigger", 2],
+        ["MenuProvider", 2],
+        ["NavSection", 2],
+        ["NoteEditor", 2],
+        ["Popper", 2],
+        ["PopperAnchor", 2],
+        ["PopperProvider", 2]
+      ],
+      "runs": [
+        {
+          "commits": 7,
+          "renders": 69,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 318,
+          "taskMs": 611,
+          "errors": []
+        },
+        {
+          "commits": 7,
+          "renders": 69,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 315,
+          "taskMs": 611,
+          "errors": []
+        },
+        {
+          "commits": 7,
+          "renders": 69,
+          "longTasks": 0,
+          "longTaskMs": 0,
+          "scriptMs": 316,
+          "taskMs": 610,
+          "errors": []
+        }
+      ]
+    }
+  }
+}
