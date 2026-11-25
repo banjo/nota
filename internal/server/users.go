@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -216,14 +217,14 @@ func BlobPath(dir, hash string) string {
 // and index of each of the user's vaults, and the blob files no one
 // references any more. It returns how many blob files went and their
 // bytes.
-func RemoveUserData(ctx context.Context, st *Store, dataDir string, rm UserRemoval) (files int, bytes int64, err error) {
+func RemoveUserData(ctx context.Context, st *Store, blobs BlobStore, dataDir string, rm UserRemoval) (files int, bytes int64, err error) {
 	var errs []error
 	for _, v := range rm.Vaults {
 		if err := os.RemoveAll(filepath.Join(dataDir, "vaults", fmt.Sprint(v.ID))); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	files, bytes, err = removeBlobFiles(ctx, st, dataDir, rm.blobHashes)
+	files, bytes, err = removeBlobFiles(ctx, st, blobs, rm.blobHashes)
 	return files, bytes, errors.Join(append(errs, err)...)
 }
 
@@ -231,18 +232,18 @@ func RemoveUserData(ctx context.Context, st *Store, dataDir string, rm UserRemov
 // working copy and index, and the blob files that lost their last
 // reference. A running server must close its working copy first
 // (Server.RemoveVault does).
-func RemoveVaultData(ctx context.Context, st *Store, dataDir string, rm VaultRemoval) (files int, bytes int64, err error) {
+func RemoveVaultData(ctx context.Context, st *Store, blobs BlobStore, dataDir string, rm VaultRemoval) (files int, bytes int64, err error) {
 	var errs []error
 	if err := os.RemoveAll(filepath.Join(dataDir, "vaults", fmt.Sprint(rm.Vault.ID))); err != nil {
 		errs = append(errs, err)
 	}
-	files, bytes, err = removeBlobFiles(ctx, st, dataDir, rm.blobHashes)
+	files, bytes, err = removeBlobFiles(ctx, st, blobs, rm.blobHashes)
 	return files, bytes, errors.Join(append(errs, err)...)
 }
 
-// removeBlobFiles removes the blob files of hashes that nothing
-// references any more.
-func removeBlobFiles(ctx context.Context, st *Store, dataDir string, hashes []string) (files int, bytes int64, err error) {
+// removeBlobFiles removes the blobs of hashes that nothing references
+// any more.
+func removeBlobFiles(ctx context.Context, st *Store, blobs BlobStore, hashes []string) (files int, bytes int64, err error) {
 	var errs []error
 	for _, h := range hashes {
 		// Someone may have referenced the hash since the commit (a
@@ -250,23 +251,19 @@ func removeBlobFiles(ctx context.Context, st *Store, dataDir string, hashes []st
 		if blobReferenced(ctx, st.db, h) {
 			continue
 		}
-		p := BlobPath(filepath.Join(dataDir, "blobs"), h)
-		if p == "" {
-			continue
-		}
-		fi, err := os.Stat(p)
+		b, err := blobs.Stat(ctx, h)
 		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
+			if !errors.Is(err, fs.ErrNotExist) {
 				errs = append(errs, err)
 			}
 			continue
 		}
-		if err := os.Remove(p); err != nil {
+		if err := blobs.Delete(ctx, h); err != nil {
 			errs = append(errs, err)
 			continue
 		}
 		files++
-		bytes += fi.Size()
+		bytes += b.Size
 	}
 	return files, bytes, errors.Join(errs...)
 }

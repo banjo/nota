@@ -389,6 +389,10 @@ Settings › Vaults.`,
 			if err != nil {
 				return err
 			}
+			blobs, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
 			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
 				u, err := st.UserByEmail(ctx, args[0])
 				if err != nil {
@@ -398,7 +402,7 @@ Settings › Vaults.`,
 				if err != nil {
 					return serverErr(err)
 				}
-				if _, _, err := server.RemoveVaultData(ctx, st, dir, rm); err != nil {
+				if _, _, err := server.RemoveVaultData(ctx, st, blobs, dir, rm); err != nil {
 					fmt.Fprintf(a.stderr, "nota: vault %s is deleted, but cleaning up its files failed: %v\n", args[1], err)
 				}
 				if a.json {
@@ -443,8 +447,12 @@ Run it from a timer or by hand.`,
 			if err != nil {
 				return err
 			}
+			blobs, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
 			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
-				res, err := st.CollectBlobs(ctx, filepath.Join(dir, "blobs"), server.BlobGC{DryRun: dryRun, MinAge: minAge})
+				res, err := st.CollectBlobs(ctx, blobs, server.BlobGC{DryRun: dryRun, MinAge: minAge})
 				if err != nil {
 					return err
 				}
@@ -624,6 +632,11 @@ func signupLink(code string) string {
 	return o[0] + "/app/signup?invite=" + code
 }
 
+// blobStore opens the server's blob store: <data>/blobs.
+func blobStore(dataDir string) (server.BlobStore, error) {
+	return server.NewDiskBlobs(filepath.Join(dataDir, "blobs"))
+}
+
 // withStore opens the data directory for an admin command.
 func (a *app) withStore(f *serveFlags, fn func(context.Context, *server.Store) error) error {
 	dir, err := f.dataDir()
@@ -723,6 +736,10 @@ it only prints what it would remove. This cannot be undone.`,
 			if err != nil {
 				return err
 			}
+			blobs, err := blobStore(dir)
+			if err != nil {
+				return err
+			}
 			return a.withStore(f, func(ctx context.Context, st *server.Store) error {
 				rmv, err := st.PlanUserRemoval(ctx, args[0])
 				if err != nil {
@@ -735,7 +752,7 @@ it only prints what it would remove. This cannot be undone.`,
 				if rmv, err = st.DeleteUser(ctx, args[0]); err != nil {
 					return serverErr(err)
 				}
-				files, bytes, err := server.RemoveUserData(ctx, st, dir, rmv)
+				files, bytes, err := server.RemoveUserData(ctx, st, blobs, dir, rmv)
 				rmv.BlobsReclaimed, rmv.BytesReclaimed = files, bytes
 				a.printRemoval(rmv, true)
 				return err

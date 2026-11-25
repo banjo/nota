@@ -10,8 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -415,14 +413,11 @@ func TestBlobDedupeAndSizeLimit(t *testing.T) {
 		}
 	}
 	var n int
-	filepath.Walk(filepath.Join(dir, "blobs"), func(p string, fi os.FileInfo, _ error) error {
-		if !fi.IsDir() && filepath.Base(filepath.Dir(p)) != "tmp" {
-			n++
-		}
-		return nil
-	})
+	if err := e.srv.blobs.Walk(context.Background(), func(BlobInfo) error { n++; return nil }); err != nil {
+		t.Fatal(err)
+	}
 	if n != 1 {
-		t.Fatalf("%d blobs on disk, want 1", n)
+		t.Fatalf("%d blobs stored, want 1", n)
 	}
 	st, _, perr := e.put(tok, "big.png", 0, strings.Repeat("x", 1001))
 	if st != 413 || perr.Code != protocol.CodeTooLarge {

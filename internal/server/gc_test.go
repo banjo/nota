@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"errors"
+	"io/fs"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,10 +16,28 @@ import (
 // version (or a file) still points at, including the content of a
 // deleted path, whose tombstone keeps its history readable.
 func TestCollectBlobs(t *testing.T) {
-	e := newEnv(t, Config{})
+	for name, blobs := range blobStores(t) {
+		t.Run(name, func(t *testing.T) { testCollectBlobs(t, blobs) })
+	}
+}
+
+func testCollectBlobs(t *testing.T, blobs func(t *testing.T, dataDir string) BlobStore) {
+	dataDir := t.TempDir()
+	e := newEnv(t, Config{DataDir: dataDir, Blobs: blobs(t, dataDir)})
 	ctx := context.Background()
 	tok := e.user("gc@example.com")
-	blobDir := filepath.Join(e.srv.cfg.DataDir, "blobs")
+	exists := func(h string) bool {
+		_, err := e.srv.blobs.Stat(ctx, h)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			t.Fatal(err)
+		}
+		return err == nil
+	}
+	store := func(content string) {
+		if _, _, err := e.srv.blobs.Put(ctx, strings.NewReader(content), 0); err != nil {
+			t.Fatal(err)
+		}
+	}
 	const keep, hist = "keep me\n", "deleted but in history\n"
 	if code, _, perr := e.put(tok, "keep.md", 0, keep); code != 200 {
 		t.Fatalf("put keep: %d %v", code, perr)
@@ -47,17 +66,11 @@ func TestCollectBlobs(t *testing.T) {
 	}
 	// A file nothing knows about, as a crashed upload leaves it.
 	const orphan = "orphan bytes\n"
-	op := BlobPath(blobDir, hashOf(orphan))
-	if err := os.MkdirAll(filepath.Dir(op), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(op, []byte(orphan), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	store(orphan)
 
 	wantBytes := int64(len(scratch) + len(orphan))
 	future := time.Now().Add(2 * time.Hour) // older than the grace
-	dry, err := e.srv.Store().CollectBlobs(ctx, blobDir, BlobGC{DryRun: true, Now: future})
+	dry, err := e.srv.Store().CollectBlobs(ctx, e.srv.blobs, BlobGC{DryRun: true, Now: future})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,15 +78,15 @@ func TestCollectBlobs(t *testing.T) {
 		t.Fatalf("dry run: %+v, want rows 1 files 2 orphans 1 bytes %d", dry, wantBytes)
 	}
 	for _, h := range []string{hashOf(scratch), hashOf(orphan)} {
-		if _, err := os.Stat(BlobPath(blobDir, h)); err != nil {
-			t.Fatalf("dry run removed %s: %v", h, err)
+		if !exists(h) {
+			t.Fatalf("dry run removed %s", h)
 		}
 	}
 	if n, _ := countRows(ctx, e.srv.Store().db, `SELECT count(*) FROM blobs WHERE hash = ?`, hashOf(scratch)); n != 1 {
 		t.Fatalf("dry run changed rows: %d", n)
 	}
 
-	res, err := e.srv.Store().CollectBlobs(ctx, blobDir, BlobGC{Now: future})
+	res, err := e.srv.Store().CollectBlobs(ctx, e.srv.blobs, BlobGC{Now: future})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +94,8 @@ func TestCollectBlobs(t *testing.T) {
 		t.Fatalf("gc: %+v, want rows 1 files 2 bytes %d", res, wantBytes)
 	}
 	for _, h := range []string{hashOf(scratch), hashOf(orphan)} {
-		if _, err := os.Stat(BlobPath(blobDir, h)); !os.IsNotExist(err) {
-			t.Fatalf("%s still there: %v", h, err)
+		if exists(h) {
+			t.Fatalf("%s still there", h)
 		}
 	}
 	if n, _ := countRows(ctx, e.srv.Store().db, `SELECT count(*) FROM blobs WHERE hash = ?`, hashOf(scratch)); n != 0 {
@@ -91,8 +104,8 @@ func TestCollectBlobs(t *testing.T) {
 	// Live content survives: the current file and the history of the
 	// deleted path.
 	for h := range map[string]bool{hashOf(keep): true, hashOf(hist): true} {
-		if _, err := os.Stat(BlobPath(blobDir, h)); err != nil {
-			t.Fatalf("live blob %s gone: %v", h, err)
+		if !exists(h) {
+			t.Fatalf("live blob %s gone", h)
 		}
 	}
 	if res, body := e.do(tok, "GET", protocol.FilePath("main", "keep.md"), nil, ""); res.StatusCode != 200 || string(body) != keep {
@@ -103,21 +116,15 @@ func TestCollectBlobs(t *testing.T) {
 	}
 
 	// A second pass finds nothing; a young orphan is left alone.
-	fresh := BlobPath(blobDir, hashOf("just uploaded\n"))
-	if err := os.MkdirAll(filepath.Dir(fresh), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(fresh, []byte("just uploaded\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	again, err := e.srv.Store().CollectBlobs(ctx, blobDir, BlobGC{})
+	store("just uploaded\n")
+	again, err := e.srv.Store().CollectBlobs(ctx, e.srv.blobs, BlobGC{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if again.Rows != 0 || again.Files != 0 || again.Young != 1 {
 		t.Fatalf("second pass: %+v", again)
 	}
-	if _, err := os.Stat(fresh); err != nil {
-		t.Fatalf("young orphan swept: %v", err)
+	if !exists(hashOf("just uploaded\n")) {
+		t.Fatal("young orphan swept")
 	}
 }

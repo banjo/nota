@@ -78,7 +78,7 @@ func (s *Server) RemoveVault(ctx context.Context, userID int64, name string, che
 	if ws != nil {
 		ws.close() // waits for a write in flight (ws.mu)
 	}
-	if _, _, err := RemoveVaultData(ctx, s.store, s.cfg.DataDir, rm); err != nil {
+	if _, _, err := RemoveVaultData(ctx, s.store, s.blobs, s.cfg.DataDir, rm); err != nil {
 		// The vault is gone from the database, which is the truth; a
 		// leftover directory is reconciled away if the id is reused and
 		// "nota serve blobs gc" sweeps leftover blobs.

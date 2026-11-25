@@ -42,7 +42,7 @@ type Config struct {
 	MaxFileSize int64
 	// Logger receives one wide event per request; slog.Default if nil.
 	Logger *slog.Logger
-	// Blobs overrides the blob store (default: DiskBlobs in DataDir/blobs).
+	// Blobs is the blob store (default: DiskBlobs in DataDir/blobs).
 	Blobs BlobStore
 	// KeepAlive is the SSE keepalive interval; 25 s if 0.
 	KeepAlive time.Duration
@@ -188,6 +188,9 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 
 // Store returns the server's database.
 func (s *Server) Store() *Store { return s.store }
+
+// Blobs returns the server's blob store.
+func (s *Server) Blobs() BlobStore { return s.blobs }
 
 // Close closes the database. Call it after the HTTP server has shut down.
 func (s *Server) Close() error {
