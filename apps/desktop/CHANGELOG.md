@@ -1,5 +1,13 @@
 # @nota/desktop
 
+## 0.1.5
+
+### Patch Changes
+
+- [#65](https://github.com/banjo/nota/pull/65) [`91b7ad0`](https://github.com/banjo/nota/commit/91b7ad09c68ea951f192e43191a806ec4fb42c9d) - Export a note, a folder or the whole vault: a web page with the images inside, a PDF (⌘P prints), Markdown that other apps read, or the files as they are in a zip. In the "…" menus, ⌘K, File ▸ Export and `nota export`.
+
+- [#67](https://github.com/banjo/nota/pull/67) [`2da2608`](https://github.com/banjo/nota/commit/2da2608f609f7bfba960a2e451b2a42e82f2ef7b) - Import notes from Obsidian, Apple Notes (on a Mac), Bear, Notion, Logseq or any folder or zip of Markdown files. Everything goes into a new folder, nothing is replaced, links keep working and dates come along. In Settings, ⌘K, File ▸ Import Notes… and `nota import`.
+
 ## 0.1.4
 
 ### Patch Changes
