@@ -1,0 +1,60 @@
+# An Obsidian vault: hidden folders are left out, it goes into a folder
+# named after it, and a taken name gets " 2" with its links rewritten.
+nota import obsidian Valv --dry-run
+stdout 'Would import 2 notes and 1 file into Valv'
+! exists vault/Valv
+
+nota import obsidian Valv
+stdout 'Imported 2 notes and 1 file into Valv'
+exists vault/Valv/Plan.md
+exists vault/Valv/Ark/Möte.md
+exists vault/Valv/bild.png
+! exists vault/Valv/.obsidian
+grep '^created: 2023-01-02T00:00:00Z$' vault/Valv/Plan.md
+grep '\[\[Möte\]\]' vault/Valv/Plan.md
+
+# Again: a new folder, so nothing is mixed or replaced.
+nota import obsidian Valv --json
+stdout '"folder": "Valv 2"'
+stdout '"notes": 2'
+
+# Into a folder that has the notes already: renamed, links follow.
+nota import markdown Valv --folder Valv
+stdout 'Imported 2 notes and 1 file into Valv'
+stdout 'Plan.md → Valv/Plan 2.md \(the name was taken\)'
+stdout 'Rewrote 3 links'
+grep '\[the plan\]\(../Plan%202.md\)' 'vault/Valv/Ark/Möte 2.md'
+grep 'Se \[\[Möte 2\|Möte\]\] och !\[\[bild 2.png\]\]' 'vault/Valv/Plan 2.md'
+
+# One file, into the top of the vault.
+nota import markdown Lös.markdown --folder /
+stdout 'Imported 1 note into the vault'
+exists vault/Lös.md
+
+# Bad input.
+! nota import markdown nope
+stderr 'nope does not exist'
+! nota import evernote x
+stderr 'import from markdown, obsidian or apple-notes, not "evernote"'
+! nota import markdown
+stderr 'give the folder or zip to import'
+
+-- vault/Inbox/x.md --
+# x
+-- Valv/Plan.md --
+---
+date created: 2023-01-02
+---
+# Plan
+
+Se [[Möte]] och ![[bild.png]].
+-- Valv/Ark/Möte.md --
+# Möte
+
+Tillbaka till [the plan](../Plan.md).
+-- Valv/bild.png --
+png
+-- Valv/.obsidian/app.json --
+{}
+-- Lös.markdown --
+# Lös

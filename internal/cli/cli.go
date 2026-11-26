@@ -172,7 +172,7 @@ Every command prints JSON with --json.`,
 
 	root.AddCommand(
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(), a.folderCmd(),
-		a.rmCmd(), a.tagCmd(), a.setCmd(), a.pinCmd(), a.unpinCmd(), a.replaceCmd(), a.exportCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(), a.pluginsCmd(),
+		a.rmCmd(), a.tagCmd(), a.setCmd(), a.pinCmd(), a.unpinCmd(), a.replaceCmd(), a.exportCmd(), a.importCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(), a.pluginsCmd(),
 		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(), a.serveCmd(),
 		a.syncCmd(), a.remoteCmd(), a.loginCmd(), a.logoutCmd(), a.devicesCmd(),
 		a.historyCmd(), a.restoreCmd(), a.trashCmd(), a.settingsCmd(),

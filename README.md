@@ -31,6 +31,7 @@
 - ⚡️ Light: one 20 MB binary for the CLI, MCP and server; a search over 10,000 notes takes about 18 ms.
 - 🔄 Sync you host: three-way merge per file, conflict copies instead of lost edits, a version history for every note.
 - 📤 Export a note, a folder or the vault: a web page with its images inside, a PDF, Markdown that other apps read, or the files as they are in a zip.
+- 📥 Import from Obsidian, Apple Notes, Bear, Notion or any folder of Markdown files, with dates, images and working links ([moving to Nota](docs/moving-to-nota.md)).
 - 🔗 Share a note: a link to it as a web page of your server, always up to date, with its images, in your theme and optionally behind a password.
 - 📖 Three views per note: Live preview while you write, a read-only Reading mode (⌘E) and the raw Source, all from the top bar or ⌘K.
 - 📂 Open any Markdown file: Finder's **Open With ▸ Nota**, the Dock or `nota open --app file.md` shows it as a read-only preview, editable as a draft and saved to the vault only when you say so. Nota is never made the default `.md` app.
@@ -137,6 +138,7 @@ Both sync with the vault. Details and examples: [docs/hooks.md](docs/hooks.md).
 ## Documentation
 
 - [CLI](docs/cli.md): commands, configuration, ignore rules, timestamps.
+- [Moving to Nota](docs/moving-to-nota.md): from Obsidian, Apple Notes, Bear, Notion and Logseq.
 - [Agents](docs/agents.md): MCP over stdio and HTTP, the tools and resources.
 - [Views and hooks](docs/hooks.md): saved queries and scripts on note events.
 - [Themes](docs/themes.md): the built-in themes and how to make your own.

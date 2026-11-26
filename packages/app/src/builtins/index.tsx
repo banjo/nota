@@ -49,6 +49,7 @@ import { focusNoteTitle } from "../components/RowMenu.tsx";
 import { openHistory } from "../components/History.tsx";
 import { openShare } from "../components/Share.tsx";
 import { openExport, printNote } from "../components/Export.tsx";
+import { openImport } from "../components/Import.tsx";
 import { startRename } from "../components/Rename.tsx";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
@@ -266,6 +267,24 @@ export function registerBuiltins(r: Registry): () => void {
       icon: FileDown,
       when: (ctx) => !!ctx.client.export,
       run: () => openExport({ kind: "vault" }),
+    }),
+    r.register("command", {
+      id: "vault.import",
+      title: "Import notes…",
+      group: "Vault",
+      keywords: [
+        "import",
+        "obsidian",
+        "apple notes",
+        "bear",
+        "notion",
+        "zip",
+        "markdown",
+        "importera",
+      ],
+      icon: FolderInput,
+      when: (ctx) => !!ctx.client.import,
+      run: () => openImport(),
     }),
     r.register("command", {
       id: "note.delete",

@@ -177,6 +177,31 @@ export interface HistoryEntry {
 }
 
 /**
+ * ImportSupport says what this system can import from besides folders
+ * and zips.
+ */
+export interface ImportSupport {
+  appleNotes: boolean;
+}
+
+/** Item is one file of the report. */
+export interface Item {
+  /** Source is the file in the source. */
+  source: string;
+  /** Path is where it is in the vault; empty when skipped. */
+  path?: string;
+  status: Status;
+  reason?: string;
+  /**
+   * Detail is a remark on a file that was imported, such as what of
+   * it was left out.
+   */
+  detail?: string;
+  /** Note is true for a note, false for any other file. */
+  note: boolean;
+}
+
+/**
  * Link is a link between two notes. To is "" when the target does not
  * resolve to a note.
  */
@@ -388,6 +413,25 @@ export interface ReplaceResult {
   stale: string[];
 }
 
+/** Report says what an import did, or would do in a dry run. */
+export interface Report {
+  /** Folder is the vault folder the files went into; "" for the root. */
+  folder: string;
+  /** Notes and Files count the notes and the other files written. */
+  notes: number;
+  files: number;
+  /** Renamed and Skipped count the items with those statuses. */
+  renamed: number;
+  skipped: number;
+  /**
+   * Links is the number of links rewritten to keep pointing at the
+   * imported notes.
+   */
+  links: number;
+  dryRun: boolean;
+  items: Item[];
+}
+
 /** Result says which notes Apply changed. */
 export interface Result {
   /** Count is the number of links rewritten. */
@@ -499,6 +543,9 @@ export interface ShareTheme {
   mode?: string;
   tokens?: Record<string, string>;
 }
+
+/** Status is what happened to one file. */
+export type Status = "imported" | "renamed" | "skipped";
 
 /** SyncStatus describes the background sync of the open vault. */
 export interface SyncStatus {
@@ -652,6 +699,19 @@ export const Vault = {
    * nil when that version is a delete.
    */
   historyVersion: bind<[string, number], string | null>("Vault.HistoryVersion", (path: string, version: number) => [path, version]),
+  /**
+   * ImportAppleNotes imports every note in Apple Notes (macOS), which
+   * asks the user to allow it the first time.
+   */
+  importAppleNotes: bind<[], Report | null>("Vault.ImportAppleNotes", () => []),
+  /**
+   * ImportFiles asks for a folder (zip false) or a zip of Markdown notes
+   * and imports it into a new folder named after it (importer.Run).
+   * It returns nil when the user cancels.
+   */
+  importFiles: bind<[boolean], Report | null>("Vault.ImportFiles", (zip: boolean) => [zip]),
+  /** ImportSources lists the import sources this system has. */
+  importSources: bind<[], ImportSupport>("Vault.ImportSources", () => []),
   /** Inbox returns the notes in the inbox folder, newest first. */
   inbox: bind<[], NoteInfo[]>("Vault.Inbox", () => []),
   /** Info describes the open vault. */

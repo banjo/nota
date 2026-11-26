@@ -37,6 +37,10 @@ export default defineConfig({
     signingIdentity: "-",
     infoPlist: {
       LSApplicationCategoryType: "public.app-category.productivity",
+      // Importing from Apple Notes reads it through its scripting
+      // (internal/importer/applenotes.js). With a Developer ID and the
+      // hardened runtime, this also needs the apple-events entitlement.
+      NSAppleEventsUsageDescription: "Nota reads your notes in Apple Notes to import them.",
       // Replaces the entry MyGo makes from fileAssociations, which has
       // LSHandlerRank "Default" (cmd/mygo/bundle.go in v0.10.0): Nota is
       // offered in Open With but never made the default app for .md.
