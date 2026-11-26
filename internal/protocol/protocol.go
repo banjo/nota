@@ -331,3 +331,44 @@ func HistoryPath(vault, p string) string {
 
 // EventsPath is the SSE stream of change nudges.
 func EventsPath(vault string) string { return "/v1/vaults/" + url.PathEscape(vault) + "/events" }
+
+// ShareTheme is the look of a shared note: a mode and the colour tokens
+// of the sharer's theme in it, as the app had them when sharing. No
+// tokens is Nota's own theme in that mode; no mode follows the reader's
+// system.
+type ShareTheme struct {
+	Mode   string            `json:"mode,omitempty"` // "light", "dark" or ""
+	Tokens map[string]string `json:"tokens,omitempty"`
+}
+
+// Share is a shared note (GET /v1/api/vaults/{vault}/shares and PUT
+// …/shares/{path}).
+type Share struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
+	// URL is the link to give out.
+	URL string `json:"url"`
+	// Password is true when the link asks for a password.
+	Password bool        `json:"password"`
+	Theme    *ShareTheme `json:"theme,omitempty"`
+	Created  time.Time   `json:"created"`
+	Updated  time.Time   `json:"updated"`
+}
+
+// ShareRequest is the body of PUT …/shares/{path}, which shares a note
+// or changes its share: Password nil keeps the password, "" removes it;
+// Theme nil keeps the theme, an empty one is Nota's own.
+type ShareRequest struct {
+	Password *string     `json:"password,omitempty"`
+	Theme    *ShareTheme `json:"theme,omitempty"`
+}
+
+// SharesPath is GET of a vault's shared notes.
+func SharesPath(vault string) string {
+	return "/v1/api/vaults/" + url.PathEscape(vault) + "/shares"
+}
+
+// SharePath is PUT (share, change) and DELETE (unshare) of one note.
+func SharePath(vault, p string) string {
+	return SharesPath(vault) + "/" + EscapePath(p)
+}

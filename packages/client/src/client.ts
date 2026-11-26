@@ -19,6 +19,7 @@ import type {
   PropertyPatch,
   ServerVaultApi,
   SettingsApi,
+  SharesApi,
   ShellApi,
   SyncStatus,
   TagCount,
@@ -109,6 +110,11 @@ export interface NotesClient {
    * Attachments folder, under a free name, and resolves to its path.
    */
   attach?(name: string, data: Blob): Promise<string>;
+  /**
+   * Shared notes, on the sync server: the web app's vault, a synced
+   * vault on the desktop (which rejects while sync is off).
+   */
+  shares?: SharesApi;
   /** Calls listener whenever notes change, from anywhere. */
   subscribe(listener: (event: ChangeEvent) => void): () => void;
   /** Background sync (desktop); absent where the server is the vault. */

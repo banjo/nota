@@ -683,6 +683,13 @@ func (s *Store) commit(ctx context.Context, tx *sql.Tx, v vault, w write) (proto
 		append(args, protocol.FoldKey(e.Path))...); err != nil {
 		return protocol.Entry{}, err
 	}
+	if w.Deleted {
+		// A deleted note is no longer shared: a note made later at its
+		// path must not show up behind the old link. Move keeps the link.
+		if _, err := tx.ExecContext(ctx, `DELETE FROM shares WHERE vault_id = ? AND path = ?`, v.ID, w.Path); err != nil {
+			return protocol.Entry{}, err
+		}
+	}
 	if !w.Deleted {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO blobs (user_id, hash, size, created_at) VALUES (?, ?, ?, ?)
 			ON CONFLICT DO NOTHING`, v.UserID, e.Hash, e.Size, ms(s.now())); err != nil {
@@ -818,6 +825,10 @@ func (s *Store) Move(ctx context.Context, userID int64, vaultName string, m prot
 		}
 		if other != "" {
 			return caseCollision(m.To, other)
+		}
+		// A shared note keeps its link when it moves.
+		if _, err := tx.ExecContext(ctx, `UPDATE shares SET path = ? WHERE vault_id = ? AND path = ?`, m.To, v.ID, m.From); err != nil {
+			return err
 		}
 		if out.From, err = s.commit(ctx, tx, v, write{Path: m.From, Hash: cur.Hash, Size: cur.Size, Deleted: true, Device: device}); err != nil {
 			return err

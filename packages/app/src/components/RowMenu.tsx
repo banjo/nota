@@ -10,6 +10,7 @@ import {
   FilePlus2,
   FolderInput,
   FolderPlus,
+  Globe,
   History,
   type LucideIcon,
   PenLine,
@@ -32,12 +33,13 @@ import { openHistory } from "./History.tsx";
 import { startNewFolder } from "./NewFolder.tsx";
 import { startRename } from "./Rename.tsx";
 import { openRowSheet, type RowTarget } from "./RowSheet.tsx";
+import { openShare } from "./Share.tsx";
 
 // The actions of a sidebar row, as a right-click menu on a desk and as a
 // bottom sheet under a finger (a long press): one list, two skins. Every
 // action is also a ⌘K command or shares its function (note.new,
 // folder.add, note.addToFolder, note.newInFolder, note.rename,
-// folder.rename, note.pin, note.history, note.delete).
+// folder.rename, note.pin, note.history, note.share, note.delete).
 
 /** Puts the cursor in the open note's title field, selected: renaming it where it is. */
 export const focusNoteTitle = (): void => {
@@ -156,6 +158,17 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
           run: () => openHistory(t.path),
           group: 1,
         },
+        ...(client.shares
+          ? [
+              {
+                id: "share",
+                label: "Share…",
+                icon: Globe,
+                run: () => openShare(t.path),
+                group: 1,
+              },
+            ]
+          : []),
         {
           id: "delete",
           label: "Move to trash",

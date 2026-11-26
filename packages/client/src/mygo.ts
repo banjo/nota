@@ -22,6 +22,8 @@ import type {
   ReplaceQuery,
   SettingsApi,
   SettingsLayers,
+  Share,
+  ShareRequest,
   SyncStatus,
   TagCount,
   Tree,
@@ -89,6 +91,9 @@ export interface MygoBindings {
     purgeTrash(id: string): Promise<void>;
     emptyTrash(): Promise<number>;
     restore(path: string, version: number): Promise<void>;
+    shares(): Promise<Share[] | null>;
+    share(path: string, req: ShareRequest): Promise<Share>;
+    unshare(path: string): Promise<void>;
     syncStatus(): Promise<SyncStatus>;
   };
   Account: {
@@ -298,6 +303,11 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     history: async (path) => list(await v.history(path)),
     historyVersion: async (path, version) => (await v.historyVersion(path, version)) ?? null,
     restore: (path, version) => v.restore(path, version),
+    shares: {
+      list: async () => list(await v.shares()),
+      put: (path, req) => v.share(path, req),
+      remove: (path) => v.unshare(path),
+    },
     fileUrl: (path, from) =>
       fileBase("vault") +
       escapePath(path) +

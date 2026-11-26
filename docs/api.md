@@ -194,6 +194,48 @@ Shapes:
 | `GET …/changes?since=` | the sync change feed (to see which paths changed) |
 | `GET …/events?protocol=1` | SSE: `event: change` / `data: {"cursor": N}` on every new version (from any device, the web or a hook), `: keepalive` comments every 25 s. Use `new EventSource(url, {withCredentials: true})`. Responses send `X-Accel-Buffering: no` so proxies do not buffer. |
 
+## Sharing
+
+A note of a vault can be shared as a web page of the server, at
+`/s/{id}` on `NOTA_SERVER_PUBLIC_URL`. The page is the note as it is
+now (every save shows), rendered on the server as static HTML in the
+look of Reading mode: no scripts, a strict CSP, `noindex`, no referrer.
+The frontmatter and `%%comments%%` are left out. Images of the vault the
+note shows are served under the share (`/s/{id}/f/{path}`), and nothing
+else of the vault is. A link to another note is a link only when that
+note is shared too, otherwise plain text. Images from the web are links,
+as in the app.
+
+| Route | Body → response |
+| --- | --- |
+| `GET …/shares` | → `[Share]` the vault's shared notes, by path |
+| `PUT …/shares/{path}` | `{password?, theme?}` → `Share`. Shares the note, or changes its share: a `password` sets one, `""` removes it, leaving it out keeps it; likewise `theme` (`{}` is Nota's own). `404 not_found` when the note doesn't exist, `400 bad_request` for a theme that isn't one. |
+| `DELETE …/shares/{path}` | → `204`; the link leads nowhere from then on. `404 not_found` when the note isn't shared. |
+
+```jsonc
+// Share
+{"id": "pZ0PJNahKiy7E6LF", "path": "Projekt/Plan.md",
+ "url": "https://nota.app.example.com/s/pZ0PJNahKiy7E6LF",
+ "password": true,
+ "theme": {"mode": "dark", "tokens": {"background": "#1c1c1e", "ink": "#5fd9c4"}},
+ "created": "…", "updated": "…"}
+```
+
+`theme` is the sharer's look when sharing: a mode and colour tokens (the
+names of [themes](themes.md), values plain hex, `rgb()` or `hsl()`
+colours). The apps send the theme in effect; without tokens the page
+uses Nota's own colours, and without a mode it follows the reader's
+system.
+
+A link survives moves and renames. Deleting the note unshares it, so a
+note made later at the same path is not shown behind the old link.
+
+With a password, the page asks for it (a form `POST /s/{id}`). The right
+one sets a cookie for that share (30 days, `HttpOnly`) that is only good
+for that password: changing or removing it locks earlier readers out.
+Tries are rate limited per IP and share (10 a minute), and passwords are
+stored as PBKDF2-SHA256 hashes.
+
 **Vault names.** A vault is addressed by its name everywhere: these
 routes, the sync protocol, `.nota/sync.toml` (`nota remote`, the desktop
 app) and `/mcp?vault=`. Device tokens belong to the account, not to a

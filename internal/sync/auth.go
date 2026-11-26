@@ -198,3 +198,27 @@ func (c *Client) Restore(ctx context.Context, p string, version int64) (protocol
 	err := c.json(ctx, "POST", "/v1/api/vaults/"+url.PathEscape(c.Vault)+"/history/"+protocol.EscapePath(p)+"/restore", nil, body, &out)
 	return out, err
 }
+
+// Shares lists the vault's shared notes.
+func (c *Client) Shares(ctx context.Context) ([]protocol.Share, error) {
+	var out []protocol.Share
+	err := c.json(ctx, "GET", protocol.SharesPath(c.Vault), nil, nil, &out)
+	return out, err
+}
+
+// Share shares a note on the server, or changes its share.
+func (c *Client) Share(ctx context.Context, p string, req protocol.ShareRequest) (protocol.Share, error) {
+	body, _ := json.Marshal(req)
+	var out protocol.Share
+	err := c.json(ctx, "PUT", protocol.SharePath(c.Vault, p), nil, body, &out)
+	return out, err
+}
+
+// Unshare stops sharing a note: its link leads nowhere from then on.
+func (c *Client) Unshare(ctx context.Context, p string) error {
+	res, err := c.do(ctx, "DELETE", protocol.SharePath(c.Vault, p), nil, nil)
+	if err != nil {
+		return err
+	}
+	return res.Body.Close()
+}

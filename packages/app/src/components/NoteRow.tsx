@@ -8,7 +8,16 @@ import {
 } from "@nota/ui/dropdown-menu";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, FolderInput, History, MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
+import {
+  FileText,
+  FolderInput,
+  Globe,
+  History,
+  MoreHorizontal,
+  Pin,
+  PinOff,
+  Trash2,
+} from "lucide-react";
 import { memo } from "react";
 import { deleteNote, setPinned } from "../actions.ts";
 import { useClient } from "../context.ts";
@@ -20,6 +29,7 @@ import { useTreeValue } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { openHistory } from "./History.tsx";
+import { openShare } from "./Share.tsx";
 import { RenameRow, useRenaming } from "./Rename.tsx";
 import { Row } from "./Row.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
@@ -158,6 +168,11 @@ export function NoteMenu({
         <DropdownMenuItem onSelect={() => openHistory(path)}>
           <History /> History
         </DropdownMenuItem>
+        {client.shares ? (
+          <DropdownMenuItem onSelect={() => openShare(path)}>
+            <Globe /> Share…
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => void deleteNote(client, qc, path)}>
           <Trash2 /> Move to trash
