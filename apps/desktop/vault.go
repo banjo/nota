@@ -20,6 +20,7 @@ import (
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
 	"github.com/banjo/nota/internal/relink"
+	"github.com/banjo/nota/internal/replace"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -464,6 +465,69 @@ func (s *Vault) Search(q string, filter ListQuery) ([]NoteInfo, error) {
 		return nil, err
 	}
 	return noteInfos(es), nil
+}
+
+// ReplaceQuery is what to find and replace across notes, and in which.
+type ReplaceQuery struct {
+	replace.Options
+	Folder string `json:"folder,omitempty"`
+	Tag    string `json:"tag,omitempty"`
+}
+
+// ReplaceResult is what Replace changed: each note with its body before
+// and its hash after, so saving the body back with that hash undoes it.
+type ReplaceResult struct {
+	Notes []replace.Changed `json:"notes"`
+	Count int               `json:"count"`
+	Stale []string          `json:"stale"`
+}
+
+func (s *Vault) replacer(q ReplaceQuery) (*replace.Replacer, index.Query, error) {
+	r, err := replace.New(q.Options)
+	if err != nil {
+		return nil, index.Query{}, err
+	}
+	iq := index.Query{Tag: q.Tag, Sort: index.Sort{Field: "path"}}
+	if q.Folder != "" {
+		if iq.Folder, err = vault.CleanPath(q.Folder); err != nil {
+			return nil, iq, err
+		}
+	}
+	return r, iq, nil
+}
+
+// FindReplace lists the matches of a find and replace across notes,
+// note by note: in bodies only, code skipped unless asked.
+func (s *Vault) FindReplace(q ReplaceQuery) ([]replace.Note, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, iq, err := s.replacer(q)
+	if err != nil {
+		return nil, err
+	}
+	return replace.Find(s.v, s.ix, r, iq)
+}
+
+// Replace replaces the picked matches of a FindReplace. A note changed
+// since is left alone and listed in Stale.
+func (s *Vault) Replace(q ReplaceQuery, picks []replace.Pick) (ReplaceResult, error) {
+	if s.v == nil {
+		return ReplaceResult{}, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, _, err := s.replacer(q)
+	if err != nil {
+		return ReplaceResult{}, err
+	}
+	res, err := replace.ApplyNotes(s.v, r, picks)
+	if err != nil {
+		return ReplaceResult{}, err
+	}
+	return ReplaceResult{Notes: res.Notes, Count: res.Count, Stale: res.Stale}, nil
 }
 
 // Tags returns every tag with its note count.

@@ -43,6 +43,7 @@ export const mcpTools: [name: string, what: string][] = [
   ["append_to_note", "adds text to the end of a note"],
   ["update_note", "a body, refused if the note moved on"],
   ["update_frontmatter", "properties and tags, line by line"],
+  ["replace_in_notes", "find and replace, shown before it writes"],
   ["move_note", "files a note into a folder"],
   ["list_tags", "every tag with its count"],
   ["list_views", "the saved views in .nota/views"],

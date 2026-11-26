@@ -191,6 +191,24 @@ export interface ListQuery {
   limit?: number;
 }
 
+/** Match is one place a note would change. */
+export interface Match {
+  /** Line is the 1-based line in the file. */
+  line: number;
+  /** Start and End are byte offsets in the file. */
+  start: number;
+  end: number;
+  /** Text is what is there, With what it becomes. */
+  text: string;
+  with: string;
+  /**
+   * Before and After are the rest of the line around the match,
+   * shortened, for showing it.
+   */
+  before: string;
+  after: string;
+}
+
 /**
  * MoveResult is where a moved note (or folder) went, and the links in
  * other notes that were rewritten to follow it.
@@ -273,6 +291,17 @@ export interface PatchRequest {
 }
 
 /**
+ * Pick is the matches to replace in one note, by index into the list
+ * Find gave; nil means all of them. Hash, when set, must be the note's
+ * hash for the replace to go ahead.
+ */
+export interface Pick {
+  path: string;
+  hash?: string;
+  matches?: number[];
+}
+
+/**
  * Plugin is one folder of .nota/plugins. A plugin that could not be
  * read has Error set and nothing else but ID and Dir.
  */
@@ -294,6 +323,59 @@ export interface RemoteVault {
   name: string;
   cursor: number;
   created: string;
+}
+
+/** Changed is one note a replace wrote. */
+export interface ReplaceChanged {
+  path: string;
+  count: number;
+  /**
+   * Before is the body the note had (frontmatter excluded): saving it
+   * back undoes the replace.
+   */
+  before: string;
+  /** Hash is the note as written, so an undo can check nothing changed since. */
+  hash: string;
+}
+
+/**
+ * Note is a note with matches: Hash is the file the matches were found
+ * in, so a later Apply can tell whether it changed since.
+ */
+export interface ReplaceNote {
+  path: string;
+  title: string;
+  hash: string;
+  matches: Match[];
+}
+
+/** ReplaceQuery is what to find and replace across notes, and in which. */
+export interface ReplaceQuery {
+  find: string;
+  replace: string;
+  /**
+   * Regex reads Find as a regular expression (RE2) and expands $1,
+   * ${name} in Replace; otherwise both are literal text.
+   */
+  regex?: boolean;
+  /** Case matches case exactly; by default it is ignored. */
+  case?: boolean;
+  /** Word matches only whole words: no letter, digit or _ on either side. */
+  word?: boolean;
+  /** Code includes code blocks and inline code, which are skipped by default. */
+  code?: boolean;
+  folder?: string;
+  tag?: string;
+}
+
+/**
+ * ReplaceResult is what Replace changed: each note with its body before
+ * and its hash after, so saving the body back with that hash undoes it.
+ */
+export interface ReplaceResult {
+  notes: ReplaceChanged[];
+  count: number;
+  stale: string[];
 }
 
 /** Result says which notes Apply changed. */
@@ -494,6 +576,11 @@ export const Vault = {
    * many files it deleted.
    */
   emptyTrash: bind<[], number>("Vault.EmptyTrash", () => []),
+  /**
+   * FindReplace lists the matches of a find and replace across notes,
+   * note by note: in bodies only, code skipped unless asked.
+   */
+  findReplace: bind<[ReplaceQuery], ReplaceNote[]>("Vault.FindReplace", (q: ReplaceQuery) => [q]),
   /** Get returns one note with its content, hash, links and backlinks. */
   get: bind<[string], Note>("Vault.Get", (path: string) => [path]),
   /**
@@ -539,6 +626,11 @@ export const Vault = {
    * file in it moves with it, one note.moved event per note.
    */
   renameFolder: bind<[string, string], MoveResult>("Vault.RenameFolder", (path: string, to: string) => [path, to]),
+  /**
+   * Replace replaces the picked matches of a FindReplace. A note changed
+   * since is left alone and listed in Stale.
+   */
+  replace: bind<[ReplaceQuery, Pick[]], ReplaceResult>("Vault.Replace", (q: ReplaceQuery, picks: Pick[]) => [q, picks]),
   /**
    * Restore makes an old server version of a note its newest one; the
    * background sync brings it to this vault (the server nudges it).

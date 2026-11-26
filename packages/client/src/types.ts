@@ -55,6 +55,61 @@ export interface Note extends NoteInfo {
   links: Link[];
 }
 
+/** A find and replace across notes: what, and in which notes. */
+export interface ReplaceQuery {
+  find: string;
+  replace: string;
+  /** `find` is a regular expression (RE2); `$1` in `replace` is its first group. */
+  regex?: boolean;
+  /** Match case; ignored by default. */
+  case?: boolean;
+  /** Whole words only. */
+  word?: boolean;
+  /** Also in code blocks and inline code, which are skipped by default. */
+  code?: boolean;
+  folder?: string;
+  tag?: string;
+}
+
+/** One place a replace would change, with the rest of its line around it. */
+export interface ReplaceMatch {
+  line: number;
+  text: string;
+  with: string;
+  before: string;
+  after: string;
+}
+
+/** A note with matches; `hash` is the content they were found in. */
+export interface ReplaceNote {
+  path: string;
+  title: string;
+  hash: string;
+  matches: ReplaceMatch[];
+}
+
+/** The matches to replace in a note, by index into its list; all when absent. */
+export interface ReplacePick {
+  path: string;
+  hash: string;
+  matches?: number[];
+}
+
+/** A note a replace wrote: saving `before` on `base` undoes it. */
+export interface ReplacedNote {
+  path: string;
+  count: number;
+  before: string;
+  base: Base;
+}
+
+export interface ReplaceResult {
+  notes: ReplacedNote[];
+  count: number;
+  /** Notes that changed since their matches were found; left alone. */
+  stale: string[];
+}
+
 /** What a save or a frontmatter edit is checked against. */
 export interface Base {
   version: number;

@@ -3,6 +3,9 @@ import {
   type NotesClient,
   NotaError,
   type PropertyPatch,
+  type ReplacePick,
+  type ReplaceQuery,
+  type ReplaceResult,
   type Tree,
 } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
@@ -460,4 +463,58 @@ export async function movePinned(
   } catch (e) {
     fail("Couldn't move the pinned note", e);
   }
+}
+
+const matches = (n: number) => `${n} ${n === 1 ? "match" : "matches"}`;
+
+/**
+ * Replaces the picked matches of a find across notes. The toast has
+ * Undo, which saves each note's old body back unless it changed since.
+ */
+export async function replaceInNotes(
+  client: NotesClient,
+  qc: QueryClient,
+  query: ReplaceQuery,
+  picks: ReplacePick[],
+): Promise<ReplaceResult | undefined> {
+  if (!client.replace) return undefined;
+  let r: ReplaceResult;
+  try {
+    r = await client.replace(query, picks);
+  } catch (e) {
+    fail("Couldn't replace", e);
+    return undefined;
+  }
+  void qc.invalidateQueries();
+  const stale = r.stale.length
+    ? `${count(r.stale.length, "note")} changed meanwhile and ${r.stale.length === 1 ? "was" : "were"} left as ${r.stale.length === 1 ? "it was" : "they were"}.`
+    : undefined;
+  if (r.count === 0) {
+    toast.error("Nothing was replaced", { description: stale });
+    return r;
+  }
+  const undo = async () => {
+    let kept = 0;
+    for (const n of r.notes) {
+      try {
+        const w = await client.save(n.path, n.before, n.base);
+        if (w.conflict) kept++;
+        else noteWritten(qc, w.note);
+      } catch {
+        kept++;
+      }
+    }
+    void qc.invalidateQueries();
+    if (kept)
+      toast.error(
+        `${count(kept, "note")} changed since the replace and ${kept === 1 ? "was" : "were"} left as ${kept === 1 ? "it is" : "they are"}`,
+      );
+    else toast("Undid the replace");
+  };
+  toast.success(`Replaced ${matches(r.count)} in ${count(r.notes.length, "note")}`, {
+    description: stale,
+    duration: 10_000,
+    action: { label: "Undo", onClick: () => void undo() },
+  });
+  return r;
 }

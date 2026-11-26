@@ -48,6 +48,8 @@ marker and blocks typing, but links, tags and checkboxes still work.
 | ![Live](screenshots/mode-live.png) | ![Reading](screenshots/mode-reading.png) | ![Source](screenshots/mode-source.png) |
 | Live: markers show on the line you edit | Reading: the finished page, read-only | Source: the raw markdown |
 
+On a narrow window the switch shows icons only ([narrow](screenshots/mode-narrow.png)).
+
 ## Find in a note
 
 ⌘F opens a find bar over the note (⌘K "Find in note"; "Find in note" in the "…" sheet on a phone),
@@ -57,7 +59,11 @@ closes it. In the replace field Enter replaces the current match and ⌘Enter re
 one undo step. Reading mode finds but has no replace row. The title is a field of its own and is not
 searched.
 
-On a narrow window the switch shows icons only ([narrow](screenshots/mode-narrow.png)).
+**Find in notes…** (⌘⇧F, or ⌘K) is a page of its own for find and replace across the vault: every
+match note by note, on its line, with what it becomes. Untick the ones to keep and press Replace
+(or ⌘Enter in the replace field); the toast has Undo. A click on a match opens its note with the
+find bar on it. As with `nota replace`, properties and link targets never change, and code only
+with "Include code".
 
 ## Themes
 

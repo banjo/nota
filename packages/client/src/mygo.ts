@@ -17,6 +17,9 @@ import type {
   OpenerApi,
   PluginInfo,
   PropertyPatch,
+  ReplaceNote,
+  ReplacePick,
+  ReplaceQuery,
   SettingsApi,
   SettingsLayers,
   SyncStatus,
@@ -66,6 +69,15 @@ export interface MygoBindings {
     rename(path: string, to: string): Promise<MoveResult>;
     delete(path: string): Promise<string>;
     search(q: string, filter: ListQuery): Promise<NoteInfo[] | null>;
+    findReplace(q: ReplaceQuery): Promise<ReplaceNote[] | null>;
+    replace(
+      q: ReplaceQuery,
+      picks: ReplacePick[],
+    ): Promise<{
+      notes: { path: string; count: number; before: string; hash: string }[] | null;
+      count: number;
+      stale: string[] | null;
+    }>;
     tags(): Promise<TagCount[] | null>;
     views(): Promise<ViewInfo[] | null>;
     plugins(): Promise<PluginInfo[] | null>;
@@ -271,6 +283,15 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     purgeTrash: (id) => v.purgeTrash(id),
     emptyTrash: () => v.emptyTrash(),
     search: async (q, filter = {}) => (q.trim() ? list(await v.search(q, filter)) : []),
+    findReplace: async (q) => list(await v.findReplace(q)),
+    async replace(q, picks) {
+      const r = await v.replace(q, picks);
+      return {
+        notes: list(r.notes).map(({ hash, ...n }) => ({ ...n, base: { version: 0, hash } })),
+        count: r.count,
+        stale: list(r.stale),
+      };
+    },
     tags: async () => list(await v.tags()),
     views: async () => list(await v.views()),
     plugins: async () => list(await v.plugins()),

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+
+	"github.com/banjo/nota/internal/replace"
 )
 
 // testVault opens a vault in a temp dir with a few notes. Published
@@ -352,5 +354,30 @@ func TestRenameAndMoveRewriteLinks(t *testing.T) {
 	}
 	if got := read(t, dir, "Länk.md"); got != "[[Roadmap]] and [[Roadmap|planen]]\n" {
 		t.Fatalf("after move: %q", got)
+	}
+}
+
+func TestFindReplaceAndUndo(t *testing.T) {
+	s, dir, _ := testVault(t, map[string]string{"Projekt/Plan.md": plan, "Annat.md": "Inget\n"})
+	q := ReplaceQuery{Options: replace.Options{Find: "sync", Replace: "Synk"}, Folder: "Projekt"}
+	notes, err := s.FindReplace(q)
+	if err != nil || len(notes) != 1 || notes[0].Path != "Projekt/Plan.md" {
+		t.Fatalf("find = %+v, %v", notes, err)
+	}
+	before := read(t, dir, "Projekt/Plan.md")
+	res, err := s.Replace(q, []replace.Pick{{Path: notes[0].Path, Hash: notes[0].Hash}})
+	if err != nil || res.Count != len(notes[0].Matches) || len(res.Stale) != 0 {
+		t.Fatalf("replace = %+v, %v", res, err)
+	}
+	if got := read(t, dir, "Projekt/Plan.md"); !strings.Contains(got, "# Synk-protokoll\n") || !strings.Contains(got, "tags: [nota, sync]") {
+		t.Fatalf("after replace:\n%s", got)
+	}
+	// Saving the old body on the written hash undoes it (apart from updated).
+	if r, err := s.Save(res.Notes[0].Path, res.Notes[0].Before, res.Notes[0].Hash); err != nil || r.Conflict {
+		t.Fatalf("undo = %+v, %v", r, err)
+	}
+	stamp := regexp.MustCompile(`(?m)^updated: .*$`)
+	if got := read(t, dir, "Projekt/Plan.md"); stamp.ReplaceAllString(got, "U") != stamp.ReplaceAllString(before, "U") {
+		t.Fatalf("after undo:\n%s\nwant\n%s", got, before)
 	}
 }

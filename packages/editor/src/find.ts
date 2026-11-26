@@ -10,7 +10,7 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
-import type { EditorState, Extension } from "@codemirror/state";
+import { EditorSelection, type EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap, type Panel, type ViewUpdate } from "@codemirror/view";
 
 // Find (⌘F) and replace (⌥⌘F) in the open note: CodeMirror's search
@@ -384,9 +384,47 @@ export const findExtension: Extension = [
   findTheme,
 ];
 
+/**
+ * A search to open the bar with, instead of the selection. `near` picks
+ * the match to select: the first one after `before` + `text` (a line's
+ * start up to the match, "…" where it was cut); without it, the first.
+ */
+export interface FindPreset {
+  search: string;
+  replace?: string;
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+  regexp?: boolean;
+  near?: { before: string; text: string };
+}
+
+/** The preset's query and the match it picks, if any. */
+export function presetMatch(state: EditorState, preset: FindPreset) {
+  const { near, ...spec } = preset;
+  const q = new SearchQuery(spec);
+  let from = 0;
+  if (near) {
+    const lead = near.before.replace(/^…/, "") + near.text;
+    const at = state.doc.toString().indexOf(lead);
+    if (at >= 0) from = at + lead.length - near.text.length;
+  }
+  const m = q.valid ? q.getCursor(state, from).next() : undefined;
+  return { q, range: m && !m.done ? EditorSelection.range(m.value.from, m.value.to) : undefined };
+}
+
 /** Opens the bar (with the replace row when `replace`), with the selection as the query. */
-export function open(view: EditorView, replace: boolean) {
+export function open(view: EditorView, replace: boolean, preset?: FindPreset) {
   openSearchPanel(view);
+  if (preset) {
+    const { q, range } = presetMatch(view.state, preset);
+    view.dispatch({
+      effects: [
+        setSearchQuery.of(q),
+        ...(range ? [EditorView.scrollIntoView(range, { y: "center" })] : []),
+      ],
+      selection: range,
+    });
+  }
   const panel = panels.get(view);
   if (!panel) return;
   if (replace) panel.focusReplace();
