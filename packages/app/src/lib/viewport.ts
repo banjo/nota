@@ -75,3 +75,6 @@ function useMedia(query: string): boolean {
 /** One pane at a time (the 720px navigation stack): menus become sheets. */
 export const NARROW = "(max-width: 720px)";
 export const useNarrow = () => useMedia(NARROW);
+
+/** A finger, not a mouse: no hover, and long presses open sheets. */
+export const useCoarse = () => useMedia("(pointer: coarse)");

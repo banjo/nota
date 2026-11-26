@@ -255,7 +255,8 @@ type ListInput struct {
 	Tag    string   `json:"tag,omitempty" jsonschema:"only notes with this tag (nested tags included)"`
 	Where  []string `json:"where,omitempty" jsonschema:"frontmatter conditions, each key=value or key!=value (case-insensitive; list items match)"`
 	View   string   `json:"view,omitempty" jsonschema:"start from a saved view (see list_views); the other filters narrow it"`
-	Sort   string   `json:"sort,omitempty" jsonschema:"path, title, created, updated or modified, optionally followed by asc or desc"`
+	Pinned bool     `json:"pinned,omitempty" jsonschema:"only the pinned notes (frontmatter pinned: a number for the place, or true), in pinned order unless sort is given"`
+	Sort   string   `json:"sort,omitempty" jsonschema:"path, title, created, updated, modified or pinned, optionally followed by asc or desc"`
 	Limit  int      `json:"limit,omitempty" jsonschema:"maximum number of notes (default 100)"`
 }
 
@@ -296,6 +297,12 @@ func (s *Service) List(in ListInput) (NotesOutput, error) {
 			return NotesOutput{}, err
 		}
 		q.Where = append(q.Where, c)
+	}
+	if in.Pinned {
+		q.Pinned = true
+		if in.Sort == "" {
+			q.Sort = index.Sort{Field: "pinned"}
+		}
 	}
 	if in.Sort != "" || q.Sort.Field == "" {
 		srt, err := index.ParseSort(firstNonEmpty(in.Sort, "path"))

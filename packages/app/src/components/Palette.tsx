@@ -31,6 +31,7 @@ import {
   resolveNewFolder,
 } from "../lib/folders.ts";
 import { folderLabel, folderOf } from "../lib/notes.ts";
+import { isPinned, pinnedNotes } from "../lib/pinned.ts";
 import { label } from "../lib/shortcuts.ts";
 import { useList, useSearch, useTree, useTreeValue } from "../queries.ts";
 import {
@@ -96,6 +97,12 @@ const CommandRow = memo(function CommandRow({
   );
 });
 
+/** The notes with the pinned ones first, otherwise in the same order. */
+const pinnedFirst = (notes: NoteInfo[]) => [
+  ...notes.filter(isPinned),
+  ...notes.filter((n) => !isPinned(n)),
+];
+
 function SearchMode({ query, close }: { query: string; close: () => void }) {
   const client = useClient();
   const qc = useQueryClient();
@@ -124,13 +131,20 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
   );
 
   // Titles match instantly from the tree; full text follows from the index.
+  // Pinned notes come first: all of them before typing, then the matches.
+  const pinned = useMemo(() => pinnedNotes(tree.data?.notes ?? []), [tree.data]);
   const notes = useMemo(() => {
-    if (!q) return recent.data ?? [];
-    const byTitle = (tree.data?.notes ?? []).filter((n) => fold(n.title).includes(q)).slice(0, 8);
+    if (!q) {
+      const isTop = new Set(pinned.map((n) => n.path));
+      return (recent.data ?? []).filter((n) => !isTop.has(n.path));
+    }
+    const byTitle = pinnedFirst(
+      (tree.data?.notes ?? []).filter((n) => fold(n.title).includes(q)),
+    ).slice(0, 8);
     const seen = new Set(byTitle.map((n) => n.path));
     const fromIndex = debounced ? (search.data ?? []).filter((n) => !seen.has(n.path)) : [];
-    return [...byTitle, ...fromIndex].slice(0, 12);
-  }, [q, recent.data, tree.data, search.data, debounced]);
+    return pinnedFirst([...byTitle, ...fromIndex]).slice(0, 12);
+  }, [q, recent.data, tree.data, search.data, debounced, pinned]);
 
   const cmds = commands.filter(
     (c) =>
@@ -140,6 +154,13 @@ function SearchMode({ query, close }: { query: string; close: () => void }) {
 
   return (
     <>
+      {!q && pinned.length ? (
+        <CommandGroup heading="Pinned">
+          {pinned.map((n) => (
+            <NoteItem key={n.path} note={n} open={open} />
+          ))}
+        </CommandGroup>
+      ) : null}
       {notes.length ? (
         <CommandGroup heading={q ? "Notes" : "Recent"}>
           {notes.map((n) => (

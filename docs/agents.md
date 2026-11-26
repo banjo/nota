@@ -34,7 +34,7 @@ args to pick a vault other than the default.
 | --- | --- |
 | `search_notes` | full-text search, with snippets |
 | `read_note` | a note, its frontmatter, links and hash |
-| `list_notes` | a folder, a tag, a `where` clause or a view |
+| `list_notes` | a folder, a tag, a `where` clause, `pinned` or a view |
 | `create_note` | a new note, in the inbox by default |
 | `append_to_note` | adds text to the end of a note |
 | `update_note` | replaces a body; pass `expected_hash` from `read_note` to avoid overwriting newer edits |

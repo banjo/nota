@@ -16,6 +16,8 @@ nota open --app Plan                           # In the desktop app, in Reading 
 nota open --app ~/Downloads/README.md          # Any .md file: a read-only preview.
 nota set Plan status=done priority=2           # Frontmatter, edited line by line.
 nota tag Plan +nota -draft                     # Flags go before the note.
+nota pin Plan                                  # Under Pinned in the sidebar; nota unpin Plan undoes it.
+nota ls --pinned                               # Pinned notes, in their order.
 nota mv Plan Archive                           # Links to it that would break are rewritten.
 nota mv Plan Projects/Roadmap.md               # A path ending in .md renames.
 nota folder add Projects/Ideas                  # Empty folders, nested paths too.
@@ -78,9 +80,22 @@ without the CLI; Nota is offered there but never made the default app for `.md`.
 Edits through Nota (`set`, `tag`, the app, MCP, hooks) set `updated` in the frontmatter to the
 current local time, but only in notes that already have frontmatter; `created` is written once
 by `nota add`/`create_note`. `mv` does not touch the moved file, except for its own relative
-links. `nota tag -x` edits the frontmatter
+links. Pinning (below) is not an edit either. `nota tag -x` edits the frontmatter
 only: an inline `#x` in the body stays. Frontmatter keys Nota does not know are kept byte for
 byte.
+
+## Pinned notes
+
+A note is pinned when its frontmatter has `pinned:` set to a number or `true`. The app lists
+pinned notes under **Pinned** at the top of the sidebar and first in ⌘K, lowest number first and
+`pinned: true` last. Pin and unpin from a note's menu, ⌘K or ⌘⇧P in the app, `nota pin` and
+`nota unpin`, or `update_frontmatter` over MCP; drag a pinned note in the sidebar to reorder.
+
+`nota pin` puts the note last (ten past the highest number); reordering in the app picks a number
+between the neighbours, so it usually rewrites one file. A change that only touches `pinned`
+leaves `updated` alone. As it is frontmatter, the pin syncs with the note and stays through a
+move or rename. `nota ls --pinned` and `list_notes` with `pinned: true` list them in order;
+`--sort pinned` sorts any list that way.
 
 ## Moving and renaming
 

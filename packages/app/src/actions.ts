@@ -1,4 +1,10 @@
-import { type LinksUpdated, type NotesClient, NotaError } from "@nota/client";
+import {
+  type LinksUpdated,
+  type NotesClient,
+  NotaError,
+  type PropertyPatch,
+  type Tree,
+} from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { rememberFolder } from "./lib/folders.ts";
@@ -10,8 +16,9 @@ import {
   resolveLink,
   splitTitle,
 } from "./lib/notes.ts";
+import { isPinned, movePin, nextPin, PINNED_KEY, pinnedNotes } from "./lib/pinned.ts";
 import { followedPath, remapFolder } from "./lib/rename.ts";
-import { keys, noteWritten, setNoteBase } from "./queries.ts";
+import { keys, noteBase, noteWritten, setNoteBase } from "./queries.ts";
 import { type Route, useUI } from "./state.ts";
 
 // What commands, menus and rows do, in one place.
@@ -382,4 +389,75 @@ export async function openVaultFlow(client: NotesClient, mode: "create" | "open"
     // Not knowing is not a reason to refuse.
   }
   useUI.getState().openVaultFlow(mode);
+}
+
+/** Shows new `pinned` values in the cached tree before the writes land. */
+function showPins(qc: QueryClient, pins: Map<string, number | null>) {
+  qc.setQueryData<Tree>(
+    keys.tree,
+    (t) =>
+      t && {
+        ...t,
+        notes: t.notes.map((n) => {
+          if (!pins.has(n.path)) return n;
+          const { [PINNED_KEY]: _, ...rest } = n.properties;
+          const v = pins.get(n.path);
+          return { ...n, properties: v === null ? rest : { ...rest, [PINNED_KEY]: v } };
+        }),
+      },
+  );
+}
+
+/** Writes only `pinned` (null unpins), whatever else changed in the note meanwhile. */
+async function writePins(client: NotesClient, qc: QueryClient, pins: Map<string, number | null>) {
+  showPins(qc, pins);
+  try {
+    for (const [path, v] of pins) {
+      const patch: PropertyPatch =
+        v === null ? { unset: [PINNED_KEY] } : { set: { [PINNED_KEY]: v } };
+      let r = await client.patch(path, patch, noteBase(path));
+      if (r.conflict) r = await client.patch(path, patch);
+      if (!r.conflict) noteWritten(qc, r.note);
+    }
+  } finally {
+    void qc.invalidateQueries({ queryKey: keys.tree });
+  }
+}
+
+const loadTree = (client: NotesClient, qc: QueryClient) =>
+  qc.ensureQueryData({ queryKey: keys.tree, queryFn: () => client.tree() });
+
+/** Pins a note last in the pinned list, or unpins it. */
+export async function setPinned(client: NotesClient, qc: QueryClient, path: string, pin: boolean) {
+  try {
+    const tree = await loadTree(client, qc);
+    const note = tree.notes.find((n) => n.path === path);
+    if (note && isPinned(note) === pin) return;
+    await writePins(client, qc, new Map([[path, pin ? nextPin(tree.notes) : null]]));
+  } catch (e) {
+    fail(pin ? "Couldn't pin the note" : "Couldn't unpin the note", e);
+  }
+}
+
+export async function togglePinned(client: NotesClient, qc: QueryClient, path: string) {
+  const tree = await loadTree(client, qc);
+  const note = tree.notes.find((n) => n.path === path);
+  await setPinned(client, qc, path, !(note && isPinned(note)));
+}
+
+/** Moves a pinned note to `index` in the pinned list. */
+export async function movePinned(
+  client: NotesClient,
+  qc: QueryClient,
+  path: string,
+  index: number,
+) {
+  try {
+    const tree = await loadTree(client, qc);
+    const changes = movePin(pinnedNotes(tree.notes), path, index);
+    if (changes.length)
+      await writePins(client, qc, new Map(changes.map((c) => [c.path, c.pinned])));
+  } catch (e) {
+    fail("Couldn't move the pinned note", e);
+  }
 }

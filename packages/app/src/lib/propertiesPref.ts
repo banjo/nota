@@ -1,5 +1,6 @@
 // Whether a note's properties (its frontmatter) show above the body.
 
+import { PINNED_KEY } from "./pinned.ts";
 import {
   DEFAULT_SHOW_PREF,
   readShowPref,
@@ -20,6 +21,6 @@ export const savePropertiesPref = pref.save;
 export const toggledPropertiesPref = toggledShowPref;
 export const watchPropertiesPref = pref.watch;
 
-/** How many properties the chip counts: every key in the note's frontmatter. */
+/** How many properties the chip counts: every key in the note's frontmatter but `pinned`, which the sidebar shows. */
 export const propertyCount = (props: Record<string, unknown> | undefined) =>
-  Object.keys(props ?? {}).length;
+  Object.keys(props ?? {}).filter((k) => k !== PINNED_KEY).length;

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"sort"
 	"strings"
@@ -50,7 +51,7 @@ func ParseCond(s string) (Cond, error) {
 
 // Sort orders query results.
 type Sort struct {
-	// Field is one of "path", "title", "created", "updated", "modified".
+	// Field is one of "path", "title", "created", "updated", "modified", "pinned".
 	Field string
 	Desc  bool
 }
@@ -61,17 +62,27 @@ var sortColumns = map[string]string{
 	"created":  "n.created",
 	"updated":  "n.updated",
 	"modified": "n.mtime",
+	"pinned":   pinOrder,
 }
 
+// pinnedValue matches a property_values row that pins its note: true or
+// a number (see vault.PinnedKey).
+const pinnedValue = `pv.key = 'pinned' AND (pv.value = 'true' OR pv.value GLOB '[0-9]*' OR pv.value GLOB '-[0-9]*')`
+
+// pinOrder is a note's place in the pinned list: its number, after those
+// the notes pinned with true, then the notes not pinned at all.
+const pinOrder = `coalesce((SELECT min(CASE WHEN pv.value = 'true' THEN 1e300 ELSE CAST(pv.value AS REAL) END)
+	FROM property_values pv WHERE pv.note_id = n.id AND ` + pinnedValue + `), 9e300)`
+
 // ParseSort parses "updated desc", "title", "created asc" and so on. The
-// empty string sorts by path.
+// empty string sorts by path; "pinned" sorts by place in the pinned list.
 func ParseSort(s string) (Sort, error) {
 	f := strings.Fields(strings.ToLower(s))
 	if len(f) == 0 {
 		return Sort{Field: "path"}, nil
 	}
 	if _, ok := sortColumns[f[0]]; !ok || len(f) > 2 {
-		return Sort{}, fmt.Errorf("index: sort %q: want <path|title|created|updated|modified> [asc|desc]", s)
+		return Sort{}, fmt.Errorf("index: sort %q: want <path|title|created|updated|modified|pinned> [asc|desc]", s)
 	}
 	srt := Sort{Field: f[0]}
 	if len(f) == 2 {
@@ -93,8 +104,10 @@ type Query struct {
 	// Tag matches the tag and its nested tags: "a" matches "a" and "a/b".
 	Tag   string
 	Where []Cond
-	Sort  Sort
-	Limit int
+	// Pinned keeps only the pinned notes.
+	Pinned bool
+	Sort   Sort
+	Limit  int
 }
 
 // filter renders the WHERE clause shared by Query and Search.
@@ -116,6 +129,9 @@ func (q Query) filter() (string, []any) {
 		}
 		where = append(where, sub)
 		args = append(args, c.Key, c.Value)
+	}
+	if q.Pinned {
+		where = append(where, `EXISTS (SELECT 1 FROM property_values pv WHERE pv.note_id = n.id AND `+pinnedValue+`)`)
 	}
 	if len(where) == 0 {
 		return "", nil
@@ -644,4 +660,19 @@ func (ix *Index) Tags() ([]TagCount, error) {
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+// NextPin is the pinned value that puts a note last in the pinned list
+// (before the notes pinned with true): ten past the highest number, so
+// a note can later be moved between two others without renumbering.
+func (ix *Index) NextPin() (int, error) {
+	var hi sql.NullFloat64
+	err := ix.db.QueryRow(`SELECT max(CAST(pv.value AS REAL)) FROM property_values pv WHERE ` + pinnedValue + ` AND pv.value <> 'true'`).Scan(&hi)
+	if err != nil {
+		return 0, fmt.Errorf("index: next pin: %w", err)
+	}
+	if !hi.Valid || hi.Float64 < 0 {
+		return 10, nil
+	}
+	return int(math.Floor(hi.Float64)) + 10, nil
 }

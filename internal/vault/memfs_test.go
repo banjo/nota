@@ -147,4 +147,11 @@ func TestSaveStampsUpdated(t *testing.T) {
 		t.Fatalf("new: %v %v", created, err)
 	}
 	check("New.md", "---\na: 1\n---\n")
+	// Pinning, moving a pin and unpinning change only `pinned`.
+	for _, fm := range []string{"a: 1\npinned: 10\n", "a: 1\npinned: 5\n", "a: 1\n"} {
+		if _, _, err := v.Save("New", []byte("---\n"+fm+"---\n")); err != nil {
+			t.Fatal(err)
+		}
+		check("New.md", "---\n"+fm+"---\n")
+	}
 }

@@ -331,3 +331,37 @@ func TestParseHelpers(t *testing.T) {
 		t.Error("empty key accepted")
 	}
 }
+
+func TestPinned(t *testing.T) {
+	dir := t.TempDir()
+	for name, pinned := range map[string]string{
+		"A.md": "20", "B.md": "true", "C.md": "5", "D.md": "false", "E.md": "later", "F.md": "100",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("---\npinned: "+pinned+"\n---\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "G.md"), []byte("Not pinned\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	v, err := vault.Open(dir, vault.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix, err := OpenVault(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ix.Close() })
+	if _, err := ix.Sync(v); err != nil {
+		t.Fatal(err)
+	}
+	// Numbers order the list (as numbers, so 100 comes after 20), true
+	// comes last; false and other values do not pin.
+	if got, want := query(t, ix, Query{Pinned: true, Sort: Sort{Field: "pinned"}}), []string{"C.md", "A.md", "F.md", "B.md"}; !slices.Equal(got, want) {
+		t.Fatalf("pinned: got %q, want %q", got, want)
+	}
+	if got, want := query(t, ix, Query{Sort: Sort{Field: "pinned"}, Limit: 5}), []string{"C.md", "A.md", "F.md", "B.md", "D.md"}; !slices.Equal(got, want) {
+		t.Fatalf("sort pinned: got %q, want %q", got, want)
+	}
+}
