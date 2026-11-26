@@ -12,6 +12,7 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  Globe,
   History,
   Inbox,
   Link2,
@@ -45,6 +46,7 @@ import { requestFind } from "../lib/find.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
 import { openHistory } from "../components/History.tsx";
+import { openShare } from "../components/Share.tsx";
 import { startRename } from "../components/Rename.tsx";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
@@ -225,6 +227,15 @@ export function registerBuiltins(r: Registry): () => void {
       shortcut: "mod+shift+h",
       when: (ctx) => !!ctx.notePath,
       run: (ctx) => openHistory(ctx.notePath!),
+    }),
+    r.register("command", {
+      id: "note.share",
+      title: "Share note…",
+      group: "Notes",
+      keywords: ["publish", "link", "web", "page", "password", "dela", "publicera"],
+      icon: Globe,
+      when: (ctx) => !!ctx.notePath && !!ctx.client.shares,
+      run: (ctx) => openShare(ctx.notePath!),
     }),
     r.register("command", {
       id: "note.delete",

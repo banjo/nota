@@ -107,6 +107,8 @@ type Server struct {
 	broker *broker
 	wa     *webauthn.WebAuthn
 	limit  *limiter
+	// shareLimit counts password tries on shared notes, per IP and share.
+	shareLimit *limiter
 
 	wsMu       gosync.Mutex
 	workspaces map[int64]*workspace // by vault id
@@ -188,6 +190,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 			n = 30
 		}
 		s.limit = newLimiter(n, 20, cfg.Now)
+		s.shareLimit = newLimiter(10, 10, cfg.Now)
 	}
 	s.routes()
 	if cfg.BlobGCInterval > 0 {
@@ -279,6 +282,7 @@ func (s *Server) routes() {
 	s.flowRoutes()
 	s.apiRoutes()
 	s.settingsRoutes()
+	s.shareRoutes()
 	s.mcpRoutes()
 	s.mux.Handle("/v1/", s.v1(func(http.ResponseWriter, *http.Request, Principal) error {
 		return &apiErr{http.StatusNotFound, protocol.Error{Code: protocol.CodeNotFound, Message: "no such route"}}

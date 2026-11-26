@@ -252,6 +252,27 @@ describe("createHttpClient", () => {
     expect(f.call(1).body).toEqual({ version: 4 });
   });
 
+  test("shares, changes and unshares a note", async () => {
+    const share = {
+      id: "abc",
+      path: "Projekt/Mål.md",
+      url: `${BASE}/s/abc`,
+      password: true,
+      created: "2026-11-26T10:00:00Z",
+      updated: "2026-11-26T10:00:00Z",
+    };
+    const f = mockFetch(json([share]), json(share), json(null, 204));
+    const c = client(f);
+    expect(await c.shares!.list()).toEqual([share]);
+    expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/shares");
+    expect(await c.shares!.put("Projekt/Mål.md", { password: "hemligt" })).toEqual(share);
+    expect(f.call(1).method).toBe("PUT");
+    expect(f.call(1).url.pathname).toBe("/v1/api/vaults/Anteckningar/shares/Projekt/M%C3%A5l.md");
+    expect(f.call(1).body).toEqual({ password: "hemligt" });
+    await c.shares!.remove("Projekt/Mål.md");
+    expect(f.call(2).method).toBe("DELETE");
+  });
+
   test("deletes into the trash and restores from it", async () => {
     const f = mockFetch(
       json({ path: "Plan.md", version: 5, deleted: true }),

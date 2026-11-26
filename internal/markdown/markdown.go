@@ -301,3 +301,17 @@ func CodeRanges(body []byte) [][2]int {
 	})
 	return out
 }
+
+// ParseWiki reads the inside of a [[wikilink]]: target, #heading and
+// |alias. Target is empty for [[#heading]], a heading in the same note.
+func ParseWiki(inner string) Link {
+	l, _ := parseWiki(inner)
+	return l
+}
+
+// ParseLocalLink reads the destination of a markdown link to a local
+// file, resolved against folder; file is true when it is not a note, ok
+// false when it is not a local file at all (a web link, #heading).
+func ParseLocalLink(dest, folder string) (l Link, file, ok bool) {
+	return parseLocalLink(dest, folder)
+}

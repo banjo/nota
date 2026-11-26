@@ -197,6 +197,10 @@ type VaultInfo struct {
 // live on the server.
 var ErrNoHistory = errors.New("history needs sync: sign in to sync in Settings")
 
+// ErrNoShare is returned for sharing without a sync remote: shared notes
+// are pages of the sync server.
+var ErrNoShare = errors.New("sharing needs sync: sign in to sync in Settings")
+
 // ErrNoVault is returned while the first-run setup has not chosen a
 // vault: the window is open, but nothing is bound to read from.
 var ErrNoVault = errors.New("no vault is open yet: finish the setup first")
@@ -969,3 +973,40 @@ func (s *Vault) SyncStatus() SyncStatus {
 
 // intoFolder is the path of the note p moved into folder.
 func intoFolder(folder, p string) string { return path.Join(folder, path.Base(p)) }
+
+// Shares lists the vault's shared notes on the sync server.
+func (s *Vault) Shares(ctx context.Context) ([]protocol.Share, error) {
+	if s.v == nil {
+		return nil, ErrNoVault
+	}
+	c := s.syn.Load().client()
+	if c == nil {
+		return nil, ErrNoShare
+	}
+	return c.Shares(ctx)
+}
+
+// Share shares a note as a page of the sync server, or changes its
+// share (protocol.ShareRequest), and returns the link.
+func (s *Vault) Share(ctx context.Context, path string, req protocol.ShareRequest) (protocol.Share, error) {
+	if s.v == nil {
+		return protocol.Share{}, ErrNoVault
+	}
+	c := s.syn.Load().client()
+	if c == nil {
+		return protocol.Share{}, ErrNoShare
+	}
+	return c.Share(ctx, path, req)
+}
+
+// Unshare stops sharing a note.
+func (s *Vault) Unshare(ctx context.Context, path string) error {
+	if s.v == nil {
+		return ErrNoVault
+	}
+	c := s.syn.Load().client()
+	if c == nil {
+		return ErrNoShare
+	}
+	return c.Unshare(ctx, path)
+}

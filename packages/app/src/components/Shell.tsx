@@ -19,6 +19,7 @@ import { Onboarding, preloadScreens, Settings } from "./lazy.tsx";
 import { Palette } from "./Palette.tsx";
 import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
 import { HistoryDialog } from "./History.tsx";
+import { ShareDialog } from "./Share.tsx";
 import { RowSheet } from "./RowSheet.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { ReplaceView } from "./Replace.tsx";
@@ -209,6 +210,7 @@ export function Shell({ children }: { children?: ReactNode }) {
       <VaultDialogs />
       <RowSheet />
       <HistoryDialog />
+      <ShareDialog />
       {vaultFlow ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
           <Onboarding flow="switch" initialMode={vaultFlow.mode} onCancel={closeVaultFlow} />

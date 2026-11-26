@@ -26,6 +26,7 @@ export const keys = {
   history: (path: string) => ["history", path] as const,
   trash: ["trash"] as const,
   replace: ["replace"] as const,
+  shares: ["shares"] as const,
 };
 
 export const useVaultInfo = () => {

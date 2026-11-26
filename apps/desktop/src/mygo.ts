@@ -452,6 +452,44 @@ export interface SettingsState {
   warnings: string[];
 }
 
+/**
+ * Share is a shared note (GET /v1/api/vaults/{vault}/shares and PUT
+ * …/shares/{path}).
+ */
+export interface Share {
+  id: string;
+  path: string;
+  /** URL is the link to give out. */
+  url: string;
+  /** Password is true when the link asks for a password. */
+  password: boolean;
+  theme?: ShareTheme;
+  created: string;
+  updated: string;
+}
+
+/**
+ * ShareRequest is the body of PUT …/shares/{path}, which shares a note
+ * or changes its share: Password nil keeps the password, "" removes it;
+ * Theme nil keeps the theme, an empty one is Nota's own.
+ */
+export interface ShareRequest {
+  password?: string;
+  theme?: ShareTheme;
+}
+
+/**
+ * ShareTheme is the look of a shared note: a mode and the colour tokens
+ * of the sharer's theme in it, as the app had them when sharing. No
+ * tokens is Nota's own theme in that mode; no mode follows the reader's
+ * system.
+ */
+export interface ShareTheme {
+  /** "light", "dark" or "" */
+  mode?: string;
+  tokens?: Record<string, string>;
+}
+
 /** SyncStatus describes the background sync of the open vault. */
 export interface SyncStatus {
   /** State is "off" (no .nota/sync.toml), "starting", "synced" or "error". */
@@ -656,6 +694,13 @@ export const Vault = {
    */
   search: bind<[string, ListQuery], NoteInfo[]>("Vault.Search", (q: string, filter: ListQuery) => [q, filter]),
   /**
+   * Share shares a note as a page of the sync server, or changes its
+   * share (protocol.ShareRequest), and returns the link.
+   */
+  share: bind<[string, ShareRequest], Share>("Vault.Share", (path: string, req: ShareRequest) => [path, req]),
+  /** Shares lists the vault's shared notes on the sync server. */
+  shares: bind<[], Share[]>("Vault.Shares", () => []),
+  /**
    * SyncStatus returns the state of the background sync. Updates also
    * arrive as "syncStatus" events after every pass.
    */
@@ -668,6 +713,8 @@ export const Vault = {
   trashNote: bind<[string], string>("Vault.TrashNote", (id: string) => [id]),
   /** Tree returns every folder (empty ones too) and every note, by path. */
   tree: bind<[], Tree>("Vault.Tree", () => []),
+  /** Unshare stops sharing a note. */
+  unshare: bind<[string], void>("Vault.Unshare", (path: string) => [path]),
   /** Views returns the saved views of .nota/views with their note counts. */
   views: bind<[], ViewInfo[]>("Vault.Views", () => []),
 } as const;

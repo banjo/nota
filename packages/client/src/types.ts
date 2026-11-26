@@ -233,6 +233,47 @@ export interface HistoryEntry {
   movedFrom?: string;
 }
 
+/**
+ * The look of a shared note: the sharer's theme as its colour tokens in
+ * one mode. No tokens is Nota's own theme; no mode follows the reader.
+ */
+export interface ShareTheme {
+  /** "light", "dark", or "" to follow the reader. */
+  mode?: string;
+  tokens?: Record<string, string>;
+}
+
+/** A note shared as a web page of the sync server. */
+export interface Share {
+  id: string;
+  path: string;
+  /** The link to give out. */
+  url: string;
+  /** Whether the link asks for a password. */
+  password: boolean;
+  theme?: ShareTheme;
+  created: string;
+  updated: string;
+}
+
+/**
+ * Shares a note or changes its share: a password sets one, "" removes
+ * it, and leaving it out keeps it; likewise the theme ({} is Nota's own).
+ */
+export interface ShareRequest {
+  password?: string;
+  theme?: ShareTheme;
+}
+
+/** Shared notes: pages of the sync server, one link per note. */
+export interface SharesApi {
+  list(): Promise<Share[]>;
+  /** Shares a note (or changes its share) and resolves to its link. */
+  put(path: string, req: ShareRequest): Promise<Share>;
+  /** Stops sharing a note: its link leads nowhere from then on. */
+  remove(path: string): Promise<void>;
+}
+
 /** A deleted note. */
 export interface TrashItem {
   /** What the other trash calls take: its path in .trash/ (desktop) or its path (web). */

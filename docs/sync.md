@@ -55,6 +55,16 @@ see what changed from it to the note now; **Restore this version** makes it the 
 desktop the restored text arrives with the next sync pass, a moment later. A vault without sync
 has no history: the panel says so and links to Settings.
 
+## Sharing
+
+**Share…** in a note's "…" menu (or ⌘K "Share note…") makes a link to the note as a web page
+of your sync server, for anyone who has it: **Create link**, optionally with a password, then
+**Copy**. The page always shows the latest version, with the note's images, in the theme you had
+when sharing (**Use current** updates it). Links to other notes are plain text unless those are
+shared too. **Stop sharing** turns the link off; deleting the note does too, while moving or
+renaming it keeps the link. Sharing needs sync, so a vault without it says so and links to
+Settings. See [docs/api.md](api.md#sharing) for the details.
+
 ## Trash
 
 A delete syncs as a delete, and every device moves the file to its own `.trash/`: a note deleted

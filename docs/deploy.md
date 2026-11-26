@@ -56,6 +56,8 @@ that the bucket answers, if there is one (`503` otherwise).
   skips `text/event-stream`). Keepalive comments go out every 25 s, so
   idle timeouts above that are fine.
 - Set `NOTA_SERVER_TRUSTED_PROXIES` so rate limits see real client IPs.
+- Shared notes are pages at `/s/…` on the API's domain
+  (`NOTA_SERVER_PUBLIC_URL`), so route that path to the server too.
 
 ## First user
 

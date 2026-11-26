@@ -18,6 +18,8 @@ import type {
   ReplaceResult,
   SettingsApi,
   SettingsLayers,
+  Share,
+  ShareRequest,
   TagCount,
   Tree,
   VaultInfo,
@@ -335,6 +337,14 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
     },
     async restore(path: string, version: number) {
       await request("POST", `/history/${escapePath(path)}/restore`, { body: { version } });
+    },
+    shares: {
+      list: () => request<Share[]>("GET", "/shares"),
+      put: (path: string, req: ShareRequest) =>
+        request<Share>("PUT", `/shares/${escapePath(path)}`, { body: req }),
+      remove: async (path: string) => {
+        await request("DELETE", `/shares/${escapePath(path)}`);
+      },
     },
     subscribe(listener: (event: ChangeEvent) => void) {
       const es = openEvents(`${vaultRoot}/events?protocol=${PROTOCOL}`);
