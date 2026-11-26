@@ -1,5 +1,25 @@
 # @nota/desktop
 
+## 0.1.4
+
+### Patch Changes
+
+- [#61](https://github.com/banjo/nota/pull/61) [`7eff385`](https://github.com/banjo/nota/commit/7eff3851889f0e500f0feb7cf5f7dc5529837c1f) - Find and replace in a note. ⌘F opens a find bar over the note with match case, whole word and regex toggles, a match count, and Enter / ⇧Enter to step through the matches; ⌥⌘F adds a replace row with Replace and All. It works in Live, Source and Reading (find only), in the desktop app and on the web, and on a phone from the note's "…" sheet.
+
+- [#62](https://github.com/banjo/nota/pull/62) [`6b5a934`](https://github.com/banjo/nota/commit/6b5a934babfc29602a22a3bc9b11d2ee0130b931) - Find and replace across notes. ⌘⇧F (or "Find in notes…" in ⌘K) shows every match note by note with what it becomes; untick the ones to keep, replace, and undo from the toast. A match opens its note with the find bar on it. The CLI has `nota replace` (it lists the changes and asks first) and agents get the MCP tool `replace_in_notes` (a dry run unless told otherwise). Only note text changes: frontmatter and link targets are left alone, and code unless asked.
+
+- [#57](https://github.com/banjo/nota/pull/57) [`a0f5d9b`](https://github.com/banjo/nota/commit/a0f5d9bc68ffb7e7694a6633f5cf9ab7e2a2fd1c) - A note's history in the app: **History** in the note's "…" menu, ⌘K "Show history" or ⌘⇧H lists its versions on the sync server. Pick one to read it or see what changed since, then restore it (as a new version, so nothing is lost) or copy its text. Works on a phone too.
+
+- [#60](https://github.com/banjo/nota/pull/60) [`041f47a`](https://github.com/banjo/nota/commit/041f47a4be99fe6bd8b05ca582b26c31ff43dfea) - Pinned notes. Pin a note from its … menu, the right-click menu (a long press on a phone), ⌘K or ⌘⇧P, and it shows under **Pinned** at the top of the sidebar and first in ⌘K. Drag to reorder. The pin is `pinned: <number>` in the note's frontmatter, so it syncs and survives moves and renames, and pinning doesn't change `updated`. In the CLI, `nota pin`, `nota unpin` and `nota ls --pinned`; agents get a `pinned` filter on `list_notes`.
+
+- [#57](https://github.com/banjo/nota/pull/57) [`e7b04c3`](https://github.com/banjo/nota/commit/e7b04c3f0d8dd0a8ec8d6ddb0f5a0eeb148fdb47) - The server can collect unreferenced blobs on its own: set `NOTA_SERVER_BLOB_GC_INTERVAL=24h` (or `7d`) and it runs the same pass as `nota serve blobs gc` on that timer. Off by default.
+
+- [#63](https://github.com/banjo/nota/pull/63) [`80e1a84`](https://github.com/banjo/nota/commit/80e1a845dcf77849d4bbb19128533a1c91fd0af0) - Share a note as a web page: "Share…" in a note's menu makes a link to it on your sync server, live, with its images, in your theme and optionally behind a password.
+
+- [#57](https://github.com/banjo/nota/pull/57) [`755d720`](https://github.com/banjo/nota/commit/755d720698a8b387c260aed168d7d226020e3f7a) - A trash you can see into. The sidebar's trash button (and ⌘K "Open trash") lists deleted notes: read one, restore it, or delete it for good, and empty the trash. Deleting a note now offers **Undo**. In the CLI, `nota trash ls`, `nota trash restore` (`--to` for another folder), `nota trash rm` and `nota trash empty --older 30d`; agents get `list_trash` and `restore_note`. The web app lists the notes deleted on the server and restores them.
+
+- [#57](https://github.com/banjo/nota/pull/57) [`161a02d`](https://github.com/banjo/nota/commit/161a02d8fa52596ba4c2dfab3a60810c21b67764) - Renaming or moving a note, or renaming a folder, rewrites the links to it so they keep working: `[[Plan]]` becomes `[[Roadmap]]`, `[[Projects/Plan]]` and `[plan](Projects/Plan.md)` follow the note, and a moved note's own relative links and images are fixed from its new folder. Headings, block ids and aliases stay as written. The app says how many links changed; `nota mv` (which now also renames: `nota mv Plan Roadmap.md`) and `nota folder rename` take `--no-update-links`. See docs/cli.md.
+
 ## 0.1.3
 
 ### Patch Changes
