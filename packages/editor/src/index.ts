@@ -24,6 +24,7 @@ import {
   rememberHandlers,
   type EditorMode,
 } from "./mode.ts";
+import type { FindPreset } from "./find.ts";
 import { type PreviewHandlers, setEmbedMount } from "./preview.ts";
 import { notaSyntax } from "./syntax.ts";
 import { notaTheme } from "./theme.ts";
@@ -67,6 +68,7 @@ export {
 export { findTags, notaSyntax, parseWikilink, tagLength, type Wikilink } from "./syntax.ts";
 export { notaTheme } from "./theme.ts";
 export type { EditorView } from "@codemirror/view";
+export type { FindPreset } from "./find.ts";
 
 /**
  * Markdown with GFM and Nota's wikilinks and tags. Code in fenced blocks
@@ -102,13 +104,17 @@ const findLoaded = new WeakSet<EditorView>();
  * The search code loads the first time; in Reading mode there is no
  * replace row.
  */
-export async function openFind(view: EditorView, replace = false): Promise<void> {
+export async function openFind(
+  view: EditorView,
+  replace = false,
+  preset?: FindPreset,
+): Promise<void> {
   const find = await import("./find.ts");
   if (!findLoaded.has(view)) {
     findLoaded.add(view);
     view.dispatch({ effects: findCompartment.reconfigure(find.findExtension) });
   }
-  find.open(view, replace);
+  find.open(view, replace, preset);
 }
 
 const findKeys = keymap.of([

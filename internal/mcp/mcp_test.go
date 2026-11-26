@@ -124,7 +124,7 @@ func TestTools(t *testing.T) {
 	}
 	slices.Sort(names)
 	want := []string{"append_to_note", "create_folder", "create_note", "get_backlinks", "list_folders", "list_notes", "list_tags", "list_trash", "list_views",
-		"move_note", "read_note", "restore_note", "search_notes", "update_frontmatter", "update_note"}
+		"move_note", "read_note", "replace_in_notes", "restore_note", "search_notes", "update_frontmatter", "update_note"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools %q, want %q", names, want)
 	}
@@ -204,6 +204,28 @@ func TestTools(t *testing.T) {
 	call(t, cs, "get_backlinks", map[string]any{"note": n.Path}, &bl)
 	if len(bl.Backlinks) != 1 || bl.Backlinks[0].From != "Projekt/Plan.md" {
 		t.Fatalf("backlinks %+v", bl)
+	}
+
+	// replace_in_notes is a dry run unless dry_run is false; frontmatter
+	// and code are left alone.
+	var rp ReplaceOutput
+	call(t, cs, "replace_in_notes", map[string]any{"find": "plan", "replace": "Karta", "word": true}, &rp)
+	if !rp.DryRun || rp.Count != 1 || rp.Notes[0].Path != "Projekt/Plan.md" || rp.Notes[0].Matches[0].Text != "Plan" {
+		t.Fatalf("replace dry run %+v", rp)
+	}
+	if b, _ := m.ReadFile("Projekt/Plan.md"); !strings.Contains(string(b), "# Plan") {
+		t.Fatalf("dry run wrote: %s", b)
+	}
+	rp = ReplaceOutput{}
+	call(t, cs, "replace_in_notes", map[string]any{"find": "plan", "replace": "Karta", "word": true, "dry_run": false}, &rp)
+	if rp.DryRun || rp.Count != 1 || len(rp.Notes[0].Matches) != 0 {
+		t.Fatalf("replace %+v", rp)
+	}
+	if b, _ := m.ReadFile("Projekt/Plan.md"); !strings.Contains(string(b), "# Karta") || !strings.Contains(string(b), "tags: [projekt]") {
+		t.Fatalf("after replace: %s", b)
+	}
+	if msg := toolError(t, cs, "replace_in_notes", map[string]any{"find": "(", "replace": "", "regex": true}); !strings.Contains(msg, "invalid regular expression") {
+		t.Fatalf("bad regex: %q", msg)
 	}
 
 	var mv MoveOutput

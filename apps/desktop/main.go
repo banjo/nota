@@ -127,6 +127,7 @@ func menu(d *Desktop) *mygo.Menu {
 			{Label: "Quick Capture", Click: func(*mygo.MenuItem, *mygo.Window) { d.ShowCapture() }},
 			mygo.Separator(),
 			{Label: "Open Inbox", Accelerator: "CmdOrCtrl+Shift+I", Click: send("inbox.open")},
+			{Label: "Find in Notes…", Accelerator: "CmdOrCtrl+Shift+F", Click: send("notes.replace")},
 			{Label: "Add to Folder…", Accelerator: "CmdOrCtrl+Shift+M", Click: send("note.addToFolder")},
 			{Label: "New Note in Folder…", Click: send("note.newInFolder")},
 			{Label: "New Folder…", Accelerator: "CmdOrCtrl+Shift+N", Click: send("folder.add")},

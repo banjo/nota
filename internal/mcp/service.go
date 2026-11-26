@@ -19,6 +19,7 @@ import (
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/relink"
+	"github.com/banjo/nota/internal/replace"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -498,6 +499,96 @@ func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 		return MoveOutput{}, err
 	}
 	return MoveOutput{From: p, Path: to, URI: URI(to), Links: links}, nil
+}
+
+// ReplaceInput are the arguments of replace_in_notes.
+type ReplaceInput struct {
+	Find        string `json:"find" jsonschema:"the text to find; a regular expression (RE2) with regex"`
+	Replace     string `json:"replace" jsonschema:"what to put instead; with regex, $1 and ${name} are the groups"`
+	Regex       bool   `json:"regex,omitempty" jsonschema:"read find as a regular expression"`
+	Case        bool   `json:"case,omitempty" jsonschema:"match case; by default case is ignored"`
+	Word        bool   `json:"word,omitempty" jsonschema:"match whole words only"`
+	IncludeCode bool   `json:"include_code,omitempty" jsonschema:"also replace in code blocks and inline code, which are skipped by default"`
+	Folder      string `json:"folder,omitempty" jsonschema:"only notes in this folder and its subfolders"`
+	Tag         string `json:"tag,omitempty" jsonschema:"only notes with this tag (nested tags included)"`
+	DryRun      *bool  `json:"dry_run,omitempty" jsonschema:"list the matches without writing; true unless set to false"`
+}
+
+// ReplaceOutput is the result of replace_in_notes.
+type ReplaceOutput struct {
+	DryRun bool `json:"dry_run"`
+	// Notes are the notes with matches; on a dry run each lists them.
+	Notes []ReplaceNote `json:"notes"`
+	// Count is how many matches there are (dry run) or were replaced.
+	Count int `json:"count"`
+	// Truncated says the listed matches stop short of Count.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+// ReplaceNote is one note in a ReplaceOutput.
+type ReplaceNote struct {
+	Path    string          `json:"path"`
+	Count   int             `json:"count"`
+	Matches []replace.Match `json:"matches,omitempty"`
+}
+
+const maxListedMatches = 200
+
+// Replace finds text in note bodies (never frontmatter, code skipped
+// unless asked) and, when dry_run is false, replaces it.
+func (s *Service) Replace(in ReplaceInput) (ReplaceOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.sync(); err != nil {
+		return ReplaceOutput{}, err
+	}
+	r, err := replace.New(replace.Options{Find: in.Find, Replace: in.Replace, Regex: in.Regex, Case: in.Case, Word: in.Word, Code: in.IncludeCode})
+	if err != nil {
+		return ReplaceOutput{}, err
+	}
+	q := index.Query{Tag: in.Tag, Sort: index.Sort{Field: "path"}}
+	if in.Folder != "" {
+		if q.Folder, err = vault.CleanPath(in.Folder); err != nil {
+			return ReplaceOutput{}, err
+		}
+	}
+	notes, err := replace.Find(s.v, s.ix, r, q)
+	if err != nil {
+		return ReplaceOutput{}, err
+	}
+	out := ReplaceOutput{DryRun: in.DryRun == nil || *in.DryRun, Notes: []ReplaceNote{}}
+	if out.DryRun {
+		listed := 0
+		for _, n := range notes {
+			ms := n.Matches
+			if room := maxListedMatches - listed; len(ms) > room {
+				ms, out.Truncated = ms[:room], true
+			}
+			listed += len(ms)
+			out.Notes = append(out.Notes, ReplaceNote{Path: n.Path, Count: len(n.Matches), Matches: ms})
+			out.Count += len(n.Matches)
+		}
+		return out, nil
+	}
+	picks := make([]replace.Pick, len(notes))
+	for i, n := range notes {
+		picks[i] = replace.Pick{Path: n.Path, Hash: n.Hash}
+	}
+	res, err := replace.ApplyNotes(s.v, r, picks)
+	if err != nil {
+		return ReplaceOutput{}, err
+	}
+	if len(res.Stale) > 0 {
+		return ReplaceOutput{}, fmt.Errorf("changed while replacing, left alone: %s", strings.Join(res.Stale, ", "))
+	}
+	if err := s.sync(); err != nil {
+		return ReplaceOutput{}, err
+	}
+	for _, c := range res.Notes {
+		out.Notes = append(out.Notes, ReplaceNote{Path: c.Path, Count: c.Count})
+	}
+	out.Count = res.Count
+	return out, nil
 }
 
 // TrashOutput is the result of list_trash.

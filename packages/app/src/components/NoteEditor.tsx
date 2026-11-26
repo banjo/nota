@@ -1,6 +1,7 @@
 import type { Base, Note } from "@nota/client";
 import {
   createEditor,
+  openFind,
   type EditorView,
   refreshMedia,
   replaceDoc,
@@ -280,6 +281,22 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
     });
     return () => cancelAnimationFrame(id);
   }, [anchor, path]);
+
+  // Find in notes opened this note on a match: show it in the find bar.
+  const find = useUI((s) =>
+    s.route.kind === "note" && s.route.path === path ? s.route.find : undefined,
+  );
+  useEffect(() => {
+    const v = view.current;
+    if (!v || !find) return;
+    const id = requestAnimationFrame(() => {
+      void openFind(v, false, find);
+      const r = useUI.getState().route;
+      if (r.kind === "note" && r.path === path)
+        useUI.setState({ route: { ...r, find: undefined } });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [find, path]);
 
   // The mode changed (⌘E, ⌘K, the top bar): same editor, other extensions.
   // Source holds the title line too, so the text swaps when entering or

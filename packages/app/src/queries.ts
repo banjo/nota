@@ -25,6 +25,7 @@ export const keys = {
   account: ["account"] as const,
   history: (path: string) => ["history", path] as const,
   trash: ["trash"] as const,
+  replace: ["replace"] as const,
 };
 
 export const useVaultInfo = () => {
@@ -113,6 +114,7 @@ export function useChangeSubscription(client: NotesClient) {
           ["search"],
           ["history"],
           keys.trash,
+          keys.replace,
         ])
           void qc.invalidateQueries({ queryKey: k });
         if (paths.length === 0 || paths.some((p) => p.startsWith(".nota/plugins")))

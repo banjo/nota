@@ -256,3 +256,48 @@ func mask(body []byte) []byte {
 	})
 	return out
 }
+
+// CodeRanges returns the byte ranges [start, end) of the code in body:
+// fenced and indented code blocks (their lines and the fence's info
+// string) and the text of inline code spans.
+func CodeRanges(body []byte) [][2]int {
+	var out [][2]int
+	add := func(start, stop int) {
+		if stop > start {
+			out = append(out, [2]int{start, stop})
+		}
+	}
+	lines := func(n ast.Node) {
+		ls := n.Lines()
+		for i := 0; i < ls.Len(); i++ {
+			s := ls.At(i)
+			add(s.Start, s.Stop)
+		}
+	}
+	doc := md.Parser().Parse(text.NewReader(body))
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch n := n.(type) {
+		case *ast.FencedCodeBlock:
+			lines(n)
+			if n.Info != nil {
+				add(n.Info.Segment.Start, n.Info.Segment.Stop)
+			}
+			return ast.WalkSkipChildren, nil
+		case *ast.CodeBlock:
+			lines(n)
+			return ast.WalkSkipChildren, nil
+		case *ast.CodeSpan:
+			for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+				if t, ok := c.(*ast.Text); ok {
+					add(t.Segment.Start, t.Segment.Stop)
+				}
+			}
+			return ast.WalkSkipChildren, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	return out
+}

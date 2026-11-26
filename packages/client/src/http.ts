@@ -12,6 +12,10 @@ import type {
   NoteInfo,
   PluginInfo,
   PropertyPatch,
+  ReplaceNote,
+  ReplacePick,
+  ReplaceQuery,
+  ReplaceResult,
   SettingsApi,
   SettingsLayers,
   TagCount,
@@ -292,6 +296,20 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
           query: { q: query, ...listParams(filter) },
         })
       ).notes;
+    },
+    findReplace: async (q: ReplaceQuery) =>
+      (await request<{ notes: ReplaceNote[] }>("POST", "/replace/preview", { body: q })).notes,
+    async replace(q: ReplaceQuery, picks: ReplacePick[]): Promise<ReplaceResult> {
+      const r = await request<{
+        notes: { path: string; count: number; before: string; hash: string; version: number }[];
+        count: number;
+        stale: string[];
+      }>("POST", "/replace", { body: { ...q, picks } });
+      return {
+        notes: r.notes.map(({ hash, version, ...n }) => ({ ...n, base: { version, hash } })),
+        count: r.count,
+        stale: r.stale,
+      };
     },
     tags: async () => (await request<{ tags: TagCount[] }>("GET", "/tags")).tags,
     views: async () => (await request<{ views: ViewInfo[] }>("GET", "/views")).views,

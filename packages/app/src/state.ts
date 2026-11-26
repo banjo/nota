@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { FindPreset } from "@nota/editor";
 import { persist } from "zustand/middleware";
 import {
   loadPropertiesPref,
@@ -32,10 +33,13 @@ export type Route =
   /**
    * `via: "open"`: opened from the file manager, shown in Reading for this
    * open. `anchor`: a heading or "^block" to scroll to, from a link.
+   * `find`: open the find bar with this search, on its match (from Find in notes).
    */
-  | { kind: "note"; path: string; via?: "open"; anchor?: string }
+  | { kind: "note"; path: string; via?: "open"; anchor?: string; find?: FindPreset }
   | { kind: "inbox" }
   | { kind: "trash" }
+  /** Find and replace across notes. */
+  | { kind: "replace" }
   /** A Markdown file from outside the vault (desktop), by its opener id. */
   | { kind: "external"; id: string }
   | { kind: "list"; list: ListSpec }
@@ -198,7 +202,7 @@ export const useUI = create<UIState>()(
  * that one open, and previews of outside files do not come back.
  */
 export function persistedRoute(r: Route): Route {
-  if (r.kind === "note" && (r.via || r.anchor)) return { kind: "note", path: r.path };
+  if (r.kind === "note" && (r.via || r.anchor || r.find)) return { kind: "note", path: r.path };
   // Preview ids die with the process.
   if (r.kind === "external") return { kind: "home" };
   return r;

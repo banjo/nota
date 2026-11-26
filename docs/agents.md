@@ -39,6 +39,7 @@ args to pick a vault other than the default.
 | `append_to_note` | adds text to the end of a note |
 | `update_note` | replaces a body; pass `expected_hash` from `read_note` to avoid overwriting newer edits |
 | `update_frontmatter` | properties and tags, line by line |
+| `replace_in_notes` | find and replace across note bodies; lists the matches unless `dry_run` is `false` |
 | `move_note` | files a note into a folder and rewrites the links that would break |
 | `create_folder` | an empty folder (`a/b` makes both); fails if it exists |
 | `list_folders` | every folder, empty ones too, with note counts |

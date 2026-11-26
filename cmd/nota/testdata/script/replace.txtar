@@ -1,0 +1,106 @@
+# --dry-run lists each match as [-old-]{+new+} on its line and writes nothing.
+# Frontmatter and code are left alone; case is ignored by default.
+nota replace planen förslaget --dry-run
+cmp stdout dry.txt
+cmp vault/Projekt/Plan.md before/Plan.md
+
+# Without --yes nota asks; anything but y keeps the notes as they are.
+stdin no.txt
+nota replace planen förslaget
+stderr 'Replace 4 matches in 2 notes\? \[y/N\]'
+stderr 'nothing changed'
+cmp vault/Projekt/Plan.md before/Plan.md
+
+# y replaces, as an edit: updated moves where there is frontmatter.
+env NOTA_NOW=2026-11-26T12:00:00+01:00
+stdin yes.txt
+nota replace planen förslaget
+stderr 'Replaced 4 matches in 2 notes'
+cmp vault/Projekt/Plan.md after/Plan.md
+cmp vault/Möte.md after/Möte.md
+
+# --case, --word, --folder narrow it; --code includes code.
+nota replace --case --word Plan Karta --folder Projekt --yes
+grep '^# Karta$' vault/Projekt/Plan.md
+grep '^Planera' vault/Projekt/Plan.md
+nota replace planen x --code --yes
+grep '^const x = 1$' vault/Projekt/Plan.md
+grep '`x`' vault/Projekt/Plan.md
+
+# --regex expands groups.
+nota replace --regex '(\d{4})-(\d{2})-(\d{2})' '$3/$2/$1' --yes --json
+stdout '"count": 1'
+grep 'från 26/11/2026' vault/Möte.md
+
+# --json with --dry-run is the matches.
+nota replace förslaget plan --dry-run --json
+stdout '"path": "Möte.md"'
+stdout '"with": "plan"'
+
+# Bad input.
+exitcode 2 nota replace --regex '(' x --yes
+stderr 'invalid regular expression'
+exitcode 2 nota replace a b --json
+stderr 'pass --yes'
+exitcode 2 nota replace a
+stderr 'expected what to find'
+nota replace zzz yyy --yes
+stderr 'nothing matches'
+
+-- no.txt --
+n
+-- yes.txt --
+y
+-- vault/Projekt/Plan.md --
+---
+title: planen
+updated: 2026-11-20
+---
+# Plan
+
+Planen är klar. Se `planen`.
+
+Planera mer.
+
+```
+const planen = 1
+```
+-- before/Plan.md --
+---
+title: planen
+updated: 2026-11-20
+---
+# Plan
+
+Planen är klar. Se `planen`.
+
+Planera mer.
+
+```
+const planen = 1
+```
+-- vault/Möte.md --
+Vi gick igenom planen, och planen gäller från 2026-11-26. Sedan planen igen.
+-- dry.txt --
+Möte.md
+  1: Vi gick igenom [-planen-]{+förslaget+}, och planen gäller från 2026-11-26. Sed…
+  1: Vi gick igenom planen, och [-planen-]{+förslaget+} gäller från 2026-11-26. Sedan planen ig…
+  1: …ch planen gäller från 2026-11-26. Sedan [-planen-]{+förslaget+} igen.
+Projekt/Plan.md
+  7: [-Planen-]{+förslaget+} är klar. Se `planen`.
+-- after/Plan.md --
+---
+title: planen
+updated: 2026-11-26T12:00:00+01:00
+---
+# Plan
+
+förslaget är klar. Se `planen`.
+
+Planera mer.
+
+```
+const planen = 1
+```
+-- after/Möte.md --
+Vi gick igenom förslaget, och förslaget gäller från 2026-11-26. Sedan förslaget igen.

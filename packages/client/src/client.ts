@@ -8,6 +8,10 @@ import type {
   TrashItem,
   ListQuery,
   MoveResult,
+  ReplaceNote,
+  ReplacePick,
+  ReplaceQuery,
+  ReplaceResult,
   Note,
   NoteInfo,
   OpenerApi,
@@ -80,6 +84,10 @@ export interface NotesClient {
   emptyTrash?(): Promise<number>;
   /** Full-text search, best match first, with snippets. */
   search(query: string, filter?: ListQuery): Promise<NoteInfo[]>;
+  /** The matches of a find and replace across notes, note by note. Absent for files outside a vault. */
+  findReplace?(query: ReplaceQuery): Promise<ReplaceNote[]>;
+  /** Replaces the picked matches of findReplace; a note changed since is left alone (stale). */
+  replace?(query: ReplaceQuery, picks: ReplacePick[]): Promise<ReplaceResult>;
   tags(): Promise<TagCount[]>;
   views(): Promise<ViewInfo[]>;
   /** The vault's plugins (.nota/plugins), broken ones with their error. */

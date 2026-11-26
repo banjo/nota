@@ -21,6 +21,7 @@ import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
 import { HistoryDialog } from "./History.tsx";
 import { RowSheet } from "./RowSheet.tsx";
 import { Sidebar } from "./Sidebar.tsx";
+import { ReplaceView } from "./Replace.tsx";
 import { TrashView } from "./Trash.tsx";
 import { TopBar } from "./TopBar.tsx";
 
@@ -126,6 +127,8 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
       return <InboxView />;
     case "trash":
       return <TrashView />;
+    case "replace":
+      return <ReplaceView />;
     case "settings":
       return <Settings />;
     default:

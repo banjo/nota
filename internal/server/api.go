@@ -17,6 +17,7 @@ import (
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
 	"github.com/banjo/nota/internal/relink"
+	"github.com/banjo/nota/internal/replace"
 	nvault "github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -40,6 +41,8 @@ func (s *Server) apiRoutes() {
 	s.route("PATCH /v1/api/vaults/{vault}/notes/{path...}", ro, s.apiPatch)
 	s.route("DELETE /v1/api/vaults/{vault}/notes/{path...}", ro, s.apiDelete)
 	s.route("POST /v1/api/vaults/{vault}/move", ro, s.apiMove)
+	s.route("POST /v1/api/vaults/{vault}/replace/preview", ro, s.apiReplacePreview)
+	s.route("POST /v1/api/vaults/{vault}/replace", ro, s.apiReplace)
 	s.route("POST /v1/api/vaults/{vault}/folders", ro, s.apiCreateFolder)
 	s.route("POST /v1/api/vaults/{vault}/folders/rename", ro, s.apiRenameFolder)
 	s.route("GET /v1/api/vaults/{vault}/search", ro, s.apiSearch)
@@ -695,6 +698,99 @@ func (s *Server) apiDelete(w http.ResponseWriter, r *http.Request, p Principal) 
 	}
 	info(r).attrs = append(info(r).attrs, "file", np, "version", cur.Version)
 	writeJSON(w, http.StatusOK, cur)
+	return nil
+}
+
+// ReplaceRequest is the body of POST …/replace/preview and …/replace:
+// what to find and replace, in which notes, and (for …/replace) which
+// matches of the preview to replace.
+type ReplaceRequest struct {
+	replace.Options
+	Folder string         `json:"folder,omitempty"`
+	Tag    string         `json:"tag,omitempty"`
+	Picks  []replace.Pick `json:"picks,omitempty"`
+}
+
+// ReplacePreview is the notes with matches.
+type ReplacePreview struct {
+	Notes []replace.Note `json:"notes"`
+}
+
+// ReplaceResponse is what POST …/replace changed: each note with its
+// body before and the version written, so a client can undo it with a
+// save based on that version.
+type ReplaceResponse struct {
+	Notes []ReplacedNote `json:"notes"`
+	Count int            `json:"count"`
+	Stale []string       `json:"stale"`
+}
+
+// ReplacedNote is one note in a ReplaceResponse.
+type ReplacedNote struct {
+	replace.Changed
+	Version int64 `json:"version"`
+}
+
+func (s *Server) replaceStart(r *http.Request, p Principal) (*workspace, *replace.Replacer, ReplaceRequest, error) {
+	var req ReplaceRequest
+	if err := decodeJSON(r, &req); err != nil {
+		return nil, nil, req, err
+	}
+	rp, err := replace.New(req.Options)
+	if err != nil {
+		return nil, nil, req, badRequest("%v", err)
+	}
+	ws, err := s.openWS(r, p)
+	return ws, rp, req, err
+}
+
+func (s *Server) apiReplacePreview(w http.ResponseWriter, r *http.Request, p Principal) error {
+	ws, rp, req, err := s.replaceStart(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	q := index.Query{Tag: req.Tag, Sort: index.Sort{Field: "path"}}
+	if req.Folder != "" {
+		if q.Folder, err = nvault.CleanPath(req.Folder); err != nil {
+			return vaultErr(err)
+		}
+	}
+	notes, err := replace.Find(ws.client, ws.ix, rp, q)
+	if err != nil {
+		return vaultErr(err)
+	}
+	info(r).attrs = append(info(r).attrs, "notes", len(notes))
+	writeJSON(w, http.StatusOK, ReplacePreview{Notes: notes})
+	return nil
+}
+
+func (s *Server) apiReplace(w http.ResponseWriter, r *http.Request, p Principal) error {
+	ws, rp, req, err := s.replaceStart(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	ed, err := ws.editor(p.Device)
+	if err != nil {
+		return err
+	}
+	res, err := replace.ApplyNotes(ed, rp, req.Picks)
+	if err != nil {
+		return vaultErr(err)
+	}
+	out := ReplaceResponse{Notes: []ReplacedNote{}, Count: res.Count, Stale: res.Stale}
+	for _, c := range res.Notes {
+		cur, _, err := ws.current(r.Context(), c.Path)
+		if err != nil {
+			return err
+		}
+		out.Notes = append(out.Notes, ReplacedNote{Changed: c, Version: cur.Version})
+	}
+	info(r).attrs = append(info(r).attrs, "notes", len(out.Notes), "count", out.Count, "stale", len(out.Stale))
+	writeJSON(w, http.StatusOK, out)
 	return nil
 }
 

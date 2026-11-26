@@ -15,6 +15,7 @@ import (
 
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
+	"github.com/banjo/nota/internal/replace"
 )
 
 // webUser is a signed-in browser with a vault "main", plus a device
@@ -312,6 +313,35 @@ func (b *browser) raw(method, path, body string, hdr map[string]string) (*http.R
 	defer res.Body.Close()
 	data, _ := io.ReadAll(res.Body)
 	return res, string(data)
+}
+
+func TestWebAPIReplace(t *testing.T) {
+	e, _ := authEnv(t, Config{Signup: SignupOpen})
+	b, _ := webUser(t, e, "anton@example.com")
+	if st, m := b.call("POST", api+"/notes", CreateRequest{Title: "Möte", Folder: "/", Body: "Tid: 10:00, `tid`, [[tid]]\n"}, nil); st != 201 {
+		t.Fatalf("create: %d %v", st, m)
+	}
+	// Replace: preview, then the picked matches, with what undoes it.
+	var pv ReplacePreview
+	if st, m := b.call("POST", api+"/replace/preview", ReplaceRequest{Options: replace.Options{Find: "tid", Word: true}}, &pv); st != 200 || len(pv.Notes) != 1 || pv.Notes[0].Path != "Möte.md" || pv.Notes[0].Matches[0].Text != "Tid" {
+		t.Fatalf("replace preview: %d %v %+v", st, m, pv)
+	}
+	var rr ReplaceResponse
+	req := ReplaceRequest{Options: replace.Options{Find: "tid", Replace: "Klockan", Word: true}, Picks: []replace.Pick{{Path: "Möte.md", Hash: pv.Notes[0].Hash}}}
+	if st, m := b.call("POST", api+"/replace", req, &rr); st != 200 || rr.Count != 1 || len(rr.Notes) != 1 || rr.Notes[0].Version == 0 || rr.Notes[0].Before != "# Möte\n\nTid: 10:00, `tid`, [[tid]]\n" {
+		t.Fatalf("replace: %d %v %+v", st, m, rr)
+	}
+	var got Note
+	if b.call("GET", notePathURL("Möte.md"), nil, &got); !strings.HasSuffix(got.Content, "# Möte\n\nKlockan: 10:00, `tid`, [[tid]]\n") || got.Version != rr.Notes[0].Version {
+		t.Fatalf("after replace: %q %d", got.Content, got.Version)
+	}
+	if st, m := b.call("POST", api+"/replace", req, &rr); st != 200 || rr.Count != 0 || len(rr.Stale) != 1 {
+		t.Fatalf("replace again: %d %v %+v", st, m, rr)
+	}
+	if st, m := b.call("POST", api+"/replace/preview", ReplaceRequest{Options: replace.Options{Find: "(", Regex: true}}, nil); st != 400 {
+		t.Fatalf("bad regex: %d %v", st, m)
+	}
+
 }
 
 func TestWebAPIAttachments(t *testing.T) {

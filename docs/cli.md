@@ -20,6 +20,7 @@ nota pin Plan                                  # Under Pinned in the sidebar; no
 nota ls --pinned                               # Pinned notes, in their order.
 nota mv Plan Archive                           # Links to it that would break are rewritten.
 nota mv Plan Projects/Roadmap.md               # A path ending in .md renames.
+nota replace "Anna S" "Anna B" --dry-run      # Every match, as [-old-]{+new+}; drop --dry-run to replace.
 nota folder add Projects/Ideas                  # Empty folders, nested paths too.
 nota folder ls                                 # Every folder with its note count.
 nota folder rename Projects Work                # Moves every note in it; path links follow.
@@ -114,6 +115,24 @@ pointing at the same note:
 
 `--no-update-links` turns this off for one command. Without it, the command says on stderr how
 many links changed, and `--json` lists them under `links`.
+
+## Find and replace
+
+`nota replace <find> <replace>` replaces text in the bodies of notes. It lists every match on its
+line as `[-old-]{+new+}` and asks before writing; `--yes` writes without asking, `--dry-run` only
+lists (with `--json`, one of them is required). Each changed note is saved like an edit.
+
+- Case is ignored unless `--case`; `--word` matches whole words; `--folder` and `--tag` narrow
+  the notes.
+- `--regex` reads `<find>` as an [RE2](https://github.com/google/re2/wiki/Syntax) expression. In
+  `<replace>`, `$1` is the first group (`$1st` too), `${name}` a named group and `$$` a `$`.
+- Frontmatter is never touched (use `nota set` and `nota tag`), nor where a link points: rename
+  the note instead, and the links follow. Code blocks and inline code are skipped unless `--code`.
+- A note that changes between the listing and the write is left alone, and the command fails
+  naming it.
+
+The same replace is `replace_in_notes` over MCP (a dry run unless `dry_run: false`) and ⌘⇧F in the
+app, where each match can be unticked and the toast has Undo.
 
 ## Trash
 
