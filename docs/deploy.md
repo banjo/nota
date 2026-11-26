@@ -20,6 +20,20 @@ and keeps everything in the volume `/data`, which must be writable by
 that user. On SIGTERM the server stops accepting connections, ends SSE
 streams and gives running requests 10 s.
 
+## The hosted server
+
+nota.app.banjoanton.com runs on Coolify, which builds this `Dockerfile` from the branch
+`build/v1`, not `main`: a push to `build/v1` deploys (it takes about 3 minutes). To ship what is
+on `main`, fast-forward the branch:
+
+```sh
+git fetch origin && git push origin origin/main:refs/heads/build/v1
+```
+
+`build/v1` has no commits of its own, so this never needs `--force`. Check the deploy with a
+route the new version adds; `/s/<anything>` answers with Nota's own "doesn't lead anywhere" page
+since shared notes.
+
 ## Configuration
 
 | Variable | Default | |
