@@ -119,6 +119,9 @@ the latest `vX.Y.Z` tag on origin.
    The script downloads `Nota-0.1.0-arm64.zip`, checks it against `checksums.txt` and fills in
    `packaging/homebrew/nota.rb`. It refuses prereleases unless `--dry-run` or
    `--allow-prerelease`. Then `brew update && brew install --cask banjo/tap/nota` to try it.
+6. Deploy the server: fast-forward `build/v1` to `main`
+   (`git push origin origin/main:refs/heads/build/v1`), which Coolify builds
+   ([deploy.md](deploy.md#the-hosted-server)).
 
 
 ## The landing page

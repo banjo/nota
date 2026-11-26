@@ -11,7 +11,7 @@
                                                └──► release.yml builds and publishes
                                                     the GitHub release, then has
                                                     Cloudflare rebuild the landing page
- by hand: Homebrew cask
+ by hand: Homebrew cask, then build/v1 (server deploy)
 ```
 
 ## 1. Add a changeset to your pull request
@@ -42,5 +42,15 @@ asks Cloudflare Pages to rebuild the landing page, which picks up the new versio
 ```sh
 scripts/bump-cask.sh <version>
 ```
+
+## 5. Deploy the server
+
+The hosted server deploys from `build/v1`, not `main`; fast-forward it after the release:
+
+```sh
+git fetch origin && git push origin origin/main:refs/heads/build/v1
+```
+
+See [docs/deploy.md](docs/deploy.md#the-hosted-server).
 
 Prereleases, failure recovery and what each job checks: [docs/release.md](docs/release.md).
