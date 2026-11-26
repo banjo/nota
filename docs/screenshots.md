@@ -48,6 +48,15 @@ marker and blocks typing, but links, tags and checkboxes still work.
 | ![Live](screenshots/mode-live.png) | ![Reading](screenshots/mode-reading.png) | ![Source](screenshots/mode-source.png) |
 | Live: markers show on the line you edit | Reading: the finished page, read-only | Source: the raw markdown |
 
+## Find in a note
+
+⌘F opens a find bar over the note (⌘K "Find in note"; "Find in note" in the "…" sheet on a phone),
+and ⌥⌘F (Ctrl+H on Linux in the editor) opens it with a replace row. It has match case, whole word and regex
+toggles and a "3 of 12" count; Enter and ⇧Enter (or ⌘G and ⇧⌘G) step through the matches, and Esc
+closes it. In the replace field Enter replaces the current match and ⌘Enter replaces them all, as
+one undo step. Reading mode finds but has no replace row. The title is a field of its own and is not
+searched.
+
 On a narrow window the switch shows icons only ([narrow](screenshots/mode-narrow.png)).
 
 ## Themes
