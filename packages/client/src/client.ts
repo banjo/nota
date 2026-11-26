@@ -5,6 +5,7 @@ import type {
   ChangeEvent,
   CreateInput,
   HistoryEntry,
+  TrashItem,
   ListQuery,
   MoveResult,
   Note,
@@ -62,15 +63,32 @@ export interface NotesClient {
   renameFolder(path: string, to: string): Promise<MoveResult>;
   /** Gives a note a new path. */
   rename(path: string, to: string): Promise<MoveResult>;
-  /** Moves a note to the trash. */
-  remove(path: string): Promise<void>;
+  /** Moves a note to the trash; resolves to its id there, for restoreTrash. */
+  remove(path: string): Promise<string>;
+  /** The deleted notes, most recently deleted first. */
+  trash(): Promise<TrashItem[]>;
+  /** A deleted note's content. */
+  trashNote(id: string): Promise<string>;
+  /**
+   * Puts a deleted note back where it was, or into `folder` ("/" is the
+   * root), and resolves to its path. Rejects when a note has taken it.
+   */
+  restoreTrash(id: string, folder?: string): Promise<string>;
+  /** Deletes a note in the trash for good. Absent where the server keeps every version (web). */
+  purgeTrash?(id: string): Promise<void>;
+  /** Deletes everything in the trash for good, resolving to how many. Absent on the web. */
+  emptyTrash?(): Promise<number>;
   /** Full-text search, best match first, with snippets. */
   search(query: string, filter?: ListQuery): Promise<NoteInfo[]>;
   tags(): Promise<TagCount[]>;
   views(): Promise<ViewInfo[]>;
   /** The vault's plugins (.nota/plugins), broken ones with their error. */
   plugins(): Promise<PluginInfo[]>;
+  /** The versions of a note on the sync server, newest first, through renames. */
   history(path: string): Promise<HistoryEntry[]>;
+  /** The content of one version; null when that version is a delete. */
+  historyVersion(path: string, version: number): Promise<string | null>;
+  /** Makes an old version the newest one (a new version: history is kept). */
   restore(path: string, version: number): Promise<void>;
   /**
    * The URL an <img> loads a vault file from. With `from` (a note's

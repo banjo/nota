@@ -42,15 +42,17 @@ are structured JSON; failures come back as tool errors with a readable message.
 | `append_to_note`     | `note`, `text`                                                                    | Added on a line of its own; start `text` with an empty line for a new paragraph.                                         |
 | `update_note`        | `note`, `body`, `expected_hash?`                                                  | Replaces the body; the frontmatter is kept.                                                                              |
 | `update_frontmatter` | `note`, `set?` (JSON values), `unset?`                                            | Tags: `set: {"tags": [...]}` replaces the whole list.                                                                    |
-| `move_note`          | `note`, `folder`                                                                  | Creates the folder; `/` is the root. Fails if the name is taken there.                                                   |
+| `move_note`          | `note`, `folder`                                                                  | Creates the folder; `/` is the root. Fails if the name is taken there. Rewrites links to it; `links` says which notes.   |
 | `create_folder`      | `path`                                                                            | `a/b` makes both; fails if it exists. Rarely needed: create and move make folders.                                       |
 | `list_folders`       | none                                                                              | Every folder, empty ones too, with note counts.                                                                          |
 | `list_tags`          | none                                                                              | Every tag with its count.                                                                                                |
 | `list_views`         | none                                                                              | Saved views; pass an `id` as `view` to `list_notes`.                                                                     |
 | `get_backlinks`      | `note`                                                                            | Notes linking here via wikilinks, embeds or Markdown links.                                                              |
+| `list_trash`         | none                                                                              | Deleted notes in `.trash/`: `path` there, `from`, `deletedAt`, newest first.                                             |
+| `restore_note`       | `note`, `folder?`                                                                 | `note` is a trash `path` or the `from` path. Back where it was, or into `folder`; fails if a note has taken the path.    |
 
-There is no delete or folder-rename tool. For those, use the CLI (`nota rm`, `nota folder
-rename`) after confirming with the user.
+There is no delete, empty-trash or folder-rename tool. For those, use the CLI (`nota rm`,
+`nota trash empty`, `nota folder rename`) after confirming with the user.
 
 ## Safe rewrites
 

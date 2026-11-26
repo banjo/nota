@@ -39,12 +39,14 @@ args to pick a vault other than the default.
 | `append_to_note` | adds text to the end of a note |
 | `update_note` | replaces a body; pass `expected_hash` from `read_note` to avoid overwriting newer edits |
 | `update_frontmatter` | properties and tags, line by line |
-| `move_note` | files a note into a folder |
+| `move_note` | files a note into a folder and rewrites the links that would break |
 | `create_folder` | an empty folder (`a/b` makes both); fails if it exists |
 | `list_folders` | every folder, empty ones too, with note counts |
 | `list_tags` | every tag with its count |
 | `list_views` | the saved views in `.nota/views` |
 | `get_backlinks` | the notes that link to a note |
+| `list_trash` | the deleted notes in `.trash/`, with where each came from and when |
+| `restore_note` | puts a deleted note back where it was, or into another folder |
 
 Results are structured JSON; failures come back as tool errors. Each note is also a resource at
 `nota://note/<path>` (percent-encode non-ASCII names, e.g. `nota://note/M%C3%B6ten/Plan.md`).

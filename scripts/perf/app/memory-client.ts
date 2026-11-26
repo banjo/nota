@@ -76,6 +76,7 @@ export function createMemoryClient(
 ): NotesClient {
   const inbox = opts.inbox ?? "Inbox";
   const notes = new Map<string, Stored>();
+  const trashed = new Map<string, Stored>();
   const extraFolders = new Set<string>(opts.folders ?? []);
   const listeners = new Set<(e: ChangeEvent) => void>();
   let clock = Date.parse("2026-11-20T09:00:00Z");
@@ -251,7 +252,7 @@ export function createMemoryClient(
       n.path = to;
       notes.set(to, n);
       emit([path, to]);
-      return wait<MoveResult>({ from: path, path: to });
+      return wait<MoveResult>({ from: path, path: to, links: { count: 0, notes: [] } });
     },
     createFolder: async (path) => {
       if (allFolders().includes(path)) throw new NotaError("exists", "exists", 409);
@@ -268,7 +269,7 @@ export function createMemoryClient(
           notes.set(n.path, n);
         }
       emit([path, to]);
-      return wait<MoveResult>({ from: path, path: to });
+      return wait<MoveResult>({ from: path, path: to, links: { count: 0, notes: [] } });
     },
     rename: async (path, to) => {
       const n = need(path);
@@ -277,12 +278,35 @@ export function createMemoryClient(
       n.path = to;
       notes.set(to, n);
       emit([path, to]);
-      return wait<MoveResult>({ from: path, path: to });
+      return wait<MoveResult>({ from: path, path: to, links: { count: 0, notes: [] } });
     },
     remove: async (path) => {
+      const n = need(path);
       notes.delete(path);
+      trashed.set(path, n);
       emit([path]);
-      return wait(undefined);
+      return wait(path);
+    },
+    trash: () =>
+      wait(
+        [...trashed].map(([path, n]) => ({
+          id: path,
+          path,
+          deletedAt: new Date().toISOString(),
+          size: n.body.length,
+        })),
+      ),
+    trashNote: (id) => wait(trashed.get(id)?.body ?? ""),
+    restoreTrash: async (id, folder) => {
+      const n = trashed.get(id);
+      if (!n) throw new NotaError("not found", "not_found", 404);
+      const to = folder && folder !== "/" ? `${folder}/${id.split("/").pop()}` : id;
+      if (notes.has(to)) throw new NotaError("exists", "exists", 409);
+      trashed.delete(id);
+      n.path = to;
+      notes.set(to, n);
+      emit([to]);
+      return wait(to);
     },
     search: async (query, f) => {
       const q = query.toLowerCase();
@@ -306,6 +330,7 @@ export function createMemoryClient(
       ),
     plugins: () => wait([]),
     history: () => wait([]),
+    historyVersion: () => wait(null),
     restore: () => wait(undefined),
     subscribe: (listener) => {
       listeners.add(listener);

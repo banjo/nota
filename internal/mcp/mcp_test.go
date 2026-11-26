@@ -123,8 +123,8 @@ func TestTools(t *testing.T) {
 		}
 	}
 	slices.Sort(names)
-	want := []string{"append_to_note", "create_folder", "create_note", "get_backlinks", "list_folders", "list_notes", "list_tags", "list_views",
-		"move_note", "read_note", "search_notes", "update_frontmatter", "update_note"}
+	want := []string{"append_to_note", "create_folder", "create_note", "get_backlinks", "list_folders", "list_notes", "list_tags", "list_trash", "list_views",
+		"move_note", "read_note", "restore_note", "search_notes", "update_frontmatter", "update_note"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools %q, want %q", names, want)
 	}
@@ -257,6 +257,55 @@ func TestTools(t *testing.T) {
 	}
 	if msg := toolError(t, cs, "search_notes", map[string]any{}); msg == "" {
 		t.Fatal("search without query should explain")
+	}
+}
+
+func TestMoveRewritesLinks(t *testing.T) {
+	cs, m := connect(t, map[string]string{
+		"Projekt/Plan.md": "# Plan\n",
+		"Länk.md":         "[[Projekt/Plan#Mål]] and [plan](Projekt/Plan.md)\n",
+	})
+	var mv MoveOutput
+	call(t, cs, "move_note", map[string]any{"note": "Projekt/Plan.md", "folder": "Arkiv"}, &mv)
+	if mv.Links.Count != 2 || len(mv.Links.Notes) != 1 || mv.Links.Notes[0].Path != "Länk.md" {
+		t.Fatalf("links %+v", mv.Links)
+	}
+	b, err := m.ReadFile("Länk.md")
+	if err != nil || string(b) != "[[Arkiv/Plan#Mål]] and [plan](Arkiv/Plan.md)\n" {
+		t.Fatalf("Länk.md = %q, %v", b, err)
+	}
+}
+
+func TestTrashAndRestore(t *testing.T) {
+	cs, m := connectWith(t, map[string]string{"Projekt/Plan.md": "# Plan\n", "Idé.md": "# Idé\n"}, func(v *vault.Vault, _ *events.Bus) {
+		for _, p := range []string{"Projekt/Plan", "Idé"} {
+			if _, err := v.Delete(p); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+	var tr TrashOutput
+	call(t, cs, "list_trash", map[string]any{}, &tr)
+	if len(tr.Items) != 2 {
+		t.Fatalf("trash %+v", tr)
+	}
+	var r RestoreOutput
+	call(t, cs, "restore_note", map[string]any{"note": "Projekt/Plan.md"}, &r)
+	if r.Path != "Projekt/Plan.md" || r.URI != "nota://note/Projekt/Plan.md" {
+		t.Fatalf("restore %+v", r)
+	}
+	if _, err := m.ReadFile("Projekt/Plan.md"); err != nil {
+		t.Fatal(err)
+	}
+	call(t, cs, "restore_note", map[string]any{"note": ".trash/Idé.md", "folder": "Arkiv"}, &r)
+	if r.Path != "Arkiv/Idé.md" {
+		t.Fatalf("restore into folder %+v", r)
+	}
+	// It's in the index again.
+	var n Note
+	call(t, cs, "read_note", map[string]any{"note": "Idé"}, &n)
+	if msg := toolError(t, cs, "restore_note", map[string]any{"note": "Nope"}); !strings.Contains(msg, "not found") {
+		t.Errorf("restore missing: %s", msg)
 	}
 }
 

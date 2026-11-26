@@ -1,4 +1,4 @@
-import { type NotesClient, NotaError } from "@nota/client";
+import { type LinksUpdated, type NotesClient, NotaError } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { rememberFolder } from "./lib/folders.ts";
@@ -21,6 +21,20 @@ const message = (e: unknown) =>
 
 export function fail(action: string, e: unknown) {
   toast.error(action, { description: message(e) });
+}
+
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "Updated 3 links in 2 notes", or undefined when a move changed no links. */
+export function linksMessage(links: LinksUpdated | undefined): string | undefined {
+  if (!links?.count) return undefined;
+  return `Updated ${count(links.count, "link")} in ${count(links.notes.length, "note")}`;
+}
+
+/** Tells the user which links a rename or move rewrote, if any. */
+export function reportLinks(links: LinksUpdated | undefined) {
+  const m = linksMessage(links);
+  if (m) toast(m);
 }
 
 /** Where a new note goes: the folder on screen, else the inbox. */
@@ -70,7 +84,11 @@ export async function moveNote(
     useUI.getState().moved(r.from, r.path);
     qc.removeQueries({ queryKey: keys.note(r.from) });
     void qc.invalidateQueries();
-    if (!opts.quiet) toast.success(`Moved to ${folderLabel(folderOf(r.path))}`);
+    if (!opts.quiet)
+      toast.success(`Moved to ${folderLabel(folderOf(r.path))}`, {
+        description: linksMessage(r.links),
+      });
+    else reportLinks(r.links);
     return r;
   } catch (e) {
     fail("Couldn't move the note", e);
@@ -132,6 +150,7 @@ export async function renameFolder(
     useUI.setState({ expanded, route });
     qc.removeQueries({ queryKey: ["note"] });
     void qc.invalidateQueries();
+    reportLinks(r.links);
     return r.path;
   } catch (e) {
     if (inline) inline.onError(message(e));
@@ -172,6 +191,7 @@ export async function renameNote(
       const m = await client.rename(path, to);
       useUI.getState().moved(m.from, m.path);
       qc.removeQueries({ queryKey: keys.note(m.from) });
+      reportLinks(m.links);
       at = m.path;
     }
     void qc.invalidateQueries();
@@ -224,16 +244,75 @@ export async function createNoteIn(client: NotesClient, qc: QueryClient, folder:
 
 export async function deleteNote(client: NotesClient, qc: QueryClient, path: string) {
   try {
-    await client.remove(path);
+    const id = await client.remove(path);
     const ui = useUI.getState();
-    if (ui.route.kind === "note" && ui.route.path === path) ui.navigate({ kind: "home" });
+    const open = ui.route.kind === "note" && ui.route.path === path;
+    if (open) ui.navigate({ kind: "home" });
     qc.removeQueries({ queryKey: keys.note(path) });
     void qc.invalidateQueries();
-    toast(
-      client.kind === "desktop" ? "Moved to the trash (.trash in the vault)" : "Moved to the trash",
-    );
+    toast("Moved to the trash", {
+      action: {
+        label: "Undo",
+        onClick: () => void restoreFromTrash(client, qc, id, { reopen: open, quiet: true }),
+      },
+    });
   } catch (e) {
     fail("Couldn't delete the note", e);
+  }
+}
+
+const noteName = (path: string) => path.split("/").pop()!.replace(/\.md$/i, "");
+
+/**
+ * Puts a deleted note back where it was. `reopen` shows it again (the
+ * undo of deleting the open note); `quiet` skips the "Restored" toast.
+ */
+export async function restoreFromTrash(
+  client: NotesClient,
+  qc: QueryClient,
+  id: string,
+  opts: { reopen?: boolean; quiet?: boolean } = {},
+): Promise<string | undefined> {
+  try {
+    const path = await client.restoreTrash(id);
+    void qc.invalidateQueries();
+    const open = () => useUI.getState().navigate({ kind: "note", path });
+    if (opts.reopen) open();
+    if (!opts.quiet)
+      toast(`Restored “${noteName(path)}”`, {
+        description: path.includes("/") ? `In ${path.slice(0, path.lastIndexOf("/"))}` : undefined,
+        action: { label: "Open", onClick: open },
+      });
+    return path;
+  } catch (e) {
+    const taken = e instanceof NotaError && (e.code === "exists" || e.code === "case_collision");
+    fail(
+      "Couldn't restore the note",
+      taken ? "A note has taken its place since. Rename or move that note, then try again." : e,
+    );
+  }
+}
+
+/** Deletes a note in the trash for good. */
+export async function purgeFromTrash(client: NotesClient, qc: QueryClient, id: string) {
+  if (!client.purgeTrash) return;
+  try {
+    await client.purgeTrash(id);
+    void qc.invalidateQueries({ queryKey: keys.trash });
+  } catch (e) {
+    fail("Couldn't delete the note", e);
+  }
+}
+
+/** Deletes everything in the trash for good. */
+export async function emptyTrash(client: NotesClient, qc: QueryClient) {
+  if (!client.emptyTrash) return;
+  try {
+    await client.emptyTrash();
+    void qc.invalidateQueries({ queryKey: keys.trash });
+    toast("Emptied the trash");
+  } catch (e) {
+    fail("Couldn't empty the trash", e);
   }
 }
 

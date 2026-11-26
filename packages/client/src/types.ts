@@ -155,9 +155,16 @@ export type WriteResult =
   | { conflict: false; note: Note }
   | { conflict: true; current: Note | null };
 
+/** The links rewritten so they keep pointing at a moved note. */
+export interface LinksUpdated {
+  count: number;
+  notes: { path: string; links: number }[];
+}
+
 export interface MoveResult {
   from: string;
   path: string;
+  links: LinksUpdated;
 }
 
 export interface HistoryEntry {
@@ -169,6 +176,16 @@ export interface HistoryEntry {
   device: string;
   modifiedAt: string;
   movedFrom?: string;
+}
+
+/** A deleted note. */
+export interface TrashItem {
+  /** What the other trash calls take: its path in .trash/ (desktop) or its path (web). */
+  id: string;
+  /** Where it was deleted from. */
+  path: string;
+  deletedAt: string;
+  size: number;
 }
 
 /** What changed; the UI refetches what it shows. */

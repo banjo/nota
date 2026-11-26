@@ -620,6 +620,7 @@ func (v *Vault) trash(rel string) (string, error) {
 		return "", wrap(err)
 	}
 	trash := path.Join(folder, name)
+	v.recordTrash(trash, rel)
 	if IsNote(rel) {
 		v.emit(events.Event{Type: events.NoteDeleted, Path: rel, Trash: trash}, false)
 	}

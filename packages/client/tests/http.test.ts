@@ -178,7 +178,12 @@ describe("createHttpClient", () => {
   test("creates, moves, renames and deletes", async () => {
     const f = mockFetch(
       json(note({ path: "Inbox/Ringa elbolaget.md" }), 201),
-      json({ from: "Inbox/Ringa elbolaget.md", path: "Hem/Ringa elbolaget.md", version: 12 }),
+      json({
+        from: "Inbox/Ringa elbolaget.md",
+        path: "Hem/Ringa elbolaget.md",
+        version: 12,
+        links: { count: 1, notes: [{ path: "Att göra.md", links: 1 }] },
+      }),
       json({ from: "Hem/Ringa elbolaget.md", path: "Hem/Elbolaget.md", version: 13 }),
       json({}, 204),
     );
@@ -188,6 +193,7 @@ describe("createHttpClient", () => {
     expect(await c.move("Inbox/Ringa elbolaget.md", "Hem")).toEqual({
       from: "Inbox/Ringa elbolaget.md",
       path: "Hem/Ringa elbolaget.md",
+      links: { count: 1, notes: [{ path: "Att göra.md", links: 1 }] },
     });
     expect(f.call(1).body).toEqual({ path: "Inbox/Ringa elbolaget.md", folder: "Hem" });
     await c.rename("Hem/Ringa elbolaget.md", "Hem/Elbolaget.md");
@@ -199,7 +205,12 @@ describe("createHttpClient", () => {
   test("renames a folder through its own route", async () => {
     const f = mockFetch(json({ from: "Hem", path: "Hus" }));
     const c = client(f);
-    expect(await c.renameFolder("Hem", "Hus")).toEqual({ from: "Hem", path: "Hus" });
+    // A server from before link updates sends no links.
+    expect(await c.renameFolder("Hem", "Hus")).toEqual({
+      from: "Hem",
+      path: "Hus",
+      links: { count: 0, notes: [] },
+    });
     expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/folders/rename");
     expect(f.call(0).body).toEqual({ path: "Hem", to: "Hus" });
   });
@@ -239,6 +250,37 @@ describe("createHttpClient", () => {
     await c.restore("Plan.md", 4);
     expect(f.call(1).url.pathname).toBe("/v1/api/vaults/Anteckningar/history/Plan.md/restore");
     expect(f.call(1).body).toEqual({ version: 4 });
+  });
+
+  test("deletes into the trash and restores from it", async () => {
+    const f = mockFetch(
+      json({ path: "Plan.md", version: 5, deleted: true }),
+      json({
+        items: [{ id: "Plan.md", path: "Plan.md", deletedAt: "2026-11-22T10:00:00Z", size: 3 }],
+      }),
+      json({ path: "Plan.md", version: 4, content: "# P\n" }),
+      json({ path: "Arkiv/Plan.md" }),
+    );
+    const c = client(f);
+    expect(await c.remove("Plan.md")).toBe("Plan.md");
+    expect((await c.trash())[0]?.id).toBe("Plan.md");
+    expect(await c.trashNote("Plan.md")).toBe("# P\n");
+    expect(f.call(2).url.pathname).toBe("/v1/api/vaults/Anteckningar/trash/Plan.md");
+    expect(await c.restoreTrash("Plan.md", "Arkiv")).toBe("Arkiv/Plan.md");
+    expect(f.call(3).body).toEqual({ id: "Plan.md", folder: "Arkiv" });
+    expect("purgeTrash" in c).toBe(false);
+  });
+
+  test("fetches one version's content; a delete has none", async () => {
+    const f = mockFetch(
+      json({ path: "Plan.md", version: 4, content: "# Plan\n" }),
+      json({ path: "Plan.md", version: 5, deleted: true }),
+    );
+    const c = client(f);
+    expect(await c.historyVersion("Plan.md", 4)).toBe("# Plan\n");
+    expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/history/Plan.md");
+    expect(f.call(0).url.searchParams.get("version")).toBe("4");
+    expect(await c.historyVersion("Plan.md", 5)).toBeNull();
   });
 
   test("throws NotaError with the API's code", async () => {

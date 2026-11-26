@@ -35,8 +35,39 @@ import (
 //
 // It does not run at startup on purpose: a boot that walks the whole
 // blob store costs time proportional to the number of files, on every
-// restart, to reclaim nothing most of the time. Run it from a timer or
-// by hand when the store has grown.
+// restart, to reclaim nothing most of the time. Config.BlobGCInterval
+// runs it on a timer; "nota serve blobs gc" runs it by hand.
+
+// collectBlobsEvery runs CollectBlobs on a timer until Close.
+func (s *Server) collectBlobsEvery(every time.Duration) {
+	defer close(s.gcDone)
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.gcStop:
+			return
+		case <-t.C:
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-s.gcStop:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+		start := time.Now()
+		res, err := s.store.CollectBlobs(ctx, s.blobs, BlobGC{})
+		cancel()
+		if err != nil {
+			s.log.Error("blob gc", "err", err)
+			continue
+		}
+		s.log.Info("blob gc", "rows", res.Rows, "files", res.Files, "bytes", res.Bytes,
+			"orphans", res.Orphans, "young", res.Young, "duration_ms", time.Since(start).Milliseconds())
+	}
+}
 
 // DefaultBlobGrace is how long an unreferenced blob file is left alone
 // so an upload in flight is never swept.

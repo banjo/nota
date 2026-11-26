@@ -359,7 +359,7 @@ func (ws *workspace) applyOne(ctx context.Context, e protocol.Entry) error {
 			return err
 		}
 		// History is in the log; the working copy keeps no trash.
-		return fsys.Remove(trash)
+		return ws.client.PurgeTrash(trash)
 	}
 	data, err := ws.srv.readBlob(ctx, e.Hash)
 	if err != nil {

@@ -1,0 +1,74 @@
+# The trash lists deleted notes, puts them back and empties for good.
+
+# Empty to begin with.
+nota trash ls
+! stdout .
+stderr 'the trash is empty'
+nota trash ls --json
+stdout '^\[\]$'
+
+# Two deletes a day apart; the same name twice gets " 2" in the trash.
+env NOTA_NOW=2026-11-01T09:00:00Z
+nota rm Projekt/Plan
+stdout '^.trash/Projekt/Plan.md$'
+env NOTA_NOW=2026-11-20T09:00:00Z
+nota rm Idé
+nota add --folder . 'Idé'
+nota rm Idé
+stdout '^.trash/Idé 2.md$'
+
+# Newest first, with where each came from.
+nota trash ls
+cmp stdout ls.txt
+nota trash ls --json
+stdout '"from": "Projekt/Plan.md"'
+stdout '"deletedAt": "2026-11-01T09:00:00Z"'
+
+# Back where it was, by the path it had or by its name in the trash.
+nota trash restore Projekt/Plan.md
+stdout '^Projekt/Plan.md$'
+exists vault/Projekt/Plan.md
+! exists vault/.trash/Projekt
+nota ls --folder Projekt
+stdout '^Projekt/Plan.md'
+
+# A note that has taken the path is not overwritten (exit 5); --to puts
+# it elsewhere: a folder, or a path ending in .md.
+nota add --folder . Idé
+exitcode 5 nota trash restore 'Idé 2'
+stderr 'already exists'
+stderr '--to'
+nota trash restore 'Idé 2' --to Arkiv
+stdout '^Arkiv/Idé.md$'
+nota trash restore Idé --to 'Gammal idé.md'
+stdout '^Gammal idé.md$'
+exitcode 3 nota trash restore nope
+
+# Emptying needs --yes; --older keeps recent deletes.
+nota rm Arkiv/Idé
+nota rm 'Gammal idé'
+env NOTA_NOW=2026-11-30T09:00:00Z
+nota rm Projekt/Plan
+exitcode 2 nota trash empty
+stderr 'pass --yes'
+exitcode 2 nota trash empty --older soon --yes
+nota trash empty --older 5d --yes
+stderr '^deleted 2 files for good$'
+nota trash ls --json
+stdout '"from": "Projekt/Plan.md"'
+! stdout 'Idé'
+exitcode 2 nota trash rm Projekt/Plan
+nota trash rm Projekt/Plan --yes
+stdout '^.trash/Projekt/Plan.md$'
+nota trash ls
+! stdout .
+
+-- ls.txt --
+DELETED               FROM             IN TRASH
+2026-11-20T09:00:00Z  Idé.md           .trash/Idé 2.md
+2026-11-20T09:00:00Z  Idé.md           .trash/Idé.md
+2026-11-01T09:00:00Z  Projekt/Plan.md  .trash/Projekt/Plan.md
+-- vault/Projekt/Plan.md --
+# Plan
+-- vault/Idé.md --
+# Idé

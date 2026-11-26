@@ -2,7 +2,7 @@ import type { NotesClient } from "@nota/client";
 import { QueryClient } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { renameFolder } from "../src/actions.ts";
+import { linksMessage, renameFolder } from "../src/actions.ts";
 import { registerBuiltins } from "../src/builtins/index.tsx";
 import { menuTarget } from "../src/components/RowMenu.tsx";
 import {
@@ -167,5 +167,38 @@ describe("⌘K has the rename commands", () => {
     registerBuiltins(r);
     expect(r.command("note.rename")?.title).toBe("Rename note");
     expect(r.command("folder.rename")?.title).toBe("Rename folder");
+  });
+});
+
+describe("linksMessage", () => {
+  test("says how many links a move rewrote, and nothing when none", () => {
+    expect(linksMessage(undefined)).toBeUndefined();
+    expect(linksMessage({ count: 0, notes: [] })).toBeUndefined();
+    expect(linksMessage({ count: 1, notes: [{ path: "a.md", links: 1 }] })).toBe(
+      "Updated 1 link in 1 note",
+    );
+    expect(
+      linksMessage({
+        count: 3,
+        notes: [
+          { path: "a.md", links: 2 },
+          { path: "b.md", links: 1 },
+        ],
+      }),
+    ).toBe("Updated 3 links in 2 notes");
+  });
+
+  test("a renamed folder reports the links it rewrote", async () => {
+    const qc = new QueryClient();
+    const client = {
+      renameFolder: vi.fn(async () => ({
+        from: "Work",
+        path: "Job",
+        links: { count: 2, notes: [{ path: "a.md", links: 2 }] },
+      })),
+    } as unknown as NotesClient;
+    toast.mockClear();
+    await renameFolder(client, qc, "Work", "Job");
+    expect(toast).toHaveBeenCalledWith("Updated 2 links in 1 note");
   });
 });

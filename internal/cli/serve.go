@@ -45,6 +45,9 @@ const (
 	EnvServerTrustedProxies = "NOTA_SERVER_TRUSTED_PROXIES"
 	// EnvServerPollInterval is the device-code poll interval (default 5s).
 	EnvServerPollInterval = "NOTA_SERVER_POLL_INTERVAL"
+	// EnvServerBlobGC is how often blob garbage collection runs, e.g.
+	// 24h (default off: "nota serve blobs gc" by hand).
+	EnvServerBlobGC = "NOTA_SERVER_BLOB_GC_INTERVAL"
 	// EnvServerHooks=on runs each vault's .nota/hooks.toml on the server
 	// (default off).
 	EnvServerHooks = "NOTA_SERVER_HOOKS"
@@ -130,6 +133,8 @@ The server keeps a working copy and an index of every vault in
 <data>/vaults/ (for the web API and HTTP MCP). With $NOTA_SERVER_HOOKS=on
 it also runs each vault's .nota/hooks.toml on changes from clients (off
 by default: hooks are shell commands from the synced vault).
+$NOTA_SERVER_BLOB_GC_INTERVAL=24h runs "nota serve blobs gc" on that
+timer (default off).
 
 Bootstrap a user and a device token with
 
@@ -636,7 +641,8 @@ func (a *app) runServe(cmd *cobra.Command, f *serveFlags) error {
 		log.Info("nota serve: listening", "addr", ln.String(), "data", dir, "blobs", blobsName(cfg.Blobs, dir),
 			"max_file_size", maxSize, "version", Version,
 			"public_url", cfg.PublicURL, "web_origins", strings.Join(cfg.WebOrigins, ","), "rp_id", cfg.RPID,
-			"signup", string(cfg.Signup), "trusted_proxies", len(cfg.TrustedProxies), "hooks", cfg.Hooks)
+			"signup", string(cfg.Signup), "trusted_proxies", len(cfg.TrustedProxies), "hooks", cfg.Hooks,
+			"blob_gc_interval", cfg.BlobGCInterval.String())
 		if f.addrFile != "" {
 			if err := os.WriteFile(f.addrFile, []byte(ln.String()+"\n"), 0o644); err != nil {
 				log.Error("write --addr-file", "err", err)
@@ -676,6 +682,13 @@ func serverConfigFromEnv() (server.Config, error) {
 	if v := os.Getenv(EnvServerPollInterval); v != "" {
 		if cfg.PollInterval, err = time.ParseDuration(v); err != nil {
 			return cfg, fmt.Errorf("$%s: %w", EnvServerPollInterval, err)
+		}
+	}
+	switch v := strings.TrimSpace(os.Getenv(EnvServerBlobGC)); v {
+	case "", "off", "0":
+	default:
+		if cfg.BlobGCInterval, err = parseAge(v); err != nil || cfg.BlobGCInterval < time.Minute {
+			return cfg, fmt.Errorf("$%s: want a duration of at least 1m such as 24h or 7d, or off; got %q", EnvServerBlobGC, v)
 		}
 	}
 	return cfg, nil

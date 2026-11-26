@@ -8,6 +8,7 @@ import type {
   ExternalDoc,
   FolderInfo,
   HistoryEntry,
+  TrashItem,
   ListQuery,
   MoveResult,
   Note,
@@ -69,6 +70,12 @@ export interface MygoBindings {
     views(): Promise<ViewInfo[] | null>;
     plugins(): Promise<PluginInfo[] | null>;
     history(path: string): Promise<HistoryEntry[] | null>;
+    historyVersion(path: string, version: number): Promise<string | null>;
+    trash(): Promise<TrashItem[] | null>;
+    trashNote(id: string): Promise<string>;
+    restoreTrash(id: string, folder: string): Promise<string>;
+    purgeTrash(id: string): Promise<void>;
+    emptyTrash(): Promise<number>;
     restore(path: string, version: number): Promise<void>;
     syncStatus(): Promise<SyncStatus>;
   };
@@ -257,14 +264,18 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     createFolder: (path) => v.createFolder(path),
     renameFolder: (path, to) => v.renameFolder(path, to),
     rename: (path, to) => v.rename(path, to),
-    remove: async (path) => {
-      await v.delete(path);
-    },
+    remove: (path) => v.delete(path),
+    trash: async () => list(await v.trash()),
+    trashNote: (id) => v.trashNote(id),
+    restoreTrash: (id, folder = "") => v.restoreTrash(id, folder),
+    purgeTrash: (id) => v.purgeTrash(id),
+    emptyTrash: () => v.emptyTrash(),
     search: async (q, filter = {}) => (q.trim() ? list(await v.search(q, filter)) : []),
     tags: async () => list(await v.tags()),
     views: async () => list(await v.views()),
     plugins: async () => list(await v.plugins()),
     history: async (path) => list(await v.history(path)),
+    historyVersion: async (path, version) => (await v.historyVersion(path, version)) ?? null,
     restore: (path, version) => v.restore(path, version),
     fileUrl: (path, from) =>
       fileBase("vault") +

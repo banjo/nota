@@ -43,6 +43,36 @@ func TestCleanTag(t *testing.T) {
 	}
 }
 
+func TestRefs(t *testing.T) {
+	body := "[[ Plan #Mål| planen ]] ![[bild.png]] [[a/B.md]] | [[T\\|alias]] |\n" +
+		"[x](../Other%20Note.md#sec) ![i](<img/a b.png>) [w](https://x.se) `[[code]]`\n"
+	got := Refs([]byte(body), "notes/sub")
+	type ref struct {
+		raw, target    string
+		wiki, file, ag bool
+	}
+	want := []ref{
+		{"Plan", "Plan", true, false, false},
+		{"bild.png", "bild.png", true, false, false},
+		{"a/B.md", "a/B.md", true, false, false},
+		{"T", "T", true, false, false},
+		{"../Other%20Note.md", "notes/Other Note.md", false, false, false},
+		{"img/a b.png", "notes/sub/img/a b.png", false, true, true},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("refs = %#v", got)
+	}
+	for i, r := range got {
+		w := want[i]
+		if r.Raw != w.raw || body[r.Start:r.End] != w.raw || r.Target != w.target || r.Wiki != w.wiki || r.File != w.file || r.Angle != w.ag {
+			t.Errorf("ref %d = %+v, want %+v", i, r, w)
+		}
+	}
+	if got[0].Heading != "Mål" || got[0].Alias != "planen" || !got[1].Embed {
+		t.Errorf("parts: %+v %+v", got[0], got[1])
+	}
+}
+
 func TestParseWikilinkInTable(t *testing.T) {
 	body := "| Note | Link |\n|---|---|\n| a | [[projekt/Plan\\|planen]] |\n"
 	got := Parse([]byte(body), "").Links

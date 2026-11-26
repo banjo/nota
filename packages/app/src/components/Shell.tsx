@@ -18,8 +18,10 @@ import { OpenedFiles } from "./OpenedFiles.tsx";
 import { Onboarding, preloadScreens, Settings } from "./lazy.tsx";
 import { Palette } from "./Palette.tsx";
 import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
+import { HistoryDialog } from "./History.tsx";
 import { RowSheet } from "./RowSheet.tsx";
 import { Sidebar } from "./Sidebar.tsx";
+import { TrashView } from "./Trash.tsx";
 import { TopBar } from "./TopBar.tsx";
 
 /** Runs registered commands from shortcuts and the app menu. */
@@ -116,6 +118,8 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
       return <NoteList key={JSON.stringify(route.list)} list={route.list} />;
     case "inbox":
       return <InboxView />;
+    case "trash":
+      return <TrashView />;
     case "settings":
       return <Settings />;
     default:
@@ -195,6 +199,7 @@ export function Shell({ children }: { children?: ReactNode }) {
       <Palette />
       <VaultDialogs />
       <RowSheet />
+      <HistoryDialog />
       {vaultFlow ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
           <Onboarding flow="switch" initialMode={vaultFlow.mode} onCancel={closeVaultFlow} />

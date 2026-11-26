@@ -44,7 +44,7 @@ type Parsed struct {
 var (
 	md         = goldmark.New()
 	wikiRe     = regexp.MustCompile(`(!?)\[\[([^\[\]\n]+?)\]\]`)
-	mdLinkRe   = regexp.MustCompile(`(!?)\[[^\]\n]*\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)`)
+	mdLinkRe   = regexp.MustCompile(`(!?)\[[^\]\n]*\]\((?:<([^<>\n]+)>|([^)\s<>]+))(?:\s+"[^"]*")?\)`)
 	tagRe      = regexp.MustCompile(`(?:^|[\s(\[,;])#([\p{L}\p{N}_/\-]+)`)
 	schemeLike = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.\-]*:`)
 )
@@ -62,20 +62,86 @@ func Parse(body []byte, folder string) Parsed {
 			p.Tags = append(p.Tags, t)
 		}
 	}
-	for _, m := range wikiRe.FindAllSubmatch(src, -1) {
-		if l, ok := parseWiki(string(m[2])); ok {
-			l.Embed = len(m[1]) > 0
-			p.Links = append(p.Links, l)
-		}
-	}
-	for _, m := range mdLinkRe.FindAllSubmatch(src, -1) {
-		if l, ok := parseMarkdownLink(string(m[2]), folder); ok {
-			l.Embed = len(m[1]) > 0
-			p.Links = append(p.Links, l)
+	for _, r := range refs(body, src, folder) {
+		if !r.File {
+			p.Links = append(p.Links, r.Link)
 		}
 	}
 	return p
 }
+
+// Ref is a link with where its target is written in the body, so it can
+// be rewritten in place.
+type Ref struct {
+	Link
+	// Start and End are the byte offsets of the target as written:
+	// "Plan" in [[Plan#Goal|the plan]], "../Plan.md" in [x](../Plan.md#Goal).
+	Start, End int
+	// Raw is body[Start:End].
+	Raw string
+	// Angle is true for a markdown destination in <angle brackets>.
+	Angle bool
+	// File is true for a markdown link to a local file that is not a
+	// note (an image, a PDF); Target is then its vault path. Parse leaves
+	// these out.
+	File bool
+}
+
+// Refs returns every link of a body with its position: wikilinks and
+// embeds first, then markdown links, including those to local files that
+// are not notes. Links in code are left out, as in Parse.
+func Refs(body []byte, folder string) []Ref { return refs(body, mask(body), folder) }
+
+func refs(body, src []byte, folder string) []Ref {
+	var out []Ref
+	for _, m := range wikiRe.FindAllSubmatchIndex(src, -1) {
+		inner := string(src[m[4]:m[5]])
+		l, ok := parseWiki(inner)
+		if !ok {
+			continue
+		}
+		l.Embed = m[3] > m[2]
+		end := len(inner)
+		if i := strings.IndexByte(inner, '|'); i >= 0 {
+			end = len(strings.TrimSuffix(inner[:i], `\`))
+		}
+		if i := strings.IndexByte(inner[:end], '#'); i >= 0 {
+			end = i
+		}
+		start := 0
+		for start < end && isSpace(inner[start]) {
+			start++
+		}
+		for end > start && isSpace(inner[end-1]) {
+			end--
+		}
+		r := Ref{Link: l, Start: m[4] + start, End: m[4] + end}
+		r.Raw = string(body[r.Start:r.End])
+		out = append(out, r)
+	}
+	for _, m := range mdLinkRe.FindAllSubmatchIndex(src, -1) {
+		ds, de, angle := m[4], m[5], true
+		if ds < 0 {
+			ds, de, angle = m[6], m[7], false
+		}
+		dest := string(src[ds:de])
+		l, file, ok := parseLocalLink(dest, folder)
+		if !ok {
+			continue
+		}
+		l.Embed = m[3] > m[2]
+		end := len(dest)
+		if i := strings.IndexByte(dest, '#'); i >= 0 {
+			end = i
+		}
+		r := Ref{Link: l, Start: ds, End: ds + end, File: file, Angle: angle}
+		r.Raw = string(body[r.Start:r.End])
+		out = append(out, r)
+	}
+	return out
+}
+
+func isSpace(b byte) bool { return b == ' ' || b == '\t' }
 
 // CleanTag normalizes a tag: no leading "#", no trailing "/", and at least
 // one character that is not a digit (Obsidian treats "#2026" as text).
@@ -110,9 +176,11 @@ func parseWiki(inner string) (Link, bool) {
 	return l, l.Target != "" // [[#heading]] points into the same note
 }
 
-func parseMarkdownLink(dest, folder string) (Link, bool) {
+// parseLocalLink reads the destination of a markdown link to a local
+// file; file is true when it is not a note.
+func parseLocalLink(dest, folder string) (l Link, file, ok bool) {
 	if schemeLike.MatchString(dest) || strings.HasPrefix(dest, "#") || strings.HasPrefix(dest, "//") {
-		return Link{}, false
+		return Link{}, false, false
 	}
 	heading := ""
 	if i := strings.IndexByte(dest, '#'); i >= 0 {
@@ -121,8 +189,8 @@ func parseMarkdownLink(dest, folder string) (Link, bool) {
 	if u, err := url.PathUnescape(dest); err == nil {
 		dest = u
 	}
-	if !strings.EqualFold(path.Ext(dest), ".md") {
-		return Link{}, false
+	if dest == "" {
+		return Link{}, false, false
 	}
 	var p string
 	if strings.HasPrefix(dest, "/") {
@@ -130,10 +198,11 @@ func parseMarkdownLink(dest, folder string) (Link, bool) {
 	} else {
 		p = path.Clean("/" + path.Join(folder, dest))
 	}
-	if strings.HasPrefix(p, "/..") {
-		return Link{}, false
+	if strings.HasPrefix(p, "/..") || p == "/" {
+		return Link{}, false, false
 	}
-	return Link{Target: strings.TrimPrefix(p, "/"), Heading: heading}, true
+	file = !strings.EqualFold(path.Ext(dest), ".md")
+	return Link{Target: strings.TrimPrefix(p, "/"), Heading: heading}, file, true
 }
 
 // mask returns a copy of body with code blocks, code spans and raw HTML

@@ -38,10 +38,13 @@ func NewServer(s *Service, version string, logger *slog.Logger) *sdk.Server {
 	tool(srv, "append_to_note", "Append markdown to the end of a note, on a new line. Use it for logs, lists and adding to a note without rewriting it.", add, s.Append)
 	tool(srv, "update_note", "Replace the body of a note (everything after the frontmatter, which is kept). Pass expected_hash from read_note to fail instead of overwriting changes made since.", idem, s.Update)
 	tool(srv, "update_frontmatter", "Set and remove frontmatter keys of a note. Only those keys' lines change; the updated timestamp is kept current.", idem, s.Frontmatter)
-	tool(srv, "move_note", "Move a note into another folder, keeping its file name. Fails if a note with that name is already there.", idem, s.Move)
+	tool(srv, "move_note", "Move a note into another folder, keeping its file name. Links to it that would break are rewritten (only their targets change). Fails if a note with that name is already there.", idem, s.Move)
 	tool(srv, "create_folder", "Create an empty folder (a/b makes both). Fails if it exists. Notes can also go into a new folder directly: create_note and move_note create the folder.", add, s.CreateFolder)
 	tool(srv, "list_folders", "List every folder, empty ones too, with the number of notes in it (subfolders included).", ro,
 		func(struct{}) (FoldersOutput, error) { return s.Folders() })
+	tool(srv, "list_trash", "List the deleted notes in the vault's .trash/, most recently deleted first, with where each was deleted from and when.", ro,
+		func(struct{}) (TrashOutput, error) { return s.Trash() })
+	tool(srv, "restore_note", "Put a deleted note back where it was deleted from, or into another folder. Fails if a note has taken that path since; pass folder then.", add, s.Restore)
 	tool(srv, "list_tags", "List every tag in the vault (frontmatter and inline #tags) with the number of notes that have it.", ro,
 		func(struct{}) (TagsOutput, error) { return s.Tags() })
 	tool(srv, "list_views", "List the saved views (.nota/views/*.yaml): named queries with their note counts. Pass a view's id to list_notes.", ro,

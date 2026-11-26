@@ -1,6 +1,7 @@
 # mv moves a note into a folder (created if needed) and keeps the index current.
 nota mv Projekt/Plan Arkiv/2026
 stdout '^Arkiv/2026/Plan.md$'
+stderr '^Updated 2 links in 1 note.$'
 exists vault/Arkiv/2026/Plan.md
 ! exists vault/Projekt/Plan.md
 nota ls --folder Arkiv
@@ -8,46 +9,75 @@ stdout '^Arkiv/2026/Plan.md'
 nota ls --folder Projekt
 ! stdout .
 
-# / is the vault root; --json reports both paths.
+# Links that name it by path follow it.
+cmp vault/Vägen.md vagen-1.md
+
+# / is the vault root; --json reports both paths and the links it rewrote.
 nota mv --json Arkiv/2026/Plan.md /
 stdout '"from": "Arkiv/2026/Plan.md"'
 stdout '"path": "Plan.md"'
+stdout '"count": 3'
+stdout '"path": "Vägen.md"'
 exists vault/Plan.md
+cmp vault/Vägen.md vagen-2.md
+
+# A move doesn't take over a link to another note of the same name:
+# [[Plan]] in Länk.md meant Other/Plan.md, and the moved Plan.md is now
+# closer, so the link names Other/Plan.md by path.
+cmp vault/Länk.md lank.txt
+nota backlinks Other/Plan.md
+stdout '^Länk.md\t\[\[Other/Plan\]\]$'
+
+# A new path ending in .md renames; --no-update-links leaves links alone.
+nota mv Plan.md Roadmap.md
+stdout '^Roadmap.md$'
+grep '\[\[Roadmap#Mål\]\]' vault/Vägen.md
+nota mv --no-update-links Roadmap.md Plan.md
+! stderr .
+grep '\[\[Roadmap#Mål\]\]' vault/Vägen.md
+nota mv Plan.md Roadmap.md
 
 # Moving onto an existing note is refused (exit 5); nothing changes.
-exitcode 5 nota mv Plan.md Other
+exitcode 5 nota mv Roadmap.md Other/Plan.md
 stderr 'already exists'
-exists vault/Plan.md
+exists vault/Roadmap.md
 exitcode 3 nota mv nope Other
-exitcode 2 nota mv Plan.md
-exitcode 2 nota mv Plan.md ../outside
+exitcode 2 nota mv Roadmap.md
+exitcode 2 nota mv Roadmap.md ../outside
 stderr 'leaves the vault'
 
-# Backlinks follow the moved note.
-nota backlinks Plan.md
-stdout '^Länk.md\t\[\[Plan\]\]$'
-
 # rm moves the note to .trash/ (never deletes); it leaves the index.
-nota rm Plan.md
-stdout '^.trash/Plan.md$'
-exists vault/.trash/Plan.md
-! exists vault/Plan.md
+nota rm Roadmap.md
+stdout '^.trash/Roadmap.md$'
+exists vault/.trash/Roadmap.md
+! exists vault/Roadmap.md
 nota ls
-! stdout '^Plan.md'
+! stdout '^Roadmap.md'
 nota rm --json Other/Plan.md
 stdout '"trash": ".trash/Other/Plan.md"'
-nota add --folder / Plan
-nota rm Plan.md
-stdout '^.trash/Plan 2.md$'
-exitcode 3 nota cat Plan
+nota add --folder / Roadmap
+nota rm Roadmap.md
+stdout '^.trash/Roadmap 2.md$'
+exitcode 3 nota cat Roadmap
 nota ls
 cmp stdout after.txt
 
 -- vault/Projekt/Plan.md --
 # Plan
+
+## Mål
 -- vault/Other/Plan.md --
 # Other plan
 -- vault/Länk.md --
 See [[Plan]].
+-- vault/Vägen.md --
+[[Projekt/Plan#Mål]] and [the plan](Projekt/Plan.md).
+-- vagen-1.md --
+[[Arkiv/2026/Plan#Mål]] and [the plan](Arkiv/2026/Plan.md).
+-- vagen-2.md --
+[[Plan#Mål]] and [the plan](Plan.md).
+-- lank.txt --
+See [[Other/Plan]].
 -- after.txt --
-Länk.md  See [[Plan]].
+Länk.md   See [[Other/Plan]].
+Vägen.md  [[Roadmap#Mål]] and [the plan](Roadmap.md).

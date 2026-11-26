@@ -128,3 +128,24 @@ func testCollectBlobs(t *testing.T, blobs func(t *testing.T, dataDir string) Blo
 		t.Fatal("young orphan swept")
 	}
 }
+
+// With BlobGCInterval the server collects on its own, and Close stops it.
+func TestBlobGCOnTimer(t *testing.T) {
+	later := func() time.Time { return time.Now().Add(2 * time.Hour) } // past the grace
+	e := newEnv(t, Config{BlobGCInterval: 10 * time.Millisecond, Now: later})
+	ctx := context.Background()
+	const orphan = "orphan bytes\n"
+	if _, _, err := e.srv.blobs.Put(ctx, strings.NewReader(orphan), 0); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := e.srv.blobs.Stat(ctx, hashOf(orphan)); errors.Is(err, fs.ErrNotExist) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the orphan blob was not collected")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}

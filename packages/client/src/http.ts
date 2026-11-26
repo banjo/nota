@@ -5,6 +5,7 @@ import type {
   ChangeEvent,
   CreateInput,
   HistoryEntry,
+  TrashItem,
   ListQuery,
   MoveResult,
   Note,
@@ -50,6 +51,9 @@ export interface HttpClientOptions {
 
 /** The protocol version the client speaks (docs/sync-protocol.md). */
 export const PROTOCOL = "1";
+
+/** What a server that predates link updates answers for a move. */
+const noLinks = { count: 0, notes: [] };
 
 /** Escapes a vault path segment by segment, as protocol.EscapePath does. */
 export function escapePath(p: string): string {
@@ -251,29 +255,36 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       ),
     create: (input: CreateInput) => request<Note>("POST", "/notes", { body: input }),
     async move(path: string, folder: string): Promise<MoveResult> {
-      const r = await request<{ from: string; path: string }>("POST", "/move", {
+      const r = await request<MoveResult>("POST", "/move", {
         body: { path, folder: folder || "/" },
       });
-      return { from: r.from, path: r.path };
+      return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
     async createFolder(path: string): Promise<string> {
       return (await request<{ path: string }>("POST", "/folders", { body: { path } })).path;
     },
     async renameFolder(path: string, to: string): Promise<MoveResult> {
-      const r = await request<{ from: string; path: string }>("POST", "/folders/rename", {
+      const r = await request<MoveResult>("POST", "/folders/rename", {
         body: { path, to },
       });
-      return { from: r.from, path: r.path };
+      return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
     async rename(path: string, to: string): Promise<MoveResult> {
-      const r = await request<{ from: string; path: string }>("POST", "/move", {
+      const r = await request<MoveResult>("POST", "/move", {
         body: { path, to },
       });
-      return { from: r.from, path: r.path };
+      return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
     async remove(path: string) {
       await request("DELETE", `/notes/${escapePath(path)}`);
+      // The server keeps one deleted note per path: its path is its id in the trash.
+      return path;
     },
+    trash: async () => (await request<{ items: TrashItem[] }>("GET", "/trash")).items,
+    trashNote: async (id: string) =>
+      (await request<{ content: string }>("GET", `/trash/${escapePath(id)}`)).content,
+    restoreTrash: async (id: string, folder?: string) =>
+      (await request<{ path: string }>("POST", "/trash/restore", { body: { id, folder } })).path,
     async search(query: string, filter?: ListQuery) {
       if (!query.trim()) return [];
       return (
@@ -297,6 +308,12 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         modifiedAt: e.modified_at,
         movedFrom: e.moved_from,
       }));
+    },
+    async historyVersion(path: string, version: number) {
+      const v = await request<{ content?: string | null }>("GET", `/history/${escapePath(path)}`, {
+        query: { version: String(version) },
+      });
+      return v.content ?? null;
     },
     async restore(path: string, version: number) {
       await request("POST", `/history/${escapePath(path)}/restore`, { body: { version } });

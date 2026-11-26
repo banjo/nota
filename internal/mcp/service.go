@@ -11,12 +11,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/index"
+	"github.com/banjo/nota/internal/relink"
 	"github.com/banjo/nota/internal/vault"
 	"github.com/banjo/nota/internal/views"
 )
@@ -447,12 +449,14 @@ type MoveInput struct {
 
 // MoveOutput is the result of move_note.
 type MoveOutput struct {
-	From string `json:"from"`
-	Path string `json:"path"`
-	URI  string `json:"uri"`
+	From  string        `json:"from"`
+	Path  string        `json:"path"`
+	URI   string        `json:"uri"`
+	Links relink.Result `json:"links" jsonschema:"links in other notes (and the note's own relative links) rewritten to keep pointing at the same notes"`
 }
 
-// Move moves a note to another folder, keeping its file name.
+// Move moves a note to another folder, keeping its file name, and
+// rewrites the links that would otherwise break.
 func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -463,14 +467,90 @@ func (s *Service) Move(in MoveInput) (MoveOutput, error) {
 	if err != nil {
 		return MoveOutput{}, err
 	}
+	folder, err := vault.CleanPath(in.Folder)
+	if err != nil {
+		return MoveOutput{}, err
+	}
+	planned := path.Join(folder, path.Base(p))
+	pending, err := relink.Prepare(s.v, s.ix, map[string]string{p: planned})
+	if err != nil {
+		return MoveOutput{}, err
+	}
 	where, stop := s.v.Bus().Follow()
 	defer stop()
-	to, err := s.v.Move(p, in.Folder)
+	to, err := s.v.Move(p, folder)
 	if err != nil {
 		return MoveOutput{}, err
 	}
 	to = where(to)
-	return MoveOutput{From: p, Path: to, URI: URI(to)}, nil
+	if err := s.sync(); err != nil {
+		return MoveOutput{}, err
+	}
+	links, err := pending.Apply(map[string]string{p: to})
+	if err != nil {
+		return MoveOutput{}, err
+	}
+	return MoveOutput{From: p, Path: to, URI: URI(to), Links: links}, nil
+}
+
+// TrashOutput is the result of list_trash.
+type TrashOutput struct {
+	Items []vault.TrashItem `json:"items" jsonschema:"what's in the vault's .trash/, most recently deleted first: path is where it is in the trash, from where it was deleted from"`
+}
+
+// Trash lists the deleted notes.
+func (s *Service) Trash() (TrashOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items, err := s.v.Trash()
+	if err != nil {
+		return TrashOutput{}, err
+	}
+	if items == nil {
+		items = []vault.TrashItem{}
+	}
+	return TrashOutput{Items: items}, nil
+}
+
+// RestoreInput are the arguments of restore_note.
+type RestoreInput struct {
+	Note   string `json:"note" jsonschema:"the deleted note: its path in the trash from list_trash, or the path it was deleted from (the newest delete)"`
+	Folder string `json:"folder,omitempty" jsonschema:"restore into this folder instead of where it was deleted from; '/' for the vault root"`
+}
+
+// RestoreOutput is the result of restore_note.
+type RestoreOutput struct {
+	Path string `json:"path"`
+	URI  string `json:"uri"`
+}
+
+// Restore moves a deleted note out of the trash.
+func (s *Service) Restore(in RestoreInput) (RestoreOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	it, err := s.v.FindTrash(in.Note)
+	if err != nil {
+		return RestoreOutput{}, err
+	}
+	to := ""
+	if in.Folder != "" {
+		folder, err := vault.CleanPath(in.Folder)
+		if err != nil {
+			return RestoreOutput{}, err
+		}
+		to = path.Join(folder, path.Base(it.From))
+	}
+	where, stop := s.v.Bus().Follow()
+	defer stop()
+	p, err := s.v.RestoreTrash(it.Path, to)
+	if err != nil {
+		return RestoreOutput{}, err
+	}
+	p = where(p)
+	if err := s.sync(); err != nil {
+		return RestoreOutput{}, err
+	}
+	return RestoreOutput{Path: p, URI: URI(p)}, nil
 }
 
 // FolderInput are the arguments of create_folder.

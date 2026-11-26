@@ -52,6 +52,12 @@ export interface Appearance {
   captureBackground?: string;
 }
 
+/** Changed is one note whose links were rewritten. */
+export interface Changed {
+  path: string;
+  links: number;
+}
+
 /**
  * Changes tells the frontend which notes changed: by the app itself,
  * the sync engine, a hook, or another program editing the files.
@@ -185,10 +191,14 @@ export interface ListQuery {
   limit?: number;
 }
 
-/** MoveResult is where a moved note went. */
+/**
+ * MoveResult is where a moved note (or folder) went, and the links in
+ * other notes that were rewritten to follow it.
+ */
 export interface MoveResult {
   from: string;
   path: string;
+  links: Result;
 }
 
 /** Note is one note with its content and links. */
@@ -284,6 +294,14 @@ export interface RemoteVault {
   name: string;
   cursor: number;
   created: string;
+}
+
+/** Result says which notes Apply changed. */
+export interface Result {
+  /** Count is the number of links rewritten. */
+  count: number;
+  /** Notes are the changed notes, by their path after the move. */
+  notes: Changed[];
 }
 
 /** SaveOutcome is where a saved file went. */
@@ -394,6 +412,16 @@ export interface Theme {
   dark?: Record<string, string>;
 }
 
+/** TrashItem is a deleted note in the vault's .trash/. */
+export interface TrashItem {
+  /** ID is its path in the trash, which the other trash calls take. */
+  id: string;
+  /** Path is where it was deleted from. */
+  path: string;
+  deletedAt: string;
+  size: number;
+}
+
 /** Tree is every folder and every note of the vault. */
 export interface Tree {
   inbox: string;
@@ -461,6 +489,11 @@ export const Vault = {
   createFolder: bind<[string], string>("Vault.CreateFolder", (path: string) => [path]),
   /** Delete moves a note to .trash/ and returns where it went. */
   delete: bind<[string], string>("Vault.Delete", (path: string) => [path]),
+  /**
+   * EmptyTrash deletes everything in the trash for good and returns how
+   * many files it deleted.
+   */
+  emptyTrash: bind<[], number>("Vault.EmptyTrash", () => []),
   /** Get returns one note with its content, hash, links and backlinks. */
   get: bind<[string], Note>("Vault.Get", (path: string) => [path]),
   /**
@@ -468,6 +501,11 @@ export const Vault = {
    * live on the sync server, so it needs sync.
    */
   history: bind<[string], HistoryEntry[]>("Vault.History", (path: string) => [path]),
+  /**
+   * HistoryVersion returns the content of one server version of a note;
+   * nil when that version is a delete.
+   */
+  historyVersion: bind<[string, number], string | null>("Vault.HistoryVersion", (path: string, version: number) => [path, version]),
   /** Inbox returns the notes in the inbox folder, newest first. */
   inbox: bind<[], NoteInfo[]>("Vault.Inbox", () => []),
   /** Info describes the open vault. */
@@ -492,6 +530,8 @@ export const Vault = {
    * error.
    */
   plugins: bind<[], Plugin[]>("Vault.Plugins", () => []),
+  /** PurgeTrash deletes a note in the trash for good. */
+  purgeTrash: bind<[string], void>("Vault.PurgeTrash", (id: string) => [id]),
   /** Rename gives a note a new path (a new name, a new folder, or both). */
   rename: bind<[string, string], MoveResult>("Vault.Rename", (path: string, to: string) => [path, to]),
   /**
@@ -504,6 +544,12 @@ export const Vault = {
    * background sync brings it to this vault (the server nudges it).
    */
   restore: bind<[string, number], void>("Vault.Restore", (path: string, version: number) => [path, version]),
+  /**
+   * RestoreTrash puts a deleted note back where it was deleted from, or
+   * into folder ("/" is the root), and returns its path. It refuses to
+   * overwrite a note that has taken the path.
+   */
+  restoreTrash: bind<[string, string], string>("Vault.RestoreTrash", (id: string, folder: string) => [id, folder]),
   /**
    * Save writes a note's body back, keeping its frontmatter byte for byte
    * apart from "updated", which is set to now when the note has
@@ -524,6 +570,10 @@ export const Vault = {
   syncStatus: bind<[], SyncStatus>("Vault.SyncStatus", () => []),
   /** Tags returns every tag with its note count. */
   tags: bind<[], TagCount[]>("Vault.Tags", () => []),
+  /** Trash lists the deleted notes, most recently deleted first. */
+  trash: bind<[], TrashItem[]>("Vault.Trash", () => []),
+  /** TrashNote reads a deleted note. */
+  trashNote: bind<[string], string>("Vault.TrashNote", (id: string) => [id]),
   /** Tree returns every folder (empty ones too) and every note, by path. */
   tree: bind<[], Tree>("Vault.Tree", () => []),
   /** Views returns the saved views of .nota/views with their note counts. */
