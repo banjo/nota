@@ -25,6 +25,7 @@ describe("contribution registry", () => {
     const off = registerBuiltins(r);
     expect(r.get("sidebar").map((s) => s.id)).toEqual([
       "nota.nav",
+      "nota.pinned",
       "nota.opened",
       "nota.views",
       "nota.folders",
@@ -33,6 +34,9 @@ describe("contribution registry", () => {
     expect(r.get("inboxSuggester").map((p) => p.id)).toEqual(["nota.rules"]);
     expect(r.command("note.new")?.shortcut).toBe("mod+n");
     expect(r.command("sidebar.toggle")?.shortcut).toBe("mod+\\");
+    // Pin and Unpin share ⌘⇧P; only one applies to a note at a time.
+    expect(r.command("note.pin")?.shortcut).toBe("mod+shift+p");
+    expect(r.command("note.unpin")?.shortcut).toBe("mod+shift+p");
     // The tree ships without decorations: status lives on the page.
     expect(r.get("treeDecorator")).toEqual([]);
     off();

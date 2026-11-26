@@ -8,13 +8,15 @@ import {
 } from "@nota/ui/dropdown-menu";
 import { cn } from "@nota/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, FolderInput, History, MoreHorizontal, Trash2 } from "lucide-react";
+import { FileText, FolderInput, History, MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
 import { memo } from "react";
-import { deleteNote } from "../actions.ts";
+import { deleteNote, setPinned } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { useArmed } from "../lib/armed.ts";
 import { useLongPress } from "../lib/longPress.ts";
+import { isPinned } from "../lib/pinned.ts";
 import { useNarrow } from "../lib/viewport.ts";
+import { useTreeValue } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { openHistory } from "./History.tsx";
@@ -149,6 +151,7 @@ export function NoteMenu({
         <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="right">
+        <PinItem path={path} />
         <DropdownMenuItem onSelect={() => openPalette("move", path)}>
           <FolderInput /> Move to…
         </DropdownMenuItem>
@@ -161,5 +164,19 @@ export function NoteMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function PinItem({ path }: { path: string }) {
+  const client = useClient();
+  const qc = useQueryClient();
+  const pinned = useTreeValue((t) => {
+    const n = t.notes.find((x) => x.path === path);
+    return !!n && isPinned(n);
+  });
+  return (
+    <DropdownMenuItem onSelect={() => void setPinned(client, qc, path, !pinned)}>
+      {pinned ? <PinOff /> : <Pin />} {pinned ? "Unpin" : "Pin"}
+    </DropdownMenuItem>
   );
 }

@@ -6,7 +6,7 @@ import { NotebookPen } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { useClient } from "../context.ts";
 import { label, matches } from "../lib/shortcuts.ts";
-import { type CommandContext, useRegistry } from "../registry.ts";
+import { type Command, type CommandContext, useRegistry } from "../registry.ts";
 import { currentPath, type Route, useUI } from "../state.ts";
 import { useList } from "../queries.ts";
 import { EmptyState } from "./EmptyState.tsx";
@@ -24,6 +24,9 @@ import { Sidebar } from "./Sidebar.tsx";
 import { TrashView } from "./Trash.tsx";
 import { TopBar } from "./TopBar.tsx";
 
+const enabled = (cmd: Command, ctx: CommandContext) =>
+  !cmd.when || cmd.id === "palette.toggle" || cmd.when(ctx);
+
 /** Runs registered commands from shortcuts and the app menu. */
 export function useCommandRunner() {
   const registry = useRegistry();
@@ -38,28 +41,31 @@ export function useCommandRunner() {
     last.current = { id, at: now };
     const cmd = registry.command(id);
     if (!cmd) return;
+    const ctx = context();
+    if (!enabled(cmd, ctx)) return;
+    void cmd.run(ctx);
+  };
+  const context = (): CommandContext => {
     const ui = useUI.getState();
-    const ctx: CommandContext = {
+    return {
       client,
       queryClient: qc,
       route: ui.route,
       notePath: currentPath(ui.route),
       navigate: ui.navigate,
     };
-    if (cmd.when && cmd.id !== "palette.toggle" && !cmd.when(ctx)) return;
-    void cmd.run(ctx);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing) return;
-      for (const cmd of registry.get("command")) {
-        if (cmd.shortcut && matches(e, cmd.shortcut)) {
-          e.preventDefault();
-          run(cmd.id);
-          return;
-        }
-      }
+      const cmds = registry.get("command").filter((c) => c.shortcut && matches(e, c.shortcut));
+      if (!cmds.length) return;
+      e.preventDefault();
+      // Commands may share a shortcut (Pin note / Unpin note): the one that applies runs.
+      const ctx = context();
+      const cmd = cmds.find((c) => enabled(c, ctx));
+      if (cmd) run(cmd.id);
     };
     window.addEventListener("keydown", onKey);
     const offMenu = client.shell?.onCommand(run);

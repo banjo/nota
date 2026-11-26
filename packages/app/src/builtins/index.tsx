@@ -17,6 +17,8 @@ import {
   ListTree,
   PanelLeft,
   PenLine,
+  Pin,
+  PinOff,
   Search,
   Settings,
   SunMoon,
@@ -34,7 +36,8 @@ import {
   isDirty,
   revertDraft,
 } from "../external.ts";
-import { createNote, deleteNote, newNoteFolder, openVaultFlow } from "../actions.ts";
+import { createNote, deleteNote, newNoteFolder, openVaultFlow, setPinned } from "../actions.ts";
+import { isPinned } from "../lib/pinned.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
 import { openHistory } from "../components/History.tsx";
@@ -54,6 +57,15 @@ import { onlineVaults, useVaultDialog } from "../vaults/online.ts";
 import { BacklinksPanel } from "./backlinks.tsx";
 import { FoldersSection, NavSection, ViewsSection } from "./sections.tsx";
 import { OpenedSection } from "../components/OpenedSection.tsx";
+import { PinnedSection } from "../components/PinnedSection.tsx";
+
+/** Whether the note on screen is pinned (from the cached tree). */
+function notePinned(ctx: { notePath?: string; queryClient: QueryClient }): boolean {
+  const n = ctx.queryClient
+    .getQueryData<Tree>(keys.tree)
+    ?.notes.find((x) => x.path === ctx.notePath);
+  return !!n && isPinned(n);
+}
 
 /** The folder on screen (a note's, or the list's) that can be renamed, else "". */
 function currentFolder(ctx: { route: Route; client: unknown; queryClient: QueryClient }): string {
@@ -69,6 +81,7 @@ function currentFolder(ctx: { route: Route; client: unknown; queryClient: QueryC
 export function registerBuiltins(r: Registry): () => void {
   const off = [
     r.register("sidebar", { id: "nota.nav", order: 0, component: NavSection }),
+    r.register("sidebar", { id: "nota.pinned", order: 3, component: PinnedSection }),
     r.register("sidebar", { id: "nota.opened", order: 5, component: OpenedSection }),
     r.register("sidebar", { id: "nota.views", order: 10, component: ViewsSection }),
     r.register("sidebar", { id: "nota.folders", order: 20, component: FoldersSection }),
@@ -148,6 +161,26 @@ export function registerBuiltins(r: Registry): () => void {
         });
         useUI.getState().openPalette("newFolder", baseFolder(ctx.route, tree.inbox));
       },
+    }),
+    r.register("command", {
+      id: "note.pin",
+      title: "Pin note",
+      group: "Notes",
+      keywords: ["favourite", "favorite", "star", "bookmark", "fäst"],
+      icon: Pin,
+      shortcut: "mod+shift+p",
+      when: (ctx) => !!ctx.notePath && !notePinned(ctx),
+      run: (ctx) => setPinned(ctx.client, ctx.queryClient, ctx.notePath!, true),
+    }),
+    r.register("command", {
+      id: "note.unpin",
+      title: "Unpin note",
+      group: "Notes",
+      keywords: ["favourite", "favorite", "star", "bookmark", "unfavourite"],
+      icon: PinOff,
+      shortcut: "mod+shift+p",
+      when: (ctx) => !!ctx.notePath && notePinned(ctx),
+      run: (ctx) => setPinned(ctx.client, ctx.queryClient, ctx.notePath!, false),
     }),
     r.register("command", {
       id: "note.history",

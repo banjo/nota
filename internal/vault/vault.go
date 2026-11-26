@@ -404,6 +404,21 @@ func (v *Vault) write(rel string, data []byte) (string, bool, error) {
 // UpdatedKey is the frontmatter key Save keeps current.
 const UpdatedKey = "updated"
 
+// PinnedKey marks a pinned note: a number is its place in the pinned
+// list (lower first), true pins it after the numbered ones.
+const PinnedKey = "pinned"
+
+// Pinned reports whether a `pinned` value pins its note.
+func Pinned(v any) bool {
+	switch v.(type) {
+	case int, int64, uint64, float64:
+		return true
+	case bool:
+		return v == true
+	}
+	return false
+}
+
 // Save is Write for edits made through Nota (the CLI, the app, MCP,
 // hooks): when the note on disk already has frontmatter and the new
 // content keeps it, `updated` is set to the current local time (RFC 3339).
@@ -431,9 +446,13 @@ func (v *Vault) Save(rel string, data []byte) (string, bool, error) {
 
 // Stamp returns data with `updated` set to now, when both the old and the
 // new content have a frontmatter block that parses. Otherwise data is
-// returned unchanged. Only the `updated` line changes.
+// returned unchanged. Only the `updated` line changes. Pinning,
+// unpinning and reordering pins (only `pinned` differs) is not an edit.
 func Stamp(old, data []byte, now time.Time) []byte {
 	if !frontmatter.Split(old).Has() {
+		return data
+	}
+	if bytes.Equal(frontmatter.Delete(old, PinnedKey), frontmatter.Delete(data, PinnedKey)) {
 		return data
 	}
 	doc := frontmatter.Split(data)

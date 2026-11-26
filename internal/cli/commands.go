@@ -44,7 +44,7 @@ func (f *filterFlags) register(cmd *cobra.Command, withSort bool, defaultSort st
 	fl.StringArrayVar(&f.where, "where", nil, "only notes whose property matches `key=value` (or key!=value); repeatable")
 	fl.IntVar(&f.limit, "limit", 0, "show at most this many notes")
 	if withSort {
-		fl.StringVar(&f.sort, "sort", defaultSort, "sort by path, title, created, updated or modified, optionally followed by asc or desc")
+		fl.StringVar(&f.sort, "sort", defaultSort, "sort by path, title, created, updated, modified or pinned, optionally followed by asc or desc")
 	}
 }
 
@@ -71,7 +71,7 @@ func (f *filterFlags) apply(cmd *cobra.Command, q *index.Query) error {
 	if fl.Lookup("sort") != nil && (fl.Changed("sort") || q.Sort.Field == "") {
 		s, err := index.ParseSort(f.sort)
 		if err != nil {
-			return usageErr("--sort %q: want path, title, created, updated or modified, then asc or desc", f.sort)
+			return usageErr("--sort %q: want path, title, created, updated, modified or pinned, then asc or desc", f.sort)
 		}
 		q.Sort = s
 	}
@@ -175,12 +175,14 @@ func (a *app) addText(args []string) (string, error) {
 func (a *app) lsCmd() *cobra.Command {
 	var f filterFlags
 	var view string
+	var pinned bool
 	cmd := &cobra.Command{
 		Use:   "ls",
 		Short: "List notes",
 		Example: `  nota ls --folder Projekt
   nota ls --tag projekt --where status=draft --sort "updated desc"
-  nota ls --view drafts --json`,
+  nota ls --view drafts --json
+  nota ls --pinned`,
 		Args: exactArgs(0, "no arguments"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ix, err := a.index()
@@ -201,6 +203,10 @@ func (a *app) lsCmd() *cobra.Command {
 					return err
 				}
 			}
+			if pinned {
+				q.Pinned = true
+				q.Sort = index.Sort{Field: "pinned"}
+			}
 			if err := f.apply(cmd, &q); err != nil {
 				return err
 			}
@@ -214,6 +220,7 @@ func (a *app) lsCmd() *cobra.Command {
 	}
 	f.register(cmd, true, "path")
 	cmd.Flags().StringVar(&view, "view", "", "start from a saved view (.nota/views/NAME.yaml)")
+	cmd.Flags().BoolVar(&pinned, "pinned", false, "only pinned notes, in their pinned order unless --sort is given")
 	return cmd
 }
 
@@ -823,6 +830,80 @@ frontmatter; everything else in the file stays byte for byte.
 	}
 	cmd.Flags().StringArrayVar(&unset, "unset", nil, "remove this `key`; repeatable")
 	return cmd
+}
+
+func (a *app) pinCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "pin <note>",
+		Short: "Pin a note to the top of the sidebar",
+		Long: `Pin a note: it is listed under Pinned at the top of the app's sidebar,
+last in the list. The place is the number in the note's "pinned"
+property (lower comes first; see nota ls --pinned). Pinning does not
+change "updated". Pinning a pinned note leaves it where it is.`,
+		Example:           `  nota pin Plan`,
+		Args:              exactArgs(1, "a note"),
+		ValidArgsFunction: a.completeNotes,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return a.setPin(args[0], true)
+		},
+	}
+}
+
+func (a *app) unpinCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:               "unpin <note>",
+		Short:             "Unpin a note",
+		Long:              `Unpin a note: removes its "pinned" property. "updated" stays as it was.`,
+		Example:           `  nota unpin Plan`,
+		Args:              exactArgs(1, "a note"),
+		ValidArgsFunction: a.completeNotes,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return a.setPin(args[0], false)
+		},
+	}
+}
+
+func (a *app) setPin(ref string, pin bool) error {
+	p, err := a.resolve(ref)
+	if err != nil {
+		return err
+	}
+	n, err := a.vault.Read(p)
+	if err != nil {
+		return err
+	}
+	if err := checkFrontmatter(n); err != nil {
+		return err
+	}
+	props, _ := frontmatter.Split(n.Raw).Properties()
+	src := n.Raw
+	switch {
+	case pin && !vault.Pinned(props[vault.PinnedKey]):
+		ix, err := a.index()
+		if err != nil {
+			return err
+		}
+		next, err := ix.NextPin()
+		if err != nil {
+			return err
+		}
+		if src, err = frontmatter.Set(src, vault.PinnedKey, next); err != nil {
+			return err
+		}
+	case !pin:
+		src = frontmatter.Delete(src, vault.PinnedKey)
+	}
+	if !bytes.Equal(src, n.Raw) {
+		if _, _, err := a.vault.Save(p, src); err != nil {
+			return err
+		}
+	}
+	if a.json {
+		props, _ = frontmatter.Split(src).Properties()
+		return a.printJSON(map[string]any{"path": p, "pinned": props[vault.PinnedKey]})
+	}
+	fmt.Fprintln(a.stdout, p)
+	return nil
 }
 
 // parseValue decodes a CLI value as YAML when that gives a number, a bool,

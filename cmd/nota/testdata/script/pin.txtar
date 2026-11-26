@@ -1,0 +1,77 @@
+# pin adds the note last to the pinned list: ten past the highest number.
+# "updated" stays, and nothing else in the file changes.
+env NOTA_NOW=2099-01-01T00:00:00Z
+nota pin Plan
+stdout '^Projekt/Plan.md$'
+cmp vault/Projekt/Plan.md want/plan-pinned.md
+nota pin Idé
+cmp vault/Inbox/Idé.md want/ide-pinned.md
+nota pin Anna
+stdout '^Möten/Anna.md$'
+grep '^pinned: 30$' vault/Möten/Anna.md
+
+# Pinning again leaves the note where it is.
+nota pin Plan
+cmp vault/Projekt/Plan.md want/plan-pinned.md
+
+# Setting the number by hand moves the note, and is not an edit either.
+nota set Plan pinned=100
+grep '^updated: 2026-11-20$' vault/Projekt/Plan.md
+
+# ls --pinned lists them in pinned order, as numbers (100 after 30).
+nota ls --pinned
+cmp stdout pinned.txt
+nota ls --pinned --sort path
+stdout -count=3 '\.md'
+stdout '^Inbox/Idé.md'
+nota ls --pinned --json
+stdout '"pinned": 100'
+
+# A moved note stays pinned.
+nota mv Anna Projekt
+nota ls --pinned
+stdout '^Projekt/Anna.md'
+
+# unpin removes the property and leaves updated alone.
+nota unpin Idé
+cmp vault/Inbox/Idé.md want/ide.md
+nota unpin Idé
+nota ls --pinned
+! stdout 'Idé'
+
+exitcode 2 nota pin
+stderr 'expected a note'
+
+-- vault/Inbox/Idé.md --
+Idé om sync
+-- vault/Projekt/Plan.md --
+---
+status: draft
+updated: 2026-11-20
+---
+# Plan
+-- vault/Möten/Anna.md --
+---
+tags: [möte]
+---
+# Anna
+-- want/plan-pinned.md --
+---
+status: draft
+updated: 2026-11-20
+pinned: 10
+---
+# Plan
+-- want/ide-pinned.md --
+---
+pinned: 20
+---
+Idé om sync
+-- want/ide.md --
+---
+---
+Idé om sync
+-- pinned.txt --
+Inbox/Idé.md     Idé om sync
+Möten/Anna.md    Anna         #möte
+Projekt/Plan.md  Plan

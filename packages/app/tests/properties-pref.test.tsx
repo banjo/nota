@@ -90,6 +90,7 @@ describe("properties preference", () => {
     expect(propertyCount(undefined)).toBe(0);
     expect(propertyCount({})).toBe(0);
     expect(propertyCount({ tags: ["a"], status: "draft", created: "x", custom: 1 })).toBe(4);
+    expect(propertyCount({ created: "x", pinned: 10 })).toBe(1);
   });
 });
 

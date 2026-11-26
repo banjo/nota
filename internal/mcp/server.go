@@ -33,7 +33,7 @@ func NewServer(s *Service, version string, logger *slog.Logger) *sdk.Server {
 
 	tool(srv, "search_notes", "Full-text search over note titles and bodies, best matches first, with a snippet of the matching text.", ro, s.Search)
 	tool(srv, "read_note", "Read one note: its frontmatter properties, tags, body, the whole file and a content hash.", ro, s.Read)
-	tool(srv, "list_notes", "List notes, filtered by folder, tag, frontmatter conditions (where) or a saved view, sorted by path unless sort is given.", ro, s.List)
+	tool(srv, "list_notes", "List notes, filtered by folder, tag, frontmatter conditions (where), pinned or a saved view, sorted by path unless sort is given.", ro, s.List)
 	tool(srv, "create_note", "Create a note. It goes to the inbox unless folder is given; the file name comes from the title. Tags and properties go into the frontmatter, with a created timestamp. Returns the note where it ended up (hooks may file it).", add, s.Create)
 	tool(srv, "append_to_note", "Append markdown to the end of a note, on a new line. Use it for logs, lists and adding to a note without rewriting it.", add, s.Append)
 	tool(srv, "update_note", "Replace the body of a note (everything after the frontmatter, which is kept). Pass expected_hash from read_note to fail instead of overwriting changes made since.", idem, s.Update)

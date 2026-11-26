@@ -13,14 +13,18 @@ import {
   History,
   type LucideIcon,
   PenLine,
+  Pin,
+  PinOff,
   Trash2,
 } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
-import { createNote, createNoteIn, deleteNote, newNoteFolder } from "../actions.ts";
+import type { Tree } from "@nota/client";
+import { createNote, createNoteIn, deleteNote, newNoteFolder, setPinned } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { useLongPress } from "../lib/longPress.ts";
 import { folderOf } from "../lib/notes.ts";
-import { useInboxName } from "../queries.ts";
+import { isPinned } from "../lib/pinned.ts";
+import { keys, useInboxName } from "../queries.ts";
 import { useUI } from "../state.ts";
 import { openHistory } from "./History.tsx";
 import { startNewFolder } from "./NewFolder.tsx";
@@ -31,7 +35,7 @@ import { openRowSheet, type RowTarget } from "./RowSheet.tsx";
 // bottom sheet under a finger (a long press): one list, two skins. Every
 // action is also a ⌘K command or shares its function (note.new,
 // folder.add, note.addToFolder, note.newInFolder, note.rename,
-// folder.rename, note.history, note.delete).
+// folder.rename, note.pin, note.history, note.delete).
 
 /** Puts the cursor in the open note's title field, selected: renaming it where it is. */
 export const focusNoteTitle = (): void => {
@@ -91,6 +95,8 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
     }
     if (t.kind === "note") {
       const folder = folderOf(t.path);
+      const note = qc.getQueryData<Tree>(keys.tree)?.notes.find((n) => n.path === t.path);
+      const pinned = !!note && isPinned(note);
       return [
         {
           id: "newNote",
@@ -105,6 +111,13 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
           icon: FolderPlus,
           run: () => startNewFolder(folder),
           group: 0,
+        },
+        {
+          id: "pin",
+          label: pinned ? "Unpin" : "Pin",
+          icon: pinned ? PinOff : Pin,
+          run: () => void setPinned(client, qc, t.path, !pinned),
+          group: 1,
         },
         {
           id: "rename",

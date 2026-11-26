@@ -10,6 +10,8 @@ export const SPECIAL_KEYS = new Set([
   "updated",
   "aliases",
   "alias",
+  // The pinned list's order (lib/pinned.ts): the sidebar shows it.
+  "pinned",
 ]);
 
 export type PropType = "text" | "number" | "bool" | "date" | "list";

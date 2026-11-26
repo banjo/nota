@@ -191,6 +191,14 @@ func TestTools(t *testing.T) {
 	if ls.Count != 1 {
 		t.Fatalf("tag+limit %+v", ls)
 	}
+	call(t, cs, "update_frontmatter", map[string]any{"note": "Projekt/Plan.md", "set": map[string]any{"pinned": 20}}, &r)
+	call(t, cs, "update_frontmatter", map[string]any{"note": n.Path, "set": map[string]any{"pinned": 10}}, &r)
+	call(t, cs, "list_notes", map[string]any{"pinned": true}, &ls)
+	if ls.Count != 2 || ls.Notes[0].Path != n.Path || ls.Notes[1].Path != "Projekt/Plan.md" {
+		t.Fatalf("pinned %+v", ls)
+	}
+	call(t, cs, "update_frontmatter", map[string]any{"note": n.Path, "unset": []string{"pinned"}}, &r)
+	call(t, cs, "update_frontmatter", map[string]any{"note": "Projekt/Plan.md", "unset": []string{"pinned"}}, &r)
 
 	var bl BacklinksOutput
 	call(t, cs, "get_backlinks", map[string]any{"note": n.Path}, &bl)
