@@ -283,6 +283,13 @@ func markdownTarget(r ref, at, want string) string {
 	return escape(dest, r.Angle)
 }
 
+// Destination is markdownTarget for a link written raw (in <angle
+// brackets> when angle) in the note at at: a destination that points
+// to want.
+func Destination(raw string, angle bool, at, want string) string {
+	return markdownTarget(ref{Ref: markdown.Ref{Raw: raw, Angle: angle}}, at, want)
+}
+
 // relative returns the path of the vault path to from the folder dir.
 func relative(dir, to string) string {
 	if dir == "" {

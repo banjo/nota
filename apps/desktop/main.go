@@ -134,6 +134,7 @@ func menu(d *Desktop) *mygo.Menu {
 			mygo.Separator(),
 			{Label: "Export…", Click: send("note.export")},
 			{Label: "Export All Notes…", Click: send("vault.export")},
+			{Label: "Import Notes…", Click: send("vault.import")},
 			{Label: "Print…", Accelerator: "CmdOrCtrl+P", Click: send("note.print")},
 			mygo.Separator(),
 			{Label: "Switch Vault…", Click: send("vault.switch")},

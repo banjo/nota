@@ -1,10 +1,12 @@
 import { NotaError, type NotesClient } from "./client.ts";
+import { zip, type ZipEntry } from "./zip.ts";
 import type {
   AuthApi,
   Base,
   ChangeEvent,
   CreateInput,
   ExportRequest,
+  ImportReport,
   ShareTheme,
   HistoryEntry,
   TrashItem,
@@ -371,6 +373,17 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         await printPage(await blob.text());
       },
     },
+    import: {
+      async upload(files: File[]) {
+        const one = files.length === 1 && /\.zip$/i.test(files[0]!.name) ? files[0]! : null;
+        const body = one ?? (await zip(files.filter((f) => !hidden(relPath(f))).map(entry)));
+        return request<ImportReport>("POST", "/import", {
+          query: { name: one?.name },
+          raw: body,
+          headers: { "Content-Type": "application/zip" },
+        });
+      },
+    },
     subscribe(listener: (event: ChangeEvent) => void) {
       const es = openEvents(`${vaultRoot}/events?protocol=${PROTOCOL}`);
       es.addEventListener("change", () => listener({ paths: [] }));
@@ -396,6 +409,19 @@ export function dispositionName(header: string | null): string | undefined {
 }
 
 /** Hands a file to the browser as a download. */
+/** A picked file's path: in its folder when a folder was picked. */
+const relPath = (f: File) =>
+  (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
+
+/** .obsidian/, .DS_Store and the like, which an import leaves out. */
+const hidden = (p: string) => p.split("/").some((s) => s.startsWith("."));
+
+const entry = (f: File): ZipEntry => ({
+  name: relPath(f),
+  data: f,
+  modified: new Date(f.lastModified),
+});
+
 function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

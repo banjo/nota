@@ -9,6 +9,7 @@ import {
   Cloud,
   Copy,
   ExternalLink,
+  FolderInput,
   FolderOpen,
   FolderPlus,
   LoaderCircle,
@@ -38,6 +39,7 @@ import type { ColorTheme } from "../theme/themes.ts";
 import { useTheme } from "../theme/useTheme.ts";
 import { onlineVaults } from "../vaults/online.ts";
 import { OnlineVaults } from "../vaults/OnlineVaults.tsx";
+import { openImport } from "./Import.tsx";
 import { TopBar } from "./TopBar.tsx";
 
 function Section({
@@ -667,6 +669,23 @@ function VaultActions() {
   );
 }
 
+function ImportNotes() {
+  const client = useClient();
+  if (!client.import) return null;
+  return (
+    <Section
+      title="Import"
+      description={`Bring in notes from Obsidian, Bear, Notion or any folder of Markdown files${client.import.appleNotes ? ", or from Apple Notes" : ""}. They go into a new folder.`}
+    >
+      <div>
+        <Button variant="outline" onClick={openImport}>
+          <FolderInput /> Import notes…
+        </Button>
+      </div>
+    </Section>
+  );
+}
+
 export function Settings() {
   const client = useClient();
   const info = useVaultInfo();
@@ -708,6 +727,7 @@ export function Settings() {
             <VaultActions />
           </Section>
         )}
+        <ImportNotes />
         <SyncAccount />
       </div>
     </div>

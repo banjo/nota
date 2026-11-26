@@ -21,6 +21,7 @@ import type {
   SettingsApi,
   SharesApi,
   ExportApi,
+  ImportApi,
   ShellApi,
   SyncStatus,
   TagCount,
@@ -118,6 +119,8 @@ export interface NotesClient {
   shares?: SharesApi;
   /** Exporting notes as HTML, PDF, Markdown or a zip. */
   export?: ExportApi;
+  /** Importing notes from a folder, a zip or Apple Notes. */
+  import?: ImportApi;
   /** Calls listener whenever notes change, from anywhere. */
   subscribe(listener: (event: ChangeEvent) => void): () => void;
   /** Background sync (desktop); absent where the server is the vault. */

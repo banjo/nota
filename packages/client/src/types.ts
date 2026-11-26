@@ -308,6 +308,57 @@ export interface ExportApi {
   print(path: string, theme?: ShareTheme): Promise<void>;
 }
 
+/** What happened to one file of an import. */
+export type ImportStatus = "imported" | "renamed" | "skipped";
+
+/** One file of an import's report. */
+export interface ImportItem {
+  /** The file in the source. */
+  source: string;
+  /** Where it is in the vault; absent when skipped. */
+  path?: string;
+  status: ImportStatus;
+  /** Why it was renamed or skipped. */
+  reason?: string;
+  /** A remark on an imported file, such as attachments left behind. */
+  detail?: string;
+  /** A note, rather than another file. */
+  note: boolean;
+}
+
+/** What an import did (docs/cli.md, Import). */
+export interface ImportReport {
+  /** The folder it went into; "" for the top of the vault. */
+  folder: string;
+  notes: number;
+  files: number;
+  renamed: number;
+  skipped: number;
+  /** Links rewritten to keep pointing at the imported notes. */
+  links: number;
+  dryRun: boolean;
+  items: ImportItem[];
+}
+
+/**
+ * Importing notes from elsewhere into a new folder of the vault. Nothing
+ * is replaced: taken names get " 2".
+ */
+export interface ImportApi {
+  /** Desktop: a folder or a zip the user picks; null when they cancel. */
+  pick?(kind: "folder" | "zip"): Promise<ImportReport | null>;
+  /**
+   * Web: files the user picked: one zip, or a folder's files (with their
+   * webkitRelativePath) or loose Markdown files, sent as one zip.
+   */
+  upload?(files: File[]): Promise<ImportReport>;
+  /** Apple Notes, where this system has it (the desktop app on macOS). */
+  appleNotes?: {
+    supported(): Promise<boolean>;
+    run(): Promise<ImportReport>;
+  };
+}
+
 /** A deleted note. */
 export interface TrashItem {
   /** What the other trash calls take: its path in .trash/ (desktop) or its path (web). */

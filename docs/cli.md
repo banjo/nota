@@ -159,6 +159,46 @@ The app has the same export in a note's and a folder's "…" menu and in ⌘K ("
 where "Save as PDF" is. ⌘P prints the open note. A PDF and a printout use the app's theme when it
 is light, Nota's light theme otherwise.
 
+## Import
+
+`nota import <source> [path]` brings notes in from elsewhere ([moving-to-nota.md](moving-to-nota.md)
+has a guide for each app):
+
+| Source | Path | What it reads |
+| --- | --- | --- |
+| `markdown` | a folder, a zip or one `.md` file | Markdown notes and every other file next to them: exports of Bear, Notion, Logseq and other apps |
+| `obsidian` | the vault's folder | the same as `markdown` |
+| `apple-notes` | none | every note in Apple Notes, with its folders and images (macOS) |
+
+Everything goes into one folder: by default a new one named after the source (the folder, the zip,
+"Apple Notes", with " 2" when the vault has that name), else `--folder` (`/` for the top of the
+vault). `--dry-run` shows what would happen without writing; `--json` prints the report:
+`{folder, notes, files, renamed, skipped, links, dryRun, items}`, each item with its `source`,
+`path`, `status` (`imported`, `renamed`, `skipped`), `reason` and `detail`.
+
+- **Nothing is replaced.** A name that is taken gets " 2", " 3" ….
+- **Names are cleaned** where they have characters Nota keeps out of file names (`: * ? " < > |
+  # ^ [ ] \`), and `.markdown` and the like become `.md`. Hidden files and folders (`.obsidian`,
+  `.trash`, `.DS_Store`) and `__MACOSX` are left out; a zip whose files are all in one folder is
+  read from inside it.
+- **Links follow.** A `[[link]]` or `[text](path.md)` between imported notes that a new name or the
+  folder would break is rewritten, the way Obsidian finds its target (by path, then by file name;
+  a Markdown link from the note's folder, then from the top). A link that showed its target keeps
+  showing the same text: `[[Plan: Q1]]` becomes `[[Plan Q1|Plan: Q1]]`.
+- **Dates become `created` and `updated`** (RFC 3339): from the frontmatter of other apps
+  (`date created`, `created_at`, Notion's `Created` and `Last edited time`, `modified` …, whose
+  keys then go), else from the file's creation and modification times. A `created` or `updated`
+  that isn't a date is left as it is, and so is a note whose frontmatter doesn't parse.
+
+Apple Notes is read through its scripting: macOS asks once whether the terminal (or Nota) may
+control Notes. Each note becomes a note in its folder (the account first when there is more than
+one), titled as in Notes, with its images in `Attachments/` of the import. "Recently Deleted" and
+locked notes are left out. Notes hands out images only; the report says when a note had other
+attachments, which stay in Notes.
+
+The app has it too: "Import notes…" in Settings and ⌘K (and File ▸ Import Notes… on the desktop).
+The web app imports a folder or a zip from the browser; Apple Notes is in the Mac app.
+
 ## Trash
 
 `nota rm`, deleting in the app and deletes synced from other devices move notes to `.trash/` in

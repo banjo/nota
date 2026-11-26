@@ -26,6 +26,7 @@ import type {
   ShareRequest,
   ShareTheme,
   ExportRequest,
+  ImportReport,
   SyncStatus,
   TagCount,
   Tree,
@@ -99,6 +100,9 @@ export interface MygoBindings {
     export(req: ExportRequest): Promise<string>;
     exportPDF(path: string, theme: ShareTheme | null): Promise<string>;
     print(path: string, theme: ShareTheme | null): Promise<void>;
+    importFiles(zip: boolean): Promise<ImportReport | null>;
+    importAppleNotes(): Promise<ImportReport | null>;
+    importSources(): Promise<{ appleNotes: boolean }>;
     syncStatus(): Promise<SyncStatus>;
   };
   Account: {
@@ -318,6 +322,13 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       pdf: async (path, theme) => (await v.exportPDF(path, theme ?? null)) || null,
       print: (path, theme) => v.print(path, theme ?? null),
     },
+    import: {
+      pick: async (kind) => report(await v.importFiles(kind === "zip")),
+      appleNotes: {
+        supported: async () => (await v.importSources()).appleNotes,
+        run: async () => report(await v.importAppleNotes())!,
+      },
+    },
     fileUrl: (path, from) =>
       fileBase("vault") +
       escapePath(path) +
@@ -362,4 +373,9 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     opener: openerApi(b),
     settings: settingsApi(b),
   };
+}
+
+/** Go's nil slices arrive as null. */
+function report(r: ImportReport | null): ImportReport | null {
+  return r && { ...r, items: list(r.items) };
 }
