@@ -9,7 +9,7 @@ The desktop app (MyGo + React) over the demo vault from `scripts/demo-vault.sh`:
 | ![Palette](screenshots/palette.png) | ![Settings](screenshots/settings.png) |
 | Command palette (⌘K) | Settings and sync sign-in |
 
-Narrow windows switch to a navigation stack ([narrow.png](screenshots/narrow.png)), and ⌃⌥N
+Narrow windows switch to a navigation stack ([narrow.png](screenshots/narrow.png)), and ⌥⌘N
 opens quick capture ([light](screenshots/capture.png), [dark](screenshots/capture-dark.png)).
 
 ## First run
