@@ -107,6 +107,16 @@ export interface Device {
   current: boolean;
 }
 
+/**
+ * ExportRequest is what to export: a note's path, a folder's, or "" for
+ * the vault, in a format (html, md, zip), and the look of HTML.
+ */
+export interface ExportRequest {
+  path: string;
+  format: string;
+  theme?: ShareTheme;
+}
+
 /** ExternalChanged names the outside file that changed on disk. */
 export interface ExternalChanged {
   id: string;
@@ -615,6 +625,17 @@ export const Vault = {
    */
   emptyTrash: bind<[], number>("Vault.EmptyTrash", () => []),
   /**
+   * Export exports a note, a folder or the vault (export.New) to a file
+   * the user picks, and returns its path; "" when they cancel.
+   */
+  export: bind<[ExportRequest], string>("Vault.Export", (req: ExportRequest) => [req]),
+  /**
+   * ExportPDF prints a note to a PDF the user saves, and returns its path;
+   * "" when they cancel. The paper is Letter where that is the custom, A4
+   * elsewhere.
+   */
+  exportPDF: bind<[string, ShareTheme | null], string>("Vault.ExportPDF", (path: string, theme: ShareTheme | null) => [path, theme]),
+  /**
    * FindReplace lists the matches of a find and replace across notes,
    * note by note: in bodies only, code skipped unless asked.
    */
@@ -655,6 +676,11 @@ export const Vault = {
    * error.
    */
   plugins: bind<[], Plugin[]>("Vault.Plugins", () => []),
+  /**
+   * Print shows a note's page in a window of its own, with the system's
+   * print dialog on it.
+   */
+  print: bind<[string, ShareTheme | null], void>("Vault.Print", (path: string, theme: ShareTheme | null) => [path, theme]),
   /** PurgeTrash deletes a note in the trash for good. */
   purgeTrash: bind<[string], void>("Vault.PurgeTrash", (id: string) => [id]),
   /** Rename gives a note a new path (a new name, a new folder, or both). */

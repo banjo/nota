@@ -107,6 +107,9 @@ type Page struct {
 	Theme    *Theme
 	// Home is Nota's site, linked from the footer ("" for none).
 	Home string
+	// Document leaves out the header and the footer: an exported note,
+	// a file of its own rather than a page of the server.
+	Document bool
 }
 
 // Lock is the page that asks for a shared note's password.
@@ -147,16 +150,16 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 
 {{define "page"}}{{template "head" .}}<title>{{.Page.Title}}</title>
 </head>
-<body>
-<header class="top">
+<body{{if .Page.Document}} class="document"{{end}}>
+{{if not .Page.Document}}<header class="top">
   <a class="brand"{{with .Page.Home}} href="{{.}}"{{end}} aria-label="Nota">{{template "lockup" 54}}</a>
-</header>
+</header>{{end}}
 <article>
   <h1 class="title">{{.Page.Title}}</h1>
   {{with .Page.Modified}}<p class="meta">Updated {{.}}</p>{{end}}
   <div class="note">{{.Page.Body}}</div>
 </article>
-<footer>{{template "foot" .Page.Home}}</footer>
+{{if not .Page.Document}}<footer>{{template "foot" .Page.Home}}</footer>{{end}}
 </body>
 </html>
 {{end}}

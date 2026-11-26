@@ -28,3 +28,12 @@ export function sameTheme(a: ShareTheme | undefined, b: ShareTheme | undefined):
   const ka = Object.keys(ta);
   return ka.length === Object.keys(tb).length && ka.every((k) => ta[k] === tb[k]);
 }
+
+/**
+ * The look of a printed note: the app's theme when it is light, else
+ * Nota's light theme (paper is white; a dark theme would print pale text).
+ */
+export function printTheme(): ShareTheme {
+  const t = currentShareTheme();
+  return t.mode === "light" ? t : { mode: "light" };
+}

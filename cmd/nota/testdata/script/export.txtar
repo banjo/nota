@@ -1,0 +1,50 @@
+# A note as HTML, to the current folder under its name.
+nota export Projekt/Plan.md
+stderr 'Exported 1 note to Plan.html'
+grep '<title>Plan</title>' Plan.html
+grep 'src="data:image/png;base64,' Plan.html
+grep '<span class="unresolved">Möte</span>' Plan.html
+! grep 'hemligt' Plan.html
+
+# An existing file is only replaced with --force.
+! nota export Plan
+stderr 'Plan.html exists; pass --force'
+nota export Plan --force
+
+# Markdown to standard output: wikilinks to notes outside the export are text.
+nota export Projekt/Möte.md --format md -o -
+cmp stdout mote.md
+
+# A folder, into a folder; the whole vault as it is.
+mkdir out
+nota export Projekt --format md -o out --json
+stdout '"path": "out/Projekt.zip"'
+stdout '"notes": 2'
+exists out/Projekt.zip
+nota export --format zip -o backup.zip
+exists backup.zip
+
+# Bad input.
+! nota export Nope
+stderr 'no note matches "Nope"'
+! nota export Plan --format pdf
+stderr '--format must be html, md or zip'
+
+-- vault/Projekt/Plan.md --
+# Plan
+
+Se [[Möte]]. %%hemligt%%
+
+![[bild.png]]
+-- vault/Projekt/Möte.md --
+# Möte
+
+Tillbaka till [[Plan]] och [[Annat]] ^id1
+-- vault/Annat.md --
+# Annat
+-- vault/Attachments/bild.png --
+not really a png
+-- mote.md --
+# Möte
+
+Tillbaka till Plan och Annat

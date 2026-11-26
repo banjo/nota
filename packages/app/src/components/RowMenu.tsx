@@ -18,6 +18,7 @@ import {
   PinOff,
   TextSearch,
   Trash2,
+  FileDown,
 } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Tree } from "@nota/client";
@@ -34,12 +35,13 @@ import { startNewFolder } from "./NewFolder.tsx";
 import { startRename } from "./Rename.tsx";
 import { openRowSheet, type RowTarget } from "./RowSheet.tsx";
 import { openShare } from "./Share.tsx";
+import { openExport } from "./Export.tsx";
 
 // The actions of a sidebar row, as a right-click menu on a desk and as a
 // bottom sheet under a finger (a long press): one list, two skins. Every
 // action is also a ⌘K command or shares its function (note.new,
 // folder.add, note.addToFolder, note.newInFolder, note.rename,
-// folder.rename, note.pin, note.history, note.share, note.delete).
+// folder.rename, note.pin, note.history, note.share, note.export, note.delete).
 
 /** Puts the cursor in the open note's title field, selected: renaming it where it is. */
 export const focusNoteTitle = (): void => {
@@ -95,6 +97,17 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
                 group: 1,
               },
             ]),
+        ...(client.export
+          ? [
+              {
+                id: "export",
+                label: "Export folder…",
+                icon: FileDown,
+                run: () => openExport({ kind: "folder", path: t.path }),
+                group: 1,
+              },
+            ]
+          : []),
       ];
     }
     if (t.kind === "note") {
@@ -165,6 +178,17 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
                 label: "Share…",
                 icon: Globe,
                 run: () => openShare(t.path),
+                group: 1,
+              },
+            ]
+          : []),
+        ...(client.export
+          ? [
+              {
+                id: "export",
+                label: "Export…",
+                icon: FileDown,
+                run: () => openExport({ kind: "note", path: t.path }),
                 group: 1,
               },
             ]

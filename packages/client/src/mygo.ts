@@ -24,6 +24,8 @@ import type {
   SettingsLayers,
   Share,
   ShareRequest,
+  ShareTheme,
+  ExportRequest,
   SyncStatus,
   TagCount,
   Tree,
@@ -94,6 +96,9 @@ export interface MygoBindings {
     shares(): Promise<Share[] | null>;
     share(path: string, req: ShareRequest): Promise<Share>;
     unshare(path: string): Promise<void>;
+    export(req: ExportRequest): Promise<string>;
+    exportPDF(path: string, theme: ShareTheme | null): Promise<string>;
+    print(path: string, theme: ShareTheme | null): Promise<void>;
     syncStatus(): Promise<SyncStatus>;
   };
   Account: {
@@ -307,6 +312,11 @@ export function createMygoClient(b: MygoBindings): NotesClient {
       list: async () => list(await v.shares()),
       put: (path, req) => v.share(path, req),
       remove: (path) => v.unshare(path),
+    },
+    export: {
+      save: async (req) => (await v.export(req)) || null,
+      pdf: async (path, theme) => (await v.exportPDF(path, theme ?? null)) || null,
+      print: (path, theme) => v.print(path, theme ?? null),
     },
     fileUrl: (path, from) =>
       fileBase("vault") +
