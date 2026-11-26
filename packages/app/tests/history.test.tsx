@@ -7,7 +7,7 @@ import { ClientContext } from "../src/context.ts";
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
 vi.mock("@nota/ui/sonner", () => ({ toast }));
 
-const { initialVersion, VersionPane, visibleVersions } =
+const { currentVersion, initialVersion, VersionPane, visibleVersions } =
   await import("../src/components/History.tsx");
 
 const entry = (over: Partial<HistoryEntry>): HistoryEntry => ({
@@ -41,6 +41,17 @@ describe("the version list", () => {
     expect(initialVersion(vs, "now")).toBe(1);
     expect(initialVersion([entry({ hash: "now" })], "now")).toBe(1);
     expect(initialVersion([], "now")).toBeNull();
+  });
+
+  test("marks only the newest version with the note's content as current", () => {
+    // A move repeats the content of the version before it.
+    const vs = [
+      entry({ version: 5, hash: "now", movedFrom: "Projekt/Plan.md" }),
+      entry({ version: 3, hash: "now", path: "Projekt/Plan.md" }),
+      entry({ version: 1, path: "Projekt/Plan.md" }),
+    ];
+    expect(currentVersion(vs, "now")).toBe(5);
+    expect(currentVersion(vs, "other")).toBeUndefined();
   });
 });
 

@@ -50,6 +50,14 @@ export function initialVersion(list: HistoryEntry[], current: string | undefined
   return (list.find((e) => !e.deleted && e.hash !== current) ?? list[0])?.version ?? null;
 }
 
+/**
+ * The version marked "Current": the newest with the note's content. A move
+ * or a restore repeats content, so older versions can match too.
+ */
+export function currentVersion(list: HistoryEntry[], current: string | undefined) {
+  return list.find((e) => !e.deleted && e.hash === current)?.version;
+}
+
 const when = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -164,11 +172,12 @@ function HistoryBody({ path }: { path: string }) {
     );
   }
 
+  const currentAt = currentVersion(list, current);
   const listPane = (
     <ol aria-label="Versions" className="min-h-0 overflow-y-auto overscroll-contain p-2">
       {list.map((e, i) => {
         const on = e.version === picked;
-        const isCurrent = !e.deleted && e.hash === current;
+        const isCurrent = e.version === currentAt;
         return (
           <li key={e.version}>
             <button
