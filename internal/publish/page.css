@@ -335,9 +335,6 @@ details[open] > summary.callout-title::after {
   height: 16px;
   margin-right: 6px;
   vertical-align: -3px;
-  background: currentColor;
-  mask: var(--icon) center / 16px no-repeat;
-  -webkit-mask: var(--icon) center / 16px no-repeat;
 }
 
 /* Footnotes. */
@@ -489,4 +486,42 @@ details[open] > summary.callout-title::after {
   * {
     transition: none !important;
   }
+}
+
+/* Printing, and the PDF the app prints: the note alone, on the paper. */
+@media print {
+  body {
+    font-size: 11pt;
+  }
+  .top,
+  footer {
+    display: none;
+  }
+  article,
+  .document article {
+    max-width: none;
+    padding: 0;
+  }
+  .note pre,
+  .note blockquote,
+  .note .callout,
+  .note table,
+  .note img,
+  .note figure {
+    break-inside: avoid;
+  }
+  .note h1,
+  .note h2,
+  .note h3,
+  .note h4,
+  .note h5,
+  .note h6 {
+    break-after: avoid;
+  }
+  .note pre {
+    white-space: pre-wrap;
+  }
+}
+.title + .note {
+  margin-top: 20px;
 }

@@ -274,6 +274,40 @@ export interface SharesApi {
   remove(path: string): Promise<void>;
 }
 
+/**
+ * What an export is made of: a web page in Reading mode's look, Markdown
+ * for apps that don't read Nota's syntax, or the files as they are.
+ */
+export type ExportFormat = "html" | "md" | "zip";
+
+/** What to export, and how. */
+export interface ExportRequest {
+  /** A note's path, a folder's, or "" for the whole vault. */
+  path: string;
+  format: ExportFormat;
+  /** The look of HTML; absent is Nota's own, in the reader's mode. */
+  theme?: ShareTheme;
+}
+
+/**
+ * Exports (docs/cli.md, Export): a note as one file where it can be one, a
+ * folder or the vault as a zip.
+ */
+export interface ExportApi {
+  /**
+   * Exports to a file: a save dialog (desktop) or a download (web).
+   * Resolves to where it went, or null when the save dialog was cancelled.
+   */
+  save(req: ExportRequest): Promise<string | null>;
+  /**
+   * A note as a PDF file (desktop). Where it is absent, print() does it:
+   * the print dialog saves PDFs.
+   */
+  pdf?(path: string, theme?: ShareTheme): Promise<string | null>;
+  /** Prints a note's page with the system's print dialog. */
+  print(path: string, theme?: ShareTheme): Promise<void>;
+}
+
 /** A deleted note. */
 export interface TrashItem {
   /** What the other trash calls take: its path in .trash/ (desktop) or its path (web). */

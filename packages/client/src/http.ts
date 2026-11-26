@@ -4,6 +4,8 @@ import type {
   Base,
   ChangeEvent,
   CreateInput,
+  ExportRequest,
+  ShareTheme,
   HistoryEntry,
   TrashItem,
   ListQuery,
@@ -104,6 +106,8 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       headers?: Record<string, string>;
       /** The path is under the server, not the vault (the account's routes). */
       account?: boolean;
+      /** Resolves to the response itself, for a body that isn't JSON. */
+      response?: boolean;
     } = {},
   ): Promise<T> {
     const url = new URL((init.account ? root : vaultRoot) + path);
@@ -149,8 +153,18 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         body,
       );
     }
+    if (init.response) return res as T;
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
+  }
+
+  /** An export as a file: its content and the name the server gives it. */
+  async function exported(req: ExportRequest): Promise<{ blob: Blob; name: string }> {
+    const res = await request<Response>("POST", "/export", { body: req, response: true });
+    return {
+      blob: await res.blob(),
+      name: dispositionName(res.headers.get("Content-Disposition")) ?? `export.${req.format}`,
+    };
   }
 
   const listParams = (q: ListQuery = {}) => ({
@@ -346,10 +360,73 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
         await request("DELETE", `/shares/${escapePath(path)}`);
       },
     },
+    export: {
+      async save(req: ExportRequest) {
+        const { blob, name } = await exported(req);
+        download(blob, name);
+        return name;
+      },
+      async print(path: string, theme?: ShareTheme) {
+        const { blob } = await exported({ path, format: "html", theme });
+        await printPage(await blob.text());
+      },
+    },
     subscribe(listener: (event: ChangeEvent) => void) {
       const es = openEvents(`${vaultRoot}/events?protocol=${PROTOCOL}`);
       es.addEventListener("change", () => listener({ paths: [] }));
       return () => es.close();
     },
   };
+}
+
+/** The file name of a Content-Disposition header, as RFC 6266 writes it. */
+export function dispositionName(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const star = /filename\*\s*=\s*([^']*)'[^']*'([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[2]!.trim());
+    } catch {
+      /* fall through to the plain name */
+    }
+  }
+  const plain = /filename\s*=\s*("((?:[^"\\]|\\.)*)"|[^;]+)/i.exec(header);
+  if (!plain) return undefined;
+  return plain[2] !== undefined ? plain[2].replace(/\\(.)/g, "$1") : plain[1]!.trim();
+}
+
+/** Hands a file to the browser as a download. */
+function download(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.style.display = "none";
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Prints a page of HTML through a hidden frame and the browser's print dialog. */
+function printPage(html: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:fixed;width:0;height:0;border:0;right:0;bottom:0";
+    frame.onload = () => {
+      const win = frame.contentWindow;
+      if (!win) {
+        frame.remove();
+        reject(new Error("couldn't open the page to print"));
+        return;
+      }
+      win.addEventListener("afterprint", () => setTimeout(() => frame.remove(), 1000));
+      win.focus();
+      win.print();
+      resolve();
+    };
+    frame.srcdoc = html;
+    document.body.append(frame);
+  });
 }

@@ -21,6 +21,7 @@ import {
   PenLine,
   Pin,
   PinOff,
+  Printer,
   Replace,
   Search,
   Settings,
@@ -47,6 +48,7 @@ import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
 import { openHistory } from "../components/History.tsx";
 import { openShare } from "../components/Share.tsx";
+import { openExport, printNote } from "../components/Export.tsx";
 import { startRename } from "../components/Rename.tsx";
 import { keys } from "../queries.ts";
 import type { Registry } from "../registry.ts";
@@ -236,6 +238,34 @@ export function registerBuiltins(r: Registry): () => void {
       icon: Globe,
       when: (ctx) => !!ctx.notePath && !!ctx.client.shares,
       run: (ctx) => openShare(ctx.notePath!),
+    }),
+    r.register("command", {
+      id: "note.export",
+      title: "Export note…",
+      group: "Notes",
+      keywords: ["export", "pdf", "html", "markdown", "zip", "download", "save", "exportera"],
+      icon: FileDown,
+      when: (ctx) => !!ctx.notePath && !!ctx.client.export,
+      run: (ctx) => openExport({ kind: "note", path: ctx.notePath! }),
+    }),
+    r.register("command", {
+      id: "note.print",
+      title: "Print note…",
+      group: "Notes",
+      keywords: ["print", "pdf", "paper", "skriv ut"],
+      icon: Printer,
+      shortcut: "mod+p",
+      when: (ctx) => !!ctx.notePath && !!ctx.client.export,
+      run: (ctx) => printNote(ctx.client, ctx.notePath!),
+    }),
+    r.register("command", {
+      id: "vault.export",
+      title: "Export all notes…",
+      group: "Vault",
+      keywords: ["export", "backup", "zip", "download", "markdown", "html", "exportera"],
+      icon: FileDown,
+      when: (ctx) => !!ctx.client.export,
+      run: () => openExport({ kind: "vault" }),
     }),
     r.register("command", {
       id: "note.delete",

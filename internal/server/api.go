@@ -43,6 +43,7 @@ func (s *Server) apiRoutes() {
 	s.route("POST /v1/api/vaults/{vault}/move", ro, s.apiMove)
 	s.route("POST /v1/api/vaults/{vault}/replace/preview", ro, s.apiReplacePreview)
 	s.route("POST /v1/api/vaults/{vault}/replace", ro, s.apiReplace)
+	s.route("POST /v1/api/vaults/{vault}/export", ro, s.apiExport)
 	s.route("POST /v1/api/vaults/{vault}/folders", ro, s.apiCreateFolder)
 	s.route("POST /v1/api/vaults/{vault}/folders/rename", ro, s.apiRenameFolder)
 	s.route("GET /v1/api/vaults/{vault}/search", ro, s.apiSearch)

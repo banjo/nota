@@ -17,6 +17,7 @@ import {
   Pin,
   PinOff,
   Trash2,
+  FileDown,
 } from "lucide-react";
 import { memo } from "react";
 import { deleteNote, setPinned } from "../actions.ts";
@@ -30,6 +31,7 @@ import { useContributions } from "../registry.ts";
 import { useUI } from "../state.ts";
 import { openHistory } from "./History.tsx";
 import { openShare } from "./Share.tsx";
+import { openExport } from "./Export.tsx";
 import { RenameRow, useRenaming } from "./Rename.tsx";
 import { Row } from "./Row.tsx";
 import { openRowSheet } from "./RowSheet.tsx";
@@ -171,6 +173,11 @@ export function NoteMenu({
         {client.shares ? (
           <DropdownMenuItem onSelect={() => openShare(path)}>
             <Globe /> Share…
+          </DropdownMenuItem>
+        ) : null}
+        {client.export ? (
+          <DropdownMenuItem onSelect={() => openExport({ kind: "note", path })}>
+            <FileDown /> Export…
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

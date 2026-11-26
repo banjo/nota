@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { createHttpClient, escapePath, NotaError, type EventSourceLike } from "../src/index.ts";
 import type { Note } from "../src/index.ts";
+import { dispositionName } from "../src/http.ts";
 
 const BASE = "https://nota.app.banjoanton.com";
 const ROOT = `${BASE}/v1/api/vaults/Anteckningar`;
@@ -337,5 +338,46 @@ describe("createHttpClient", () => {
     c.serverVault?.open("Notes");
     expect(openVault).toHaveBeenCalledWith("Notes");
     expect(createHttpClient({ baseUrl: BASE, vault: "Work" }).serverVault).toBeUndefined();
+  });
+});
+
+describe("export", () => {
+  test("reads the file name of a download", () => {
+    expect(dispositionName("attachment; filename=Plan.html")).toBe("Plan.html");
+    expect(dispositionName('attachment; filename="Min plan.md"')).toBe("Min plan.md");
+    expect(dispositionName("attachment; filename*=utf-8''M%C3%A5l%20och%20plan.zip")).toBe(
+      "Mål och plan.zip",
+    );
+    expect(dispositionName(null)).toBeUndefined();
+  });
+
+  test("downloads an export under the name the server gives it", async () => {
+    const res = new Response("<!doctype html>", {
+      headers: {
+        "Content-Type": "text/html",
+        "Content-Disposition": "attachment; filename*=utf-8''M%C3%A5l.html",
+      },
+    });
+    const f = mockFetch(res);
+    const clicked: string[] = [];
+    const a = {
+      style: {},
+      href: "",
+      download: "",
+      click: () => void clicked.push(a.download),
+      remove() {},
+    };
+    vi.stubGlobal("document", { createElement: () => a, body: { append() {} } });
+    try {
+      const c = client(f);
+      const theme = { mode: "dark" };
+      expect(await c.export!.save({ path: "Mål.md", format: "html", theme })).toBe("Mål.html");
+      expect(f.call(0).method).toBe("POST");
+      expect(f.call(0).url.pathname).toBe("/v1/api/vaults/Anteckningar/export");
+      expect(f.call(0).body).toEqual({ path: "Mål.md", format: "html", theme });
+      expect(clicked).toEqual(["Mål.html"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

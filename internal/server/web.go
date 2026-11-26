@@ -170,7 +170,7 @@ func (s *Server) allowedOrigin(origin string) bool {
 
 // exposed are the response headers the web app may read.
 var exposed = strings.Join([]string{protocol.HeaderProtocol, protocol.HeaderVersion, protocol.HeaderHash,
-	protocol.HeaderKind, protocol.HeaderDevice, protocol.HeaderModifiedAt, protocol.HeaderMovedFrom, "ETag", "Retry-After"}, ", ")
+	protocol.HeaderKind, protocol.HeaderDevice, protocol.HeaderModifiedAt, protocol.HeaderMovedFrom, "ETag", "Retry-After", "Content-Disposition"}, ", ")
 
 var allowedHeaders = strings.Join([]string{"Content-Type", "Authorization", HeaderClient, protocol.HeaderProtocol,
 	protocol.HeaderBaseVersion, protocol.HeaderHash, protocol.HeaderModifiedAt, "Last-Event-ID"}, ", ")

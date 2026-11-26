@@ -126,7 +126,7 @@ func (r *nodeRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	})
 	reg.Register(KindCallout, func(w util.BufWriter, _ []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 		c := n.(*Callout)
-		title := `<span class="callout-icon" aria-hidden="true"></span>` + html.EscapeString(c.Title)
+		title := calloutIcon(c.Color) + html.EscapeString(c.Title)
 		if !entering {
 			if c.Fold != "" {
 				_, _ = w.WriteString("</div></details>\n")

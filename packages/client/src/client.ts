@@ -20,6 +20,7 @@ import type {
   ServerVaultApi,
   SettingsApi,
   SharesApi,
+  ExportApi,
   ShellApi,
   SyncStatus,
   TagCount,
@@ -115,6 +116,8 @@ export interface NotesClient {
    * vault on the desktop (which rejects while sync is off).
    */
   shares?: SharesApi;
+  /** Exporting notes as HTML, PDF, Markdown or a zip. */
+  export?: ExportApi;
   /** Calls listener whenever notes change, from anywhere. */
   subscribe(listener: (event: ChangeEvent) => void): () => void;
   /** Background sync (desktop); absent where the server is the vault. */

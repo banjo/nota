@@ -32,26 +32,19 @@ var calloutIcons = map[string]string{
 	"caution":   "<path d='M12 16h.01'/><path d='M12 8v4'/><path d='M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z'/>",
 }
 
-func svgURL(svg string) string {
-	return `url("data:image/svg+xml,` + strings.ReplaceAll(url.QueryEscape(svg), "+", "%20") + `")`
-}
+// css is the stylesheet of every page: Nota's tokens, then the page.
+var css = tokensCSS + pageCSS
 
-// css is the stylesheet of every page: Nota's tokens, the page, the icons.
-var css = func() string {
-	var b strings.Builder
-	b.WriteString(tokensCSS)
-	b.WriteString(pageCSS)
-	kinds := make([]string, 0, len(calloutIcons))
-	for k := range calloutIcons {
-		kinds = append(kinds, k)
+// calloutIcon is a callout's icon as inline SVG in the callout's colour:
+// printing (WebKit's PDFs too) leaves out the CSS masks the app uses.
+func calloutIcon(kind string) string {
+	paths, ok := calloutIcons[kind]
+	if !ok {
+		paths = calloutIcons["note"]
 	}
-	sort.Strings(kinds)
-	for _, k := range kinds {
-		svg := `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>` + calloutIcons[k] + `</svg>`
-		fmt.Fprintf(&b, ".callout-%s .callout-icon{--icon:%s}\n", k, svgURL(svg))
-	}
-	return b.String()
-}()
+	return `<svg class="callout-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+		strings.ReplaceAll(paths, "'", `"`) + `</svg>`
+}
 
 // Theme is the look of a shared note.
 type Theme = protocol.ShareTheme
@@ -107,6 +100,9 @@ type Page struct {
 	Theme    *Theme
 	// Home is Nota's site, linked from the footer ("" for none).
 	Home string
+	// Document leaves out the header and the footer: an exported note,
+	// a file of its own rather than a page of the server.
+	Document bool
 }
 
 // Lock is the page that asks for a shared note's password.
@@ -147,16 +143,16 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 
 {{define "page"}}{{template "head" .}}<title>{{.Page.Title}}</title>
 </head>
-<body>
-<header class="top">
+<body{{if .Page.Document}} class="document"{{end}}>
+{{if not .Page.Document}}<header class="top">
   <a class="brand"{{with .Page.Home}} href="{{.}}"{{end}} aria-label="Nota">{{template "lockup" 54}}</a>
-</header>
+</header>{{end}}
 <article>
   <h1 class="title">{{.Page.Title}}</h1>
   {{with .Page.Modified}}<p class="meta">Updated {{.}}</p>{{end}}
   <div class="note">{{.Page.Body}}</div>
 </article>
-<footer>{{template "foot" .Page.Home}}</footer>
+{{if not .Page.Document}}<footer>{{template "foot" .Page.Home}}</footer>{{end}}
 </body>
 </html>
 {{end}}

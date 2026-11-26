@@ -70,7 +70,7 @@ func TestRender(t *testing.T) {
 		`<img src="/s/me/f/Attachments/skiss.png" alt="skiss" loading="lazy" width="200" />`,
 		`<a href="/s/abc" class="internal embed">Shared</a>`,
 		`<a href="https://example.com/x.png" rel="noopener noreferrer nofollow">extern</a>`,
-		`<div class="callout callout-warning"><p class="callout-title"><span class="callout-icon" aria-hidden="true"></span>Se upp</p><div class="callout-body">`,
+		`<div class="callout callout-warning"><p class="callout-title"><svg class="callout-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"`, `<path d="M12 9v4"/>`, `</svg>Se upp</p><div class="callout-body">`,
 		`<strong>fet</strong>`,
 		`<details class="callout callout-tip"><summary class="callout-title">`,
 		`class="footnote-ref"`,

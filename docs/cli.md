@@ -134,6 +134,31 @@ lists (with `--json`, one of them is required). Each changed note is saved like 
 The same replace is `replace_in_notes` over MCP (a dry run unless `dry_run: false`) and ⌘⇧F in the
 app, where each match can be unticked and the toast has Undo.
 
+## Export
+
+`nota export [note|folder]` exports a note, a folder or, without an argument, the whole vault.
+The file goes to the current folder under the note's or folder's name (the vault's is its folder
+name); `-o` names a file, a folder to write into, or `-` for standard output. An existing file is
+only replaced with `--force`. `--json` prints `{path, notes, bytes}`.
+
+| `--format` | A note | A folder or the vault |
+| --- | --- | --- |
+| `html` (default) | one page with its images inside it, in Reading mode's look | a zip of pages that link to each other, images in `attachments/` where they are outside the folder |
+| `md` | the note in plain Markdown; a zip when it shows images | a zip of notes and their images |
+| `zip` | the note and the images it shows, as they are, at their vault paths | every file under it, as it is, plus the images its notes show from elsewhere |
+
+Plain Markdown is for apps that don't read Nota's (and Obsidian's) syntax: `[[links]]` and
+`![[embeds]]` become Markdown links and images, `%%comments%%`, block ids (`^id`) go, and inline
+footnotes (`^[…]`) become numbered ones. The frontmatter and code stay as they are.
+
+In `html` and `md`, a link to a note that is part of the export leads to its file; any other link
+to a note is left as its text. Links to the web stay; images from the web are links, as in the app.
+
+The app has the same export in a note's and a folder's "…" menu and in ⌘K ("Export note…",
+"Export all notes…"), plus PDF: the desktop app saves one, the web app opens the print dialog,
+where "Save as PDF" is. ⌘P prints the open note. A PDF and a printout use the app's theme when it
+is light, Nota's light theme otherwise.
+
 ## Trash
 
 `nota rm`, deleting in the app and deletes synced from other devices move notes to `.trash/` in
