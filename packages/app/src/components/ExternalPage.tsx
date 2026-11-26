@@ -23,6 +23,7 @@ import {
   revertDraft,
   useOpened,
 } from "../external.ts";
+import { listenFind } from "../lib/find.ts";
 import { displayPath, linkKind } from "../lib/opened.ts";
 import { resolveLink } from "../lib/notes.ts";
 import { keys } from "../queries.ts";
@@ -258,7 +259,9 @@ function PreviewEditor({ doc, draft }: { doc: ExternalDoc; draft: string | undef
       },
     });
     view.current = v;
+    const offFind = listenFind(v);
     return () => {
+      offFind();
       v.destroy();
       view.current = null;
     };

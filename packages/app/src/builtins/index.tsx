@@ -19,9 +19,11 @@ import {
   PenLine,
   Pin,
   PinOff,
+  Replace,
   Search,
   Settings,
   SunMoon,
+  TextSearch,
   Trash2,
   Undo2,
   X,
@@ -38,6 +40,7 @@ import {
 } from "../external.ts";
 import { createNote, deleteNote, newNoteFolder, openVaultFlow, setPinned } from "../actions.ts";
 import { isPinned } from "../lib/pinned.ts";
+import { requestFind } from "../lib/find.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
 import { openHistory } from "../components/History.tsx";
@@ -181,6 +184,26 @@ export function registerBuiltins(r: Registry): () => void {
       shortcut: "mod+shift+p",
       when: (ctx) => !!ctx.notePath && notePinned(ctx),
       run: (ctx) => setPinned(ctx.client, ctx.queryClient, ctx.notePath!, false),
+    }),
+    r.register("command", {
+      id: "note.find",
+      title: "Find in note",
+      group: "Notes",
+      keywords: ["search", "find", "sök", "hitta"],
+      icon: TextSearch,
+      shortcut: "mod+f",
+      when: (ctx) => ctx.route.kind === "note" || ctx.route.kind === "external",
+      run: () => requestFind(false),
+    }),
+    r.register("command", {
+      id: "note.replace",
+      title: "Find and replace in note",
+      group: "Notes",
+      keywords: ["replace", "substitute", "ersätt"],
+      icon: Replace,
+      shortcut: "mod+alt+f",
+      when: (ctx) => ctx.route.kind === "note" || ctx.route.kind === "external",
+      run: () => requestFind(true),
     }),
     r.register("command", {
       id: "note.history",

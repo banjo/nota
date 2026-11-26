@@ -3,7 +3,13 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { Annotation, EditorState, type Extension, Transaction } from "@codemirror/state";
+import {
+  Annotation,
+  Compartment,
+  EditorState,
+  type Extension,
+  Transaction,
+} from "@codemirror/state";
 import {
   drawSelection,
   dropCursor,
@@ -88,6 +94,35 @@ export const touchScrollMargins = EditorView.scrollMargins.of(() =>
     : null,
 );
 
+const findCompartment = new Compartment();
+const findLoaded = new WeakSet<EditorView>();
+
+/**
+ * Opens the find bar (⌘F), or find and replace (⌥⌘F; Ctrl+H on Linux).
+ * The search code loads the first time; in Reading mode there is no
+ * replace row.
+ */
+export async function openFind(view: EditorView, replace = false): Promise<void> {
+  const find = await import("./find.ts");
+  if (!findLoaded.has(view)) {
+    findLoaded.add(view);
+    view.dispatch({ effects: findCompartment.reconfigure(find.findExtension) });
+  }
+  find.open(view, replace);
+}
+
+const findKeys = keymap.of([
+  {
+    key: "Mod-f",
+    run: (v) => (void openFind(v), true),
+  },
+  {
+    key: "Mod-Alt-f",
+    linux: "Ctrl-h",
+    run: (v) => (void openFind(v, true), true),
+  },
+]);
+
 /** Marks a transaction that came from outside (a reload), not typing. */
 export const external = Annotation.define<boolean>();
 
@@ -114,6 +149,8 @@ export function createEditor(parent: HTMLElement, opts: EditorOptions): EditorVi
         drawSelection(),
         dropCursor(),
         closeBrackets(),
+        findKeys,
+        findCompartment.of([]),
         keymap.of([
           ...markdownKeymap,
           ...closeBracketsKeymap,

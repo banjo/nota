@@ -15,12 +15,14 @@ import {
   PenLine,
   Pin,
   PinOff,
+  TextSearch,
   Trash2,
 } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Tree } from "@nota/client";
 import { createNote, createNoteIn, deleteNote, newNoteFolder, setPinned } from "../actions.ts";
 import { useClient } from "../context.ts";
+import { requestFind } from "../lib/find.ts";
 import { useLongPress } from "../lib/longPress.ts";
 import { folderOf } from "../lib/notes.ts";
 import { isPinned } from "../lib/pinned.ts";
@@ -112,6 +114,18 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
           run: () => startNewFolder(folder),
           group: 0,
         },
+        // On the note's own page (the phone's sheet): find in it.
+        ...(t.page
+          ? [
+              {
+                id: "find",
+                label: "Find in note",
+                icon: TextSearch,
+                run: () => requestFind(false),
+                group: 1,
+              },
+            ]
+          : []),
         {
           id: "pin",
           label: pinned ? "Unpin" : "Pin",

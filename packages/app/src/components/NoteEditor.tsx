@@ -14,6 +14,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { fail, reportLinks } from "../actions.ts";
 import { useClient } from "../context.ts";
 import { noteHandlers } from "../editorHandlers.ts";
+import { listenFind } from "../lib/find.ts";
 import { label } from "../lib/shortcuts.ts";
 import { filename, joinTitle, splitTitle, stem, type TitleParts } from "../lib/notes.ts";
 import type { NoteMode } from "../lib/noteMode.ts";
@@ -235,7 +236,9 @@ export function NoteEditor({ note, between }: { note: Note; between?: ReactNode 
       if ((e as CustomEvent<{ select?: boolean }>).detail?.select) titleRef.current?.select();
     };
     document.addEventListener("nota:focus-title", focusTitle);
+    const offFind = listenFind(v);
     return () => {
+      offFind();
       window.removeEventListener("blur", flush);
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("nota:focus-title", focusTitle);

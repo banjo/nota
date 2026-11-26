@@ -211,6 +211,15 @@
   ::selection {
     background: color-mix(in srgb, var(--ink) 24%, transparent);
   }
+  /* The find bar sticks below the page's top bar (TopBar: h-11, h-12 under a finger). */
+  .nota-editor {
+    --editor-sticky-top: 48px;
+  }
+  @media (pointer: coarse) {
+    .nota-editor {
+      --editor-sticky-top: 52px;
+    }
+  }
 }
 
 /* iOS zooms into any field under 16px and stays zoomed: under a finger
