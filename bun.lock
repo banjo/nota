@@ -13,7 +13,7 @@
     },
     "apps/desktop": {
       "name": "@nota/desktop",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "dependencies": {
         "@nota/app": "workspace:*",
         "@nota/client": "workspace:*",
