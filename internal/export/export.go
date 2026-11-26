@@ -438,6 +438,11 @@ func (e *Export) Save(dest string) (int64, error) {
 		return 0, err
 	}
 	defer os.Remove(tmp.Name())
+	// CreateTemp makes it private; an export is a file like any other.
+	if err := tmp.Chmod(0o644); err != nil {
+		tmp.Close()
+		return 0, err
+	}
 	n, err := e.WriteTo(tmp)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr

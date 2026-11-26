@@ -335,9 +335,6 @@ details[open] > summary.callout-title::after {
   height: 16px;
   margin-right: 6px;
   vertical-align: -3px;
-  background: currentColor;
-  mask: var(--icon) center / 16px no-repeat;
-  -webkit-mask: var(--icon) center / 16px no-repeat;
 }
 
 /* Footnotes. */

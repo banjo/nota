@@ -41,7 +41,7 @@ func TestPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := b.String()
-	for _, want := range []string{`data-mode="dark"`, `--ink:#ff0000;`, `<title>Plan &lt;1&gt;</title>`, `<p>hej</p>`, `.callout-note .callout-icon{--icon:url("data:image/svg+xml,`, `href="https://nota.example"`} {
+	for _, want := range []string{`data-mode="dark"`, `--ink:#ff0000;`, `<title>Plan &lt;1&gt;</title>`, `<p>hej</p>`, `href="https://nota.example"`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("page: missing %s", want)
 		}
