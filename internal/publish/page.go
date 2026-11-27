@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
+	"image/color"
 	"io"
 	"net/url"
 	"slices"
@@ -103,6 +104,15 @@ type Page struct {
 	// Document leaves out the header and the footer: an exported note,
 	// a file of its own rather than a page of the server.
 	Document bool
+	// Meta is what a chat or a social site shows of the link.
+	Meta *Meta
+}
+
+// Meta is a page's description and Open Graph tags: the preview of its
+// link. URL and Image are absolute.
+type Meta struct {
+	Title, Description string
+	URL, Image         string
 }
 
 // Lock is the page that asks for a shared note's password.
@@ -111,6 +121,9 @@ type Lock struct {
 	// Error is shown under the field: a wrong password, too many tries.
 	Error string
 	Home  string
+	// Meta is the preview of a protected note's link: it doesn't tell
+	// what the note is.
+	Meta *Meta
 }
 
 // Missing is the page of a link that leads nowhere (any more).
@@ -123,8 +136,10 @@ const lockup = `<svg xmlns="http://www.w3.org/2000/svg" width="{{.}}" viewBox="0
 const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7.2" fill="#1e7363"/><g transform="translate(1.595 2.24) scale(0.86)" fill="#fff"><path d="M7.5 25.5V8.5L20.5 24" fill="none" stroke="#fff" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M23.04 24.58L27.58 4.62A1 1 0 0 0 25.67 4.03L18.09 23.04A2.6 2.6 0 1 0 23.04 24.58Z"/></g></svg>`
 
 var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
-	"css":     func() template.CSS { return template.CSS(css) },                                             //nolint:gosec // our own
-	"favicon": func() template.URL { return template.URL("data:image/svg+xml," + url.PathEscape(favicon)) }, //nolint:gosec // our own
+	"css":        func() template.CSS { return template.CSS(css) },                                             //nolint:gosec // our own
+	"favicon":    func() template.URL { return template.URL("data:image/svg+xml," + url.PathEscape(favicon)) }, //nolint:gosec // our own
+	"cardWidth":  func() int { return CardWidth },
+	"cardHeight": func() int { return CardHeight },
 }).Parse(`
 {{define "lockup"}}` + lockup + `{{end}}
 {{define "head"}}<!doctype html>
@@ -135,7 +150,23 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="{{favicon}}">
-<style>{{css}}</style>
+{{with .Meta}}<meta name="description" content="{{.Description}}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Nota">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:image" content="{{.Image}}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="{{cardWidth}}">
+<meta property="og:image:height" content="{{cardHeight}}">
+<meta property="og:image:alt" content="{{.Title}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{.Title}}">
+<meta name="twitter:description" content="{{.Description}}">
+<meta name="twitter:image" content="{{.Image}}">
+{{end}}{{with .ThemeColor}}<meta name="theme-color" content="{{.}}">
+{{end}}<style>{{css}}</style>
 {{with .Style}}<style>{{.}}</style>{{end}}
 {{end}}
 
@@ -200,21 +231,35 @@ var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 `))
 
 type data struct {
-	Mode    string
-	Style   template.CSS
-	Page    Page
-	Lock    Lock
-	Missing Missing
+	Mode       string
+	Style      template.CSS
+	Meta       *Meta
+	ThemeColor string
+	Page       Page
+	Lock       Lock
+	Missing    Missing
+}
+
+// themeColor is the theme's background for browsers' chrome, on pages
+// with a theme of their own ("" follows the reader's system).
+func themeColor(t *Theme, m *Meta) string {
+	if m == nil || t == nil || (t.Mode == "" && t.Tokens["background"] == "") {
+		return ""
+	}
+	c := color.NRGBAModel.Convert(cardColor(t, "background")).(color.NRGBA)
+	return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B)
 }
 
 // WritePage writes a shared note's page.
 func WritePage(w io.Writer, p Page) error {
-	return tmpl.ExecuteTemplate(w, "page", data{Mode: mode(p.Theme), Style: style(p.Theme), Page: p})
+	return tmpl.ExecuteTemplate(w, "page", data{Mode: mode(p.Theme), Style: style(p.Theme), Meta: p.Meta,
+		ThemeColor: themeColor(p.Theme, p.Meta), Page: p})
 }
 
 // WriteLock writes the password page.
 func WriteLock(w io.Writer, l Lock) error {
-	return tmpl.ExecuteTemplate(w, "lock", data{Mode: mode(l.Theme), Style: style(l.Theme), Lock: l})
+	return tmpl.ExecuteTemplate(w, "lock", data{Mode: mode(l.Theme), Style: style(l.Theme), Meta: l.Meta,
+		ThemeColor: themeColor(l.Theme, l.Meta), Lock: l})
 }
 
 // WriteMissing writes the page of a link that leads nowhere.
