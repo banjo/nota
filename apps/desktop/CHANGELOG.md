@@ -1,5 +1,13 @@
 # @nota/desktop
 
+## 0.1.7
+
+### Patch Changes
+
+- [#75](https://github.com/banjo/nota/pull/75) [`aca15c2`](https://github.com/banjo/nota/commit/aca15c2fe2f773bc399400e4ed1f89153d34348d) - Folders and saved views can have an icon and a colour. Right-click a folder (or a view) and choose "Change icon…" to search 12,000 icons from Lucide, Tabler and Simple Icons, or an emoji, and pick a colour that follows the theme. The icons sync with the vault (`.nota/folders.yaml`) and follow a renamed folder. `nota folder icon Work lucide:briefcase --color blue` and `nota icons <words>` do the same from the terminal, and `set_folder_icon` and `search_icons` over MCP.
+
+- [#73](https://github.com/banjo/nota/pull/73) [`5102ec4`](https://github.com/banjo/nota/commit/5102ec43c53829620fb453e6b9e4ddec1750533c) - Imported notes keep their titles. Obsidian and other apps that keep notes as files title a note by its file name, so a note that starts with something else (a greeting, a section heading) now gets its name as a heading on top. The title field also skips blank lines at the top of a note, as the sidebar does, instead of showing "Untitled".
+
 ## 0.1.6
 
 ### Patch Changes
