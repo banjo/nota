@@ -6,7 +6,8 @@ files you edit.
 ## Skill
 
 [`skills/nota`](../skills/nota/SKILL.md) is an agent skill that teaches an agent to use Nota:
-the CLI or the MCP tools (whichever it has), views, hooks, themes, sync and the server. Install
+the CLI or the MCP tools (whichever it has), Markdown and images, find and replace, pinning,
+export and import, settings, views, hooks, themes, sync, sharing and the server. Install
 it into Claude Code, OpenCode, Codex, Cursor and others with:
 
 ```sh

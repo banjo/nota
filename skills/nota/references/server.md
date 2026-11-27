@@ -20,20 +20,24 @@ Dokku, Fly): port 8080 behind HTTPS, a persistent volume at `/data`, health chec
 
 ## Configuration
 
-| Variable                      | Default  | Meaning                                                                                                   |
-| ----------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
-| `NOTA_SERVER_ADDR`            | `:8080`  | Listen address.                                                                                           |
-| `NOTA_SERVER_DATA`            | `/data`  | Data directory.                                                                                           |
-| `NOTA_SERVER_PUBLIC_URL`      |          | The API's public URL.                                                                                     |
-| `NOTA_SERVER_WEB_ORIGIN`      |          | Web app origins, comma-separated; CORS, passkeys and sign-in links use them.                              |
-| `NOTA_SERVER_RP_ID`           |          | Passkey domain: the web app's domain. Passkeys are off without it; changing it invalidates every passkey. |
-| `NOTA_SERVER_COOKIE_DOMAIN`   | host     | E.g. `example.com` when API and web app are on sibling subdomains.                                        |
-| `NOTA_SERVER_COOKIE_INSECURE` | off      | `1` for local http only.                                                                                  |
-| `NOTA_SERVER_SIGNUP`          | `invite` | `invite`, `open` or `closed`.                                                                             |
-| `NOTA_SERVER_TRUSTED_PROXIES` | none     | Proxies whose `X-Forwarded-For` is trusted; `private` behind Traefik, Caddy or nginx.                     |
-| `NOTA_SERVER_HOOKS`           | `off`    | `on` runs vaults' hooks on the server as shell commands. Only when every account is the owner's.          |
-| `NOTA_SERVER_MAX_FILE_SIZE`   | `100MiB` | Largest file accepted.                                                                                    |
-| `NOTA_SERVER_LOG_FORMAT`      | `text`   | `json` in the image; one wide event per request on stderr.                                                |
+| Variable                       | Default       | Meaning                                                                                                                                                  |
+| ------------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NOTA_SERVER_ADDR`             | `:8080`       | Listen address.                                                                                                                                          |
+| `NOTA_SERVER_DATA`             | `/data`       | Data directory.                                                                                                                                          |
+| `NOTA_SERVER_PUBLIC_URL`       |               | The API's public URL.                                                                                                                                    |
+| `NOTA_SERVER_WEB_ORIGIN`       |               | Web app origins, comma-separated; CORS, passkeys and sign-in links use them.                                                                             |
+| `NOTA_SERVER_RP_ID`            |               | Passkey domain: the web app's domain. Passkeys are off without it; changing it invalidates every passkey.                                                |
+| `NOTA_SERVER_COOKIE_DOMAIN`    | host          | E.g. `example.com` when API and web app are on sibling subdomains.                                                                                       |
+| `NOTA_SERVER_COOKIE_INSECURE`  | off           | `1` for local http only.                                                                                                                                 |
+| `NOTA_SERVER_SIGNUP`           | `invite`      | `invite`, `open` or `closed`.                                                                                                                            |
+| `NOTA_SERVER_TRUSTED_PROXIES`  | none          | Proxies whose `X-Forwarded-For` is trusted; `private` behind Traefik, Caddy or nginx.                                                                    |
+| `NOTA_SERVER_HOOKS`            | `off`         | `on` runs vaults' hooks on the server as shell commands. Only when every account is the owner's.                                                         |
+| `NOTA_SERVER_MAX_FILE_SIZE`    | `100MiB`      | Largest file accepted.                                                                                                                                   |
+| `NOTA_SERVER_LOG_FORMAT`       | `text`        | `json` in the image; one wide event per request on stderr.                                                                                               |
+| `NOTA_SERVER_POLL_INTERVAL`    | `5s`          | Minimum interval between `nota login` polls.                                                                                                             |
+| `NOTA_SERVER_BLOB_GC_INTERVAL` | `off`         | Run blob garbage collection this often (`24h`, `7d`); first pass one interval after start.                                                               |
+| `NOTA_SERVER_BLOBS`            | `/data/blobs` | `s3://bucket/prefix` keeps file contents in an S3-compatible bucket (R2, S3, MinIO, B2).                                                                 |
+| `NOTA_SERVER_S3_ENDPOINT`      | AWS S3        | The bucket's service, e.g. `https://<account>.r2.cloudflarestorage.com`; plus `NOTA_SERVER_S3_REGION` and `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. |
 
 Typical split setup, API at `api.notes.example.com` and web app at `notes.example.com`:
 
@@ -46,7 +50,8 @@ NOTA_SERVER_TRUSTED_PROXIES=private
 ```
 
 Behind a proxy: terminate TLS there, forward to 8080, and leave server-sent events unbuffered
-(`/v1/vaults/{v}/events`); keepalives go out every 25 s.
+(`/v1/vaults/{v}/events`, `/v1/api/vaults/{v}/events`); keepalives go out every 25 s. Shared
+notes are pages at `/s/…` on the API's domain, so route that path to the server too.
 
 ## Accounts and devices
 
@@ -60,16 +65,20 @@ nota serve user rm you@example.com                      # Prints the plan; add -
 ```
 
 Also: `nota serve invite create [--email]`, `nota serve token list|revoke`,
-`nota serve auth pending`, `nota serve vault`, `nota serve rebuild` (stop the server first).
+`nota serve auth pending`, `nota serve vault list|rm`, `nota serve rebuild` (stop the server
+first). `user rm` and `vault rm` delete history for good: list first and let the user choose.
 `nota serve <command> --help` has the flags.
 
 ## Maintenance
 
 - Backups: copy `/data` with the server stopped, or `sqlite3 nota.db ".backup …"` plus
-  `blobs/`. `vaults/` can be left out.
+  `blobs/` (or the bucket). `vaults/` can be left out.
 - `nota serve blobs gc --dry-run`, then `nota serve blobs gc`, reclaims blobs nothing
-  references (after deleting accounts or vaults). It is safe next to a running server and is
-  not run automatically; schedule it if needed.
+  references (after deleting accounts or vaults). It is safe next to a running server. It runs
+  on its own only with `NOTA_SERVER_BLOB_GC_INTERVAL`, never at startup.
+- Moving blobs to a bucket: with the bucket's variables set, `nota serve blobs migrate` while
+  the server runs, again after stopping it, then start it with the variables and finish with
+  `nota serve blobs migrate --delete` to remove the local copies.
 
 ## The web app
 
