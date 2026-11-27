@@ -69,6 +69,8 @@ Set any of these to override what Nota works out. The names match the CSS variab
 | `ink-strong`                                                | Text on `ink-soft`                                      |
 | `ink-foreground`                                            | Text on `ink`, such as a primary button's label         |
 | `success`, `warning`, `danger`                              | Status colours                                          |
+| `icon-red`, `icon-orange`, `icon-yellow`, `icon-green`      | Folder and view icon colours                            |
+| `icon-blue`, `icon-purple`, `icon-pink`, `icon-gray`        | Folder and view icon colours                            |
 | `md-heading`, `md-bold`, `md-italic`                        | Markdown in the editor                                  |
 | `md-link`, `md-tag`, `md-code`, `md-quote`                  | Markdown in the editor                                  |
 | `md-table-border`, `md-table-header`                        | Table borders, and the background of the header row     |
@@ -83,7 +85,8 @@ headings use `foreground`, links use `ink`, tags use `ink-strong`, table borders
 and table headers use `code`. Code colours are worked out from `ink`, `ink-strong`, `md-tag`,
 `muted-foreground`, `success` and `warning`, darkened or lightened until they read on `code`. Callouts use `ink` (note), `md-syntax-string`
 (tip), `ink-strong` (important), `md-syntax-number` (warning) and `danger` (caution).
-Highlights are `warning` at 30% over the page.
+Highlights are `warning` at 30% over the page. `icon-red`, `icon-yellow` and `icon-green`
+default to `danger`, `warning` and `success`; an icon's accent colour is `ink`.
 
 Colours are `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`, `hsl()` or `hsla()`.
 `background`, `text` and `ink` have to be hex without alpha, because Nota works out the other

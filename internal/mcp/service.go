@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/banjo/nota/internal/edit"
+	"github.com/banjo/nota/internal/icons"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/relink"
 	"github.com/banjo/nota/internal/replace"
@@ -690,6 +691,71 @@ func (s *Service) Folders() (FoldersOutput, error) {
 		return FoldersOutput{}, err
 	}
 	return FoldersOutput{Folders: fs}, nil
+}
+
+// FolderIconInput are the arguments of set_folder_icon.
+type FolderIconInput struct {
+	Path  string `json:"path" jsonschema:"vault-relative folder path"`
+	Icon  string `json:"icon,omitempty" jsonschema:"an icon id from search_icons (lucide:briefcase, tabler:home, simple-icons:github) or an emoji; empty keeps the folder's own icon"`
+	Color string `json:"color,omitempty" jsonschema:"accent, red, orange, yellow, green, blue, purple, pink or gray; empty is the text's colour"`
+}
+
+// FolderIconOutput is the result of set_folder_icon.
+type FolderIconOutput struct {
+	Path  string `json:"path"`
+	Icon  string `json:"icon,omitempty"`
+	Color string `json:"color,omitempty"`
+}
+
+// SetFolderIcon gives a folder an icon and a colour; both empty take
+// them away.
+func (s *Service) SetFolderIcon(in FolderIconInput) (FolderIconOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, err := s.v.SetFolderIcon(in.Path, vault.FolderIcon{Icon: in.Icon, Color: in.Color})
+	if err != nil {
+		return FolderIconOutput{}, err
+	}
+	all, err := s.v.FolderIcons()
+	if err != nil {
+		return FolderIconOutput{}, err
+	}
+	return FolderIconOutput{Path: p, Icon: all[p].Icon, Color: all[p].Color}, nil
+}
+
+// IconsInput are the arguments of search_icons.
+type IconsInput struct {
+	Query string `json:"query,omitempty" jsonschema:"words the icon's name has, e.g. house or arrow down; empty lists common icons"`
+	Set   string `json:"set,omitempty" jsonschema:"lucide, tabler, emoji or simple-icons (brand logos); empty searches all"`
+	Limit int    `json:"limit,omitempty" jsonschema:"at most this many; default 40"`
+}
+
+// IconsOutput is the result of search_icons.
+type IconsOutput struct {
+	Icons []IconInfo `json:"icons"`
+}
+
+// IconInfo is one icon search_icons found.
+type IconInfo struct {
+	ID   string `json:"id" jsonschema:"what set_folder_icon and a view's icon: take"`
+	Set  string `json:"set"`
+	Name string `json:"name"`
+}
+
+// SearchIcons finds icons by name.
+func (s *Service) SearchIcons(in IconsInput) (IconsOutput, error) {
+	if in.Limit <= 0 {
+		in.Limit = 40
+	}
+	found, err := icons.Search(in.Query, in.Set, min(in.Limit, 200))
+	if err != nil {
+		return IconsOutput{}, err
+	}
+	out := IconsOutput{Icons: make([]IconInfo, len(found))}
+	for i, ic := range found {
+		out.Icons[i] = IconInfo{ID: ic.ID, Set: ic.Set, Name: ic.Name}
+	}
+	return out, nil
 }
 
 // TagsOutput is the result of list_tags.

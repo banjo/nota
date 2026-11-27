@@ -38,6 +38,8 @@ nota pin Plan --json                                    # Last under Pinned; not
 nota mv Plan Archive --json                             # Folder is created; / is the root.
 nota mv Plan Projects/Roadmap.md                        # Renames; --no-update-links keeps links.
 nota folder add Projects/Ideas                          # Empty folders, parents too.
+nota folder icon Work lucide:briefcase --color blue    # Sidebar icon; --remove clears it.
+nota icons house --json                                 # Find icon ids (Lucide, Tabler, emoji, brands).
 nota folder rename Projects Work                        # Moves every note in it; links follow.
 nota replace "Anna S" "Anna B" --dry-run --json         # Every match; then --yes to write.
 nota rm Plan                                            # To .trash/; confirm with the user first.

@@ -12,7 +12,8 @@ A view is a saved query, shown as a virtual folder in the app's sidebar and list
 ```yaml
 # .nota/views/drafts.yaml
 name: Drafts
-icon: pen
+icon: lucide:pen-line
+color: blue
 where: { status: draft }
 tag: projects
 folder: Projects
@@ -20,8 +21,10 @@ sort: updated desc
 limit: 50
 ```
 
-Every field except `name` is optional. `where` matches frontmatter values (case-insensitive,
-list items included); `tag` includes nested tags. `nota views` lists them.
+Every field except `name` is optional. `icon` and `color` are as for a folder's icon
+([cli.md](cli.md#folder-icons)); the app's icon picker writes them too. `where` matches
+frontmatter values (case-insensitive, list items included); `tag` includes nested tags.
+`nota views` lists them.
 
 ## Hooks
 

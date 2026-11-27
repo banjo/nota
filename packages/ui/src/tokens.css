@@ -46,6 +46,17 @@
   --warning: #e2a93b;
   --danger: #d4483b;
 
+  /* Folder and view icons; accent is --ink. Red, yellow and green follow
+     the status colours, so a theme that sets those changes them too. */
+  --icon-red: var(--danger);
+  --icon-orange: #e07b2f;
+  --icon-yellow: var(--warning);
+  --icon-green: var(--success);
+  --icon-blue: #3a7fd5;
+  --icon-purple: #8a5cd1;
+  --icon-pink: #d4529a;
+  --icon-gray: #8b8f97;
+
   /* Strings and numbers in code: status colours, darkened to read on --code. */
   --md-syntax-string: #24703a;
   --md-syntax-number: #a0540a;
@@ -94,6 +105,12 @@
   --ink-strong: #a3eadd;
   --ink-foreground: #15161a;
 
+  --icon-orange: #f0974f;
+  --icon-blue: #6aa6ee;
+  --icon-purple: #a98cf0;
+  --icon-pink: #ee7bb8;
+  --icon-gray: #8f9299;
+
   --md-syntax-string: #8fd6a4;
   --md-syntax-number: #eab26e;
 
@@ -130,6 +147,12 @@
     --ink-soft-hover: rgba(95, 217, 196, 0.22);
     --ink-strong: #a3eadd;
     --ink-foreground: #15161a;
+
+    --icon-orange: #f0974f;
+    --icon-blue: #6aa6ee;
+    --icon-purple: #a98cf0;
+    --icon-pink: #ee7bb8;
+    --icon-gray: #8f9299;
 
     --md-syntax-string: #8fd6a4;
     --md-syntax-number: #eab26e;

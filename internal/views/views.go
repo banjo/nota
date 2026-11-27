@@ -2,15 +2,18 @@
 // evaluates them through the index. A view is a virtual folder:
 //
 //	name: Drafts
-//	icon: pen
+//	icon: lucide:pen-line
+//	color: blue
 //	where: { status: draft }
 //	tag: projekt
 //	folder: Projekt
 //	sort: updated desc
 //	limit: 50
 //
-// Every field except name is optional. where matches frontmatter values
-// (case-insensitive, list items included); tag includes nested tags.
+// Every field except name is optional. icon is one of package icons'
+// ("lucide:pen-line", "🏠"; a bare name is Lucide's) and color one of
+// icons.Colors. where matches frontmatter values (case-insensitive, list
+// items included); tag includes nested tags.
 package views
 
 import (
@@ -18,12 +21,14 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 
+	"github.com/banjo/nota/internal/icons"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/vault"
 )
@@ -34,6 +39,7 @@ type View struct {
 	ID     string         `yaml:"-" json:"id"`
 	Name   string         `yaml:"name" json:"name"`
 	Icon   string         `yaml:"icon,omitempty" json:"icon,omitempty"`
+	Color  string         `yaml:"color,omitempty" json:"color,omitempty"`
 	Where  map[string]any `yaml:"where,omitempty" json:"where,omitempty"`
 	Tag    string         `yaml:"tag,omitempty" json:"tag,omitempty"`
 	Folder string         `yaml:"folder,omitempty" json:"folder,omitempty"`
@@ -149,4 +155,77 @@ func Eval(ix *index.Index, vw View) ([]index.Entry, error) {
 		return nil, fmt.Errorf("views: %s: %w", vw.ID, err)
 	}
 	return ix.Query(q)
+}
+
+// SetIcon writes a view's icon and colour into its file, keeping every
+// other line as it is; an empty one is taken out. The icon is checked
+// and stored as icons.Normalize has it. It returns the view as it is now.
+func SetIcon(v *vault.Vault, id, icon, color string) (View, error) {
+	vs, err := Load(v)
+	if err != nil {
+		return View{}, err
+	}
+	vw, ok := Find(vs, id)
+	if !ok {
+		return View{}, fmt.Errorf("no view %q: %w", id, vault.ErrNotFound)
+	}
+	icon = icons.Normalize(icon)
+	if icon != "" {
+		if err := icons.Check(icon); err != nil {
+			return View{}, vault.Invalid(err)
+		}
+	}
+	if err := icons.CheckColor(color); err != nil {
+		return View{}, vault.Invalid(err)
+	}
+	data, err := v.ReadFile(vw.File)
+	if err != nil {
+		return View{}, err
+	}
+	data = setKey(setKey(data, "color", color), "icon", icon)
+	nv, err := Parse(data)
+	if err != nil {
+		return View{}, fmt.Errorf("views: %s: %w", vw.File, err)
+	}
+	if _, _, err := v.WriteFile(vw.File, data); err != nil {
+		return View{}, err
+	}
+	nv.ID, nv.File = vw.ID, vw.File
+	if nv.Name == "" {
+		nv.Name = nv.ID
+	}
+	return nv, nil
+}
+
+// setKey sets a top-level "key: value" line, after the name and icon
+// lines when it is new, or removes it for an empty value.
+func setKey(data []byte, key, value string) []byte {
+	nl := "\n"
+	if strings.Contains(string(data), "\r\n") {
+		nl = "\r\n"
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\r\n"), "\n")
+	line := key + ": " + strconv.Quote(value)
+	at, after := -1, -1
+	for i, l := range lines {
+		l = strings.TrimRight(l, "\r")
+		switch {
+		case strings.HasPrefix(l, key+":"):
+			at = i
+		case strings.HasPrefix(l, "name:"), strings.HasPrefix(l, "icon:"):
+			after = i
+		}
+	}
+	switch {
+	case at >= 0 && value == "":
+		lines = append(lines[:at], lines[at+1:]...)
+	case at >= 0:
+		lines[at] = line
+	case value != "":
+		lines = slices.Insert(lines, after+1, line)
+	}
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], "\r")
+	}
+	return []byte(strings.Join(lines, nl) + nl)
 }

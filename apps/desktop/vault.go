@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/hooks"
+	"github.com/banjo/nota/internal/icons"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
@@ -84,6 +86,11 @@ type TreeFolder struct {
 	Path  string `json:"path"`
 	Name  string `json:"name"`
 	Notes int    `json:"notes"`
+	// Icon, Color and SVG are its look (.nota/folders.yaml): the icon
+	// and colour as stored, and the icon drawn, empty for an emoji.
+	Icon  string `json:"icon,omitempty"`
+	Color string `json:"color,omitempty"`
+	SVG   string `json:"svg,omitempty"`
 }
 
 // Tree is every folder and every note of the vault.
@@ -116,9 +123,12 @@ type TagCount struct {
 
 // ViewInfo is a saved view (.nota/views/*.yaml) with its note count.
 type ViewInfo struct {
-	ID     string         `json:"id"`
-	Name   string         `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Icon is as written in the file; Color and SVG as in TreeFolder.
 	Icon   string         `json:"icon,omitempty"`
+	Color  string         `json:"color,omitempty"`
+	SVG    string         `json:"svg,omitempty"`
 	Where  map[string]any `json:"where,omitempty"`
 	Tag    string         `json:"tag,omitempty"`
 	Folder string         `json:"folder,omitempty"`
@@ -363,9 +373,18 @@ func (s *Vault) Tree() (Tree, error) {
 			}
 		}
 	}
+	looks, err := s.v.FolderIcons()
+	if err != nil {
+		slog.Warn("folder icons", "err", err)
+	}
 	out := Tree{Inbox: s.v.Inbox(), Attachments: attachments.Folder(s.v), Folders: []TreeFolder{}, Notes: noteInfos(es), Cursor: s.changes.seq()}
 	for f, n := range counts {
-		out.Folders = append(out.Folders, TreeFolder{Path: f, Name: path.Base(f), Notes: n})
+		tf := TreeFolder{Path: f, Name: path.Base(f), Notes: n}
+		if fi, ok := looks[f]; ok {
+			l := icons.LookOf(fi.Icon, fi.Color)
+			tf.Icon, tf.Color, tf.SVG = l.Icon, l.Color, l.SVG
+		}
+		out.Folders = append(out.Folders, tf)
 	}
 	slices.SortFunc(out.Folders, func(a, b TreeFolder) int { return strings.Compare(a.Path, b.Path) })
 	return out, nil
@@ -573,7 +592,8 @@ func (s *Vault) Views() ([]ViewInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("view %s: %w", vw.ID, err)
 		}
-		out = append(out, ViewInfo{ID: vw.ID, Name: vw.Name, Icon: vw.Icon, Where: vw.Where, Tag: vw.Tag,
+		l := icons.LookOf(vw.Icon, vw.Color)
+		out = append(out, ViewInfo{ID: vw.ID, Name: vw.Name, Icon: vw.Icon, Color: l.Color, SVG: l.SVG, Where: vw.Where, Tag: vw.Tag,
 			Folder: vw.Folder, Sort: vw.Sort, File: vw.File, Count: len(es)})
 	}
 	return out, nil
@@ -810,6 +830,77 @@ func (s *Vault) RenameFolder(path, to string) (MoveResult, error) {
 		}
 	}
 	return res, nil
+}
+
+// IconLook is how a folder or view is drawn: its icon and colour, and
+// the icon as an <svg> (empty for an emoji).
+type IconLook struct {
+	Icon  string `json:"icon,omitempty"`
+	Color string `json:"color,omitempty"`
+	SVG   string `json:"svg,omitempty"`
+}
+
+func lookOf(icon, color string) IconLook {
+	l := icons.LookOf(icon, color)
+	return IconLook{Icon: l.Icon, Color: l.Color, SVG: l.SVG}
+}
+
+// SetFolderIcon gives a folder an icon and a colour (.nota/folders.yaml);
+// both empty take them away.
+func (s *Vault) SetFolderIcon(path, icon, color string) (IconLook, error) {
+	if s.v == nil {
+		return IconLook{}, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	folder, err := s.v.SetFolderIcon(path, vault.FolderIcon{Icon: icon, Color: color})
+	if err != nil {
+		return IconLook{}, err
+	}
+	all, err := s.v.FolderIcons()
+	if err != nil {
+		return IconLook{}, err
+	}
+	s.changes.add(folderIcons)
+	return lookOf(all[folder].Icon, all[folder].Color), nil
+}
+
+// SetViewIcon writes a saved view's icon and colour into its file.
+func (s *Vault) SetViewIcon(id, icon, color string) (IconLook, error) {
+	if s.v == nil {
+		return IconLook{}, ErrNoVault
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vw, err := views.SetIcon(s.v, id, icon, color)
+	if err != nil {
+		return IconLook{}, err
+	}
+	s.changes.add(viewsDir)
+	return lookOf(vw.Icon, vw.Color), nil
+}
+
+// IconMatch is an icon search found: its id ("lucide:house" or an
+// emoji), set, name and SVG (empty for an emoji).
+type IconMatch struct {
+	ID   string `json:"id"`
+	Set  string `json:"set"`
+	Name string `json:"name"`
+	SVG  string `json:"svg,omitempty"`
+}
+
+// SearchIcons finds icons whose name has every word of q, best first, in
+// one set ("lucide", "tabler", "emoji", "simple-icons") or all ("").
+func (s *Vault) SearchIcons(q, set string) ([]IconMatch, error) {
+	found, err := icons.Search(q, set, 120)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]IconMatch, len(found))
+	for i, ic := range found {
+		out[i] = IconMatch{ID: ic.ID, Set: ic.Set, Name: ic.Name, SVG: ic.SVG}
+	}
+	return out, nil
 }
 
 // Rename gives a note a new path (a new name, a new folder, or both).

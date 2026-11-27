@@ -1,6 +1,8 @@
 import { NotaError, type NotesClient } from "./client.ts";
 import { escapePath } from "./http.ts";
 import type {
+  IconLook,
+  IconMatch,
   AttachmentList,
   AccountState,
   ChangeEvent,
@@ -72,6 +74,9 @@ export interface MygoBindings {
     move(path: string, folder: string): Promise<MoveResult>;
     createFolder(path: string): Promise<string>;
     renameFolder(path: string, to: string): Promise<MoveResult>;
+    setFolderIcon(path: string, icon: string, color: string): Promise<IconLook>;
+    setViewIcon(id: string, icon: string, color: string): Promise<IconLook>;
+    searchIcons(q: string, set: string): Promise<IconMatch[] | null>;
     rename(path: string, to: string): Promise<MoveResult>;
     delete(path: string): Promise<string>;
     search(q: string, filter: ListQuery): Promise<NoteInfo[] | null>;
@@ -291,6 +296,9 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     move: (path, folder) => v.move(path, folder),
     createFolder: (path) => v.createFolder(path),
     renameFolder: (path, to) => v.renameFolder(path, to),
+    setFolderIcon: (path, icon, color) => v.setFolderIcon(path, icon ?? "", color ?? ""),
+    setViewIcon: (id, icon, color) => v.setViewIcon(id, icon ?? "", color ?? ""),
+    searchIcons: async (q, set) => list(await v.searchIcons(q, set ?? "")),
     rename: (path, to) => v.rename(path, to),
     remove: (path) => v.delete(path),
     trash: async () => list(await v.trash()),

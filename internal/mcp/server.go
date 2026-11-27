@@ -43,6 +43,8 @@ func NewServer(s *Service, version string, logger *slog.Logger) *sdk.Server {
 	tool(srv, "create_folder", "Create an empty folder (a/b makes both). Fails if it exists. Notes can also go into a new folder directly: create_note and move_note create the folder.", add, s.CreateFolder)
 	tool(srv, "list_folders", "List every folder, empty ones too, with the number of notes in it (subfolders included).", ro,
 		func(struct{}) (FoldersOutput, error) { return s.Folders() })
+	tool(srv, "set_folder_icon", "Give a folder an icon and a colour in the sidebar (both empty take them away). Find icon ids with search_icons. Kept in .nota/folders.yaml, which syncs.", idem, s.SetFolderIcon)
+	tool(srv, "search_icons", "Find icons for folders and saved views by name: Lucide, Tabler, emoji and Simple Icons (brand logos), best match first.", ro, s.SearchIcons)
 	tool(srv, "list_trash", "List the deleted notes in the vault's .trash/, most recently deleted first, with where each was deleted from and when.", ro,
 		func(struct{}) (TrashOutput, error) { return s.Trash() })
 	tool(srv, "restore_note", "Put a deleted note back where it was deleted from, or into another folder. Fails if a note has taken that path since; pass folder then.", add, s.Restore)

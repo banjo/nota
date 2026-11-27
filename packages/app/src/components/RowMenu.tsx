@@ -16,6 +16,7 @@ import {
   PenLine,
   Pin,
   PinOff,
+  SmilePlus,
   TextSearch,
   Trash2,
   FileDown,
@@ -31,6 +32,7 @@ import { isPinned } from "../lib/pinned.ts";
 import { keys, useInboxName } from "../queries.ts";
 import { useUI } from "../state.ts";
 import { openHistory } from "./History.tsx";
+import { openIconPicker } from "./IconPicker.tsx";
 import { startNewFolder } from "./NewFolder.tsx";
 import { startRename } from "./Rename.tsx";
 import { openRowSheet, type RowTarget } from "./RowSheet.tsx";
@@ -41,7 +43,7 @@ import { openExport } from "./Export.tsx";
 // bottom sheet under a finger (a long press): one list, two skins. Every
 // action is also a ⌘K command or shares its function (note.new,
 // folder.add, note.addToFolder, note.newInFolder, note.rename,
-// folder.rename, note.pin, note.history, note.share, note.export, note.delete).
+// folder.rename, folder.icon, note.pin, note.history, note.share, note.export, note.delete).
 
 /** Puts the cursor in the open note's title field, selected: renaming it where it is. */
 export const focusNoteTitle = (): void => {
@@ -69,6 +71,19 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
   const inbox = useInboxName();
   const openPalette = useUI((s) => s.openPalette);
   return (t) => {
+    if (t.kind === "view") {
+      return client.setViewIcon && client.searchIcons
+        ? [
+            {
+              id: "icon",
+              label: "Change icon…",
+              icon: SmilePlus,
+              run: () => openIconPicker(t),
+              group: 0,
+            },
+          ]
+        : [];
+    }
     if (t.kind === "folder") {
       return [
         {
@@ -96,6 +111,17 @@ export function useRowActions(): (t: MenuTarget) => RowAction[] {
                 run: () => startRename({ kind: "folder", path: t.path }),
                 group: 1,
               },
+              ...(client.setFolderIcon && client.searchIcons
+                ? [
+                    {
+                      id: "icon",
+                      label: "Change icon…",
+                      icon: SmilePlus,
+                      run: () => openIconPicker(t),
+                      group: 1,
+                    },
+                  ]
+                : []),
             ]),
         ...(client.export
           ? [
@@ -229,6 +255,8 @@ export function menuTarget(el: EventTarget | null): MenuTarget {
   if (!row || path === undefined) return { kind: "empty" };
   if (row.dataset.ctxKind === "folder")
     return { kind: "folder", path, name: path.split("/").pop() ?? path };
+  if (row.dataset.ctxKind === "view")
+    return { kind: "view", id: path, name: row.dataset.ctxTitle ?? path };
   return { kind: "note", path, title: row.dataset.ctxTitle ?? "" };
 }
 

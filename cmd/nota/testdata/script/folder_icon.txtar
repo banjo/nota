@@ -1,0 +1,57 @@
+# folder icon gives a folder an icon and a colour, kept in .nota/folders.yaml.
+nota folder icon Projekt lucide:briefcase --color blue
+stdout '^Projekt\s+lucide:briefcase\s+blue$'
+nota folder icon Projekt/Under 🏠
+stdout '^Projekt/Under\s+🏠$'
+cmp vault/.nota/folders.yaml folders.yaml
+
+# Without an icon it prints what the folder has; a bare name is Lucide's.
+nota folder icon Projekt
+stdout '^Projekt\s+lucide:briefcase\s+blue$'
+nota folder icon --json Andra house
+stdout '"icon": "lucide:house"'
+! stdout '"color"'
+nota folder icon Andra --color red
+stdout '^Andra\s+lucide:house\s+red$'
+
+# The icons follow a renamed folder.
+nota folder rename Projekt Jobb
+nota folder icon Jobb/Under
+stdout '^Jobb/Under\s+🏠$'
+! grep 'Projekt' vault/.nota/folders.yaml
+
+# --remove takes both away.
+nota folder icon Andra --remove
+stdout '^Andra\s+no icon$'
+! grep 'Andra' vault/.nota/folders.yaml
+
+# Unknown icons, colours and folders.
+exitcode 2 nota folder icon Jobb lucide:nope
+stderr 'no icon "nope" in lucide'
+exitcode 2 nota folder icon Jobb --color teal
+stderr 'no colour "teal"'
+exitcode 3 nota folder icon Nope house
+exitcode 3 nota folder icon Nope
+exitcode 2 nota folder icon Jobb house --remove
+
+# icons finds icons by name, best first, in every set or one.
+nota icons house
+stdout '^lucide:house\s+house$'
+stdout '^🏠\s+house$'
+nota icons --set simple-icons github
+stdout '^simple-icons:github\s+github$'
+! stdout 'lucide:'
+nota icons --json --limit 1 house
+stdout '"id": "lucide:house"'
+exitcode 2 nota icons --set fa house
+
+-- folders.yaml --
+Projekt:
+  icon: lucide:briefcase
+  color: blue
+Projekt/Under:
+  icon: 🏠
+-- vault/Projekt/Under/Plan.md --
+# Plan
+-- vault/Andra/Annan.md --
+# Annan

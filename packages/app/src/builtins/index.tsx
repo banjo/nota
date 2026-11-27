@@ -26,6 +26,7 @@ import {
   Replace,
   Search,
   Settings,
+  SmilePlus,
   SunMoon,
   TextSearch,
   Trash2,
@@ -48,6 +49,7 @@ import { requestFind } from "../lib/find.ts";
 import { baseFolder } from "../lib/folders.ts";
 import { focusNoteTitle } from "../components/RowMenu.tsx";
 import { openHistory } from "../components/History.tsx";
+import { openIconPicker } from "../components/IconPicker.tsx";
 import { openShare } from "../components/Share.tsx";
 import { openExport, printNote } from "../components/Export.tsx";
 import { openImport } from "../components/Import.tsx";
@@ -149,6 +151,19 @@ export function registerBuiltins(r: Registry): () => void {
       // The folder of the note or list on screen, never the inbox itself.
       when: (ctx) => currentFolder(ctx) !== "",
       run: (ctx) => startRename({ kind: "folder", path: currentFolder(ctx) }),
+    }),
+    r.register("command", {
+      id: "folder.icon",
+      title: "Change folder icon…",
+      group: "Notes",
+      keywords: ["icon", "emoji", "colour", "color", "folder", "mapp", "ikon", "färg"],
+      icon: SmilePlus,
+      when: (ctx) =>
+        !!ctx.client.setFolderIcon && !!ctx.client.searchIcons && currentFolder(ctx) !== "",
+      run: (ctx) => {
+        const path = currentFolder(ctx);
+        openIconPicker({ kind: "folder", path, name: path.split("/").pop() ?? path });
+      },
     }),
     r.register("command", {
       id: "note.newInFolder",

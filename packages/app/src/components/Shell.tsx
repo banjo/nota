@@ -23,6 +23,7 @@ import { AttachmentsView } from "./Attachments.tsx";
 import { ExportDialog } from "./Export.tsx";
 import { ImportDialog } from "./Import.tsx";
 import { ShareDialog } from "./Share.tsx";
+import { IconPickerDialog } from "./IconPicker.tsx";
 import { RowSheet } from "./RowSheet.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { ReplaceView } from "./Replace.tsx";
@@ -217,6 +218,7 @@ export function Shell({ children }: { children?: ReactNode }) {
       <HistoryDialog />
       <ShareDialog />
       <ExportDialog />
+      <IconPickerDialog />
       <ImportDialog />
       {vaultFlow ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-background">

@@ -14,6 +14,7 @@ import (
 
 	"github.com/banjo/nota/internal/attachments"
 	"github.com/banjo/nota/internal/edit"
+	"github.com/banjo/nota/internal/icons"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/plugins"
 	"github.com/banjo/nota/internal/protocol"
@@ -48,6 +49,9 @@ func (s *Server) apiRoutes() {
 	s.route("POST /v1/api/vaults/{vault}/import", ro, s.apiImport)
 	s.route("POST /v1/api/vaults/{vault}/folders", ro, s.apiCreateFolder)
 	s.route("POST /v1/api/vaults/{vault}/folders/rename", ro, s.apiRenameFolder)
+	s.route("PUT /v1/api/vaults/{vault}/folders/icon", ro, s.apiFolderIcon)
+	s.route("PUT /v1/api/vaults/{vault}/views/{id}/icon", ro, s.apiViewIcon)
+	s.route("GET /v1/api/vaults/{vault}/icons", ro, s.apiIcons)
 	s.route("GET /v1/api/vaults/{vault}/search", ro, s.apiSearch)
 	s.route("GET /v1/api/vaults/{vault}/tags", ro, s.apiTags)
 	s.route("GET /v1/api/vaults/{vault}/views", ro, s.apiViews)
@@ -226,6 +230,10 @@ type TreeFolder struct {
 	Path  string `json:"path"`
 	Name  string `json:"name"`
 	Notes int    `json:"notes"`
+	// Icon, Color and SVG are its look (.nota/folders.yaml, icons.LookOf).
+	Icon  string `json:"icon,omitempty"`
+	Color string `json:"color,omitempty"`
+	SVG   string `json:"svg,omitempty"`
 }
 
 // Tree is the body of GET …/tree: every folder and every note.
@@ -273,10 +281,19 @@ func (s *Server) apiTree(w http.ResponseWriter, r *http.Request, p Principal) er
 	}
 	ws.mu.Lock()
 	att := attachments.Folder(ws.client)
+	looks, lerr := ws.client.FolderIcons()
 	ws.mu.Unlock()
+	if lerr != nil {
+		looks = nil // a broken folders.yaml leaves the folders plain
+	}
 	out := Tree{Inbox: ws.client.Inbox(), Attachments: att, Folders: []TreeFolder{}, Notes: noteInfos(es)}
 	for f, n := range counts {
-		out.Folders = append(out.Folders, TreeFolder{Path: f, Name: path.Base(f), Notes: n})
+		tf := TreeFolder{Path: f, Name: path.Base(f), Notes: n}
+		if fi, ok := looks[f]; ok {
+			l := icons.LookOf(fi.Icon, fi.Color)
+			tf.Icon, tf.Color, tf.SVG = l.Icon, l.Color, l.SVG
+		}
+		out.Folders = append(out.Folders, tf)
 	}
 	slices.SortFunc(out.Folders, func(a, b TreeFolder) int { return strings.Compare(a.Path, b.Path) })
 	if err := s.store.db.QueryRowContext(r.Context(), `SELECT seq FROM vaults WHERE id = ?`, ws.id).Scan(&out.Cursor); err != nil {
@@ -435,7 +452,9 @@ func (s *Server) apiPlugins(w http.ResponseWriter, r *http.Request, p Principal)
 // ViewInfo is a saved view with its note count.
 type ViewInfo struct {
 	views.View
-	Count int `json:"count"`
+	// SVG draws its icon (icons.LookOf).
+	SVG   string `json:"svg,omitempty"`
+	Count int    `json:"count"`
 }
 
 func (s *Server) apiViews(w http.ResponseWriter, r *http.Request, p Principal) error {
@@ -455,7 +474,9 @@ func (s *Server) apiViews(w http.ResponseWriter, r *http.Request, p Principal) e
 		if err != nil {
 			return badRequest("view %s: %v", vw.ID, err)
 		}
-		out = append(out, ViewInfo{View: vw, Count: len(es)})
+		l := icons.LookOf(vw.Icon, vw.Color)
+		vw.Color = l.Color
+		out = append(out, ViewInfo{View: vw, SVG: l.SVG, Count: len(es)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"views": out})
 	return nil

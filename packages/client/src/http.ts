@@ -1,6 +1,8 @@
 import { NotaError, type NotesClient } from "./client.ts";
 import { zip, type ZipEntry } from "./zip.ts";
 import type {
+  IconLook,
+  IconMatch,
   AttachmentList,
   AuthApi,
   Base,
@@ -292,6 +294,12 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       });
       return { from: r.from, path: r.path, links: r.links ?? noLinks };
     },
+    setFolderIcon: (path, icon, color) =>
+      request<IconLook>("PUT", "/folders/icon", { body: { path, icon, color } }),
+    setViewIcon: (id, icon, color) =>
+      request<IconLook>("PUT", `/views/${encodeURIComponent(id)}/icon`, { body: { icon, color } }),
+    searchIcons: async (q, set) =>
+      (await request<{ icons: IconMatch[] }>("GET", "/icons", { query: { q, set } })).icons,
     async rename(path: string, to: string): Promise<MoveResult> {
       const r = await request<MoveResult>("POST", "/move", {
         body: { path, to },

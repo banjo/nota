@@ -121,3 +121,42 @@ func TestNoViewsDir(t *testing.T) {
 		t.Fatalf("%v %v", vs, err)
 	}
 }
+
+func TestSetIcon(t *testing.T) {
+	v, _ := setup(t)
+	read := func(rel string) string {
+		t.Helper()
+		b, err := v.ReadFile(rel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	vw, err := SetIcon(v, "drafts", "tabler:pencil", "blue")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vw.Icon != "tabler:pencil" || vw.Color != "blue" || vw.ID != "drafts" {
+		t.Errorf("view %+v", vw)
+	}
+	if got, want := read(".nota/views/drafts.yaml"), "name: Drafts\nicon: \"tabler:pencil\"\ncolor: \"blue\"\nwhere: { status: draft }\nsort: updated desc\n"; got != want {
+		t.Errorf("drafts.yaml:\n%s\nwant:\n%s", got, want)
+	}
+	if _, err := SetIcon(v, "Drafts", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(".nota/views/drafts.yaml"), "name: Drafts\nwhere: { status: draft }\nsort: updated desc\n"; got != want {
+		t.Errorf("removed:\n%s", got)
+	}
+	if _, err := SetIcon(v, "prio", "🏠", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(".nota/views/prio.yaml"); got != "icon: \"🏠\"\nwhere:\n  priority: 1\n" {
+		t.Errorf("prio.yaml:\n%s", got)
+	}
+	for _, c := range [][3]string{{"nope", "house", ""}, {"drafts", "lucide:nope", ""}, {"drafts", "house", "teal"}} {
+		if _, err := SetIcon(v, c[0], c[1], c[2]); err == nil {
+			t.Errorf("SetIcon(%q) = nil, want an error", c)
+		}
+	}
+}
