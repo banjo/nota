@@ -1,6 +1,7 @@
 import type { NoteInfo, Tree } from "@nota/client";
 import { describe, expect, test } from "vite-plus/test";
 import {
+  attachmentsRow,
   buildTree,
   filename,
   flattenTree,
@@ -82,6 +83,21 @@ describe("tree", () => {
       "Sync-protokoll",
     ]);
     expect(root.notes.map((n) => n.title)).toEqual(["Välkommen"]);
+  });
+  test("gives the attachments folder its own row unless it holds notes", () => {
+    const t = (notes: number): Tree => ({
+      inbox: "Inbox",
+      attachments: "Attachments",
+      folders: [{ path: "Attachments", name: "Attachments", notes }],
+      notes: [],
+      cursor: 0,
+    });
+    expect(attachmentsRow(t(0))).toBe("Attachments");
+    expect(attachmentsRow(t(1))).toBeUndefined();
+    expect(attachmentsRow({ ...t(0), attachments: "" })).toBeUndefined();
+    expect(attachmentsRow({ ...t(0), attachments: undefined })).toBeUndefined();
+    const rows = flattenTree(buildTree(t(0)), () => false, "Inbox", "Attachments");
+    expect(rows).toEqual([]);
   });
   test("flattens the open folders, leaving the inbox out", () => {
     const open = new Set(["Projekt", "Projekt/Nota"]);

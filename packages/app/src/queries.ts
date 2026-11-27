@@ -25,6 +25,7 @@ export const keys = {
   account: ["account"] as const,
   history: (path: string) => ["history", path] as const,
   trash: ["trash"] as const,
+  attachments: ["attachments"] as const,
   replace: ["replace"] as const,
   shares: ["shares"] as const,
 };
@@ -115,6 +116,7 @@ export function useChangeSubscription(client: NotesClient) {
           ["search"],
           ["history"],
           keys.trash,
+          keys.attachments,
           keys.replace,
         ])
           void qc.invalidateQueries({ queryKey: k });

@@ -1,4 +1,5 @@
 import type {
+  AttachmentList,
   AccountApi,
   AuthApi,
   Base,
@@ -112,6 +113,8 @@ export interface NotesClient {
    * Attachments folder, under a free name, and resolves to its path.
    */
   attach?(name: string, data: Blob): Promise<string>;
+  /** The files in the attachments folder, with the notes that use each one. */
+  attachments?(): Promise<AttachmentList>;
   /**
    * Shared notes, on the sync server: the web app's vault, a synced
    * vault on the desktop (which rejects while sync is off).

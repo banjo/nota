@@ -126,6 +126,12 @@ export interface TreeFolder {
 export interface Tree {
   /** The inbox folder, e.g. "Inbox". */
   inbox: string;
+  /**
+   * The attachments folder as it is in the vault ("Attachments", or
+   * Obsidian's "attachments"); "" or absent (an older server) when there
+   * is none.
+   */
+  attachments?: string;
   folders: TreeFolder[];
   notes: NoteInfo[];
   cursor: number;
@@ -357,6 +363,26 @@ export interface ImportApi {
     supported(): Promise<boolean>;
     run(): Promise<ImportReport>;
   };
+}
+
+/** One file in the vault's attachments folder. */
+export interface Attachment {
+  path: string;
+  name: string;
+  size: number;
+  /** RFC 3339. */
+  modified: string;
+  /** A type Nota shows: png, jpg, gif, webp, avif, svg or bmp. */
+  image: boolean;
+  /** The notes that embed or link to it. */
+  usedBy: string[];
+}
+
+/** The attachments folder and its files (subfolders included), newest first. */
+export interface AttachmentList {
+  /** "" when the vault has none yet. */
+  folder: string;
+  files: Attachment[];
 }
 
 /** A deleted note. */

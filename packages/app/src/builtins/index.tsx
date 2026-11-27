@@ -21,6 +21,7 @@ import {
   PenLine,
   Pin,
   PinOff,
+  Paperclip,
   Printer,
   Replace,
   Search,
@@ -398,6 +399,15 @@ export function registerBuiltins(r: Registry): () => void {
       icon: Inbox,
       shortcut: "mod+shift+i",
       run: (ctx) => ctx.navigate({ kind: "inbox" }),
+    }),
+    r.register("command", {
+      id: "attachments.open",
+      title: "Open attachments",
+      group: "Go to",
+      keywords: ["images", "pictures", "files", "media", "bilder", "bilagor"],
+      icon: Paperclip,
+      when: (ctx) => !!ctx.client.attachments,
+      run: (ctx) => ctx.navigate({ kind: "attachments" }),
     }),
     r.register("command", {
       id: "trash.open",

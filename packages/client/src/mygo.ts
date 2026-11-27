@@ -1,6 +1,7 @@
 import { NotaError, type NotesClient } from "./client.ts";
 import { escapePath } from "./http.ts";
 import type {
+  AttachmentList,
   AccountState,
   ChangeEvent,
   CreateInput,
@@ -89,6 +90,7 @@ export interface MygoBindings {
     history(path: string): Promise<HistoryEntry[] | null>;
     historyVersion(path: string, version: number): Promise<string | null>;
     trash(): Promise<TrashItem[] | null>;
+    attachments(): Promise<AttachmentList | null>;
     trashNote(id: string): Promise<string>;
     restoreTrash(id: string, folder: string): Promise<string>;
     purgeTrash(id: string): Promise<void>;
@@ -292,6 +294,13 @@ export function createMygoClient(b: MygoBindings): NotesClient {
     rename: (path, to) => v.rename(path, to),
     remove: (path) => v.delete(path),
     trash: async () => list(await v.trash()),
+    attachments: async () => {
+      const l = await v.attachments();
+      return {
+        folder: l?.folder ?? "",
+        files: list(l?.files).map((f) => ({ ...f, usedBy: list(f.usedBy) })),
+      };
+    },
     trashNote: (id) => v.trashNote(id),
     restoreTrash: (id, folder = "") => v.restoreTrash(id, folder),
     purgeTrash: (id) => v.purgeTrash(id),

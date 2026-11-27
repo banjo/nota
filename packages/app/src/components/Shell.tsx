@@ -19,6 +19,7 @@ import { Onboarding, preloadScreens, Settings } from "./lazy.tsx";
 import { Palette } from "./Palette.tsx";
 import { VaultDialogs } from "../vaults/VaultDialogs.tsx";
 import { HistoryDialog } from "./History.tsx";
+import { AttachmentsView } from "./Attachments.tsx";
 import { ExportDialog } from "./Export.tsx";
 import { ImportDialog } from "./Import.tsx";
 import { ShareDialog } from "./Share.tsx";
@@ -130,6 +131,8 @@ function Page({ route, run }: { route: Route; run: (id: string) => void }) {
       return <InboxView />;
     case "trash":
       return <TrashView />;
+    case "attachments":
+      return <AttachmentsView />;
     case "replace":
       return <ReplaceView />;
     case "settings":

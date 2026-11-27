@@ -143,6 +143,19 @@ export interface ExternalDoc {
   utf8: boolean;
 }
 
+/** File is one file in the attachments folder. */
+export interface File {
+  /** Path is its vault path; Name its file name. */
+  path: string;
+  name: string;
+  size: number;
+  modified: string;
+  /** Image is true for a type Nota shows (vault.ImageType). */
+  image: boolean;
+  /** UsedBy are the notes that embed or link to it, by path. */
+  usedBy: string[];
+}
+
 /** FolderInfo is what InspectFolder found. */
 export interface FolderInfo {
   /** Path is the cleaned absolute path. */
@@ -211,6 +224,13 @@ export interface Link {
   target: string;
   heading?: string;
   alias?: string;
+}
+
+/** List is the attachments folder and its files, newest first. */
+export interface List {
+  /** Folder is the folder as it is in the vault; "" when there is none. */
+  folder: string;
+  files: File[];
 }
 
 /**
@@ -602,6 +622,11 @@ export interface TrashItem {
 /** Tree is every folder and every note of the vault. */
 export interface Tree {
   inbox: string;
+  /**
+   * Attachments is the attachments folder as it is in the vault, ""
+   * when there is none: the app lists it on a page of its own.
+   */
+  attachments: string;
   folders: TreeFolder[];
   notes: NoteInfo[];
   cursor: number;
@@ -652,6 +677,11 @@ export interface ViewInfo {
  * goes through internal/vault and the index, as the CLI does.
  */
 export const Vault = {
+  /**
+   * Attachments lists the files in the vault's attachments folder with the
+   * notes that use each one.
+   */
+  attachments: bind<[], List | null>("Vault.Attachments", () => []),
   /**
    * Create writes a new note, by default into the inbox. Transform hooks
    * may file it elsewhere: the result shows where it ended up.

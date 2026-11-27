@@ -13,7 +13,7 @@ import {
 } from "react";
 import { useLongPress } from "../lib/longPress.ts";
 import { withDraft } from "../lib/newFolder.ts";
-import { buildTree, flattenTree } from "../lib/notes.ts";
+import { attachmentsRow, buildTree, flattenTree } from "../lib/notes.ts";
 import { useTree } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { type Route, useUI } from "../state.ts";
@@ -83,10 +83,17 @@ export function FolderTree() {
   const rows = useMemo(
     () =>
       withDraft(
-        root ? flattenTree(root, (p) => !!expanded[`folder:${p}`], tree.data?.inbox) : [],
+        root
+          ? flattenTree(
+              root,
+              (p) => !!expanded[`folder:${p}`],
+              tree.data?.inbox,
+              attachmentsRow(tree.data),
+            )
+          : [],
         draft,
       ),
-    [root, expanded, tree.data?.inbox, draft],
+    [root, expanded, tree.data, draft],
   );
 
   // Where the list starts inside the scroller (sections above it vary).

@@ -52,6 +52,10 @@ Pasting or dropping an image saves it in **`Attachments/`** at the vault root (o
 `attachments/`), as `Pasted image 20261125143012.png` (a dropped file keeps its name), and inserts
 `![](../Attachments/Pasted%20image%2020261125143012.png)`. Images sync like notes.
 
+The sidebar lists the folder as **Attachments**, outside the folder tree (as long as it holds no
+notes), and it opens a page of its files: a thumbnail, the size and the notes that embed or link
+to each one, so the ones no note uses are easy to find. It's also in ⌘K as "Open attachments".
+
 Nota shows png, jpg, gif, webp, avif, svg and bmp files from the vault. Images from the web
 (`![](https://…)`) are never loaded: they show as links. Previews of files outside the vault show
 no images.

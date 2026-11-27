@@ -8,21 +8,24 @@ import {
   Inbox,
   Layers,
   type LucideIcon,
+  Paperclip,
   PenLine,
   Star,
 } from "lucide-react";
 import { FolderTree } from "../components/FolderTree.tsx";
+import { attachmentsRow } from "../lib/notes.ts";
+import { useClient } from "../context.ts";
 import { FoldersHeaderActions } from "../components/FoldersHeader.tsx";
 import { NoteRow } from "../components/NoteRow.tsx";
 import { Row, SectionHeader } from "../components/Row.tsx";
-import { useInbox, useList, useTags, useViews } from "../queries.ts";
+import { useInbox, useList, useTags, useTreeValue, useViews } from "../queries.ts";
 import { type Route, useUI } from "../state.ts";
 
 // The built-in sidebar sections, registered like any plugin's.
 
-/** The nav row a route lights up: "inbox", "list:recent", "list:tag:<tag>", or "". */
+/** The nav row a route lights up: "inbox", "attachments", "list:recent", "list:tag:<tag>", or "". */
 export function navKey(route: Route): string {
-  if (route.kind === "inbox") return "inbox";
+  if (route.kind === "inbox" || route.kind === "attachments") return route.kind;
   if (route.kind !== "list") return "";
   const l = route.list;
   return l.type === "tag" ? `list:tag:${l.tag}` : `list:${l.type}`;
@@ -34,10 +37,12 @@ export const navActive = (current: string, type: string, key?: string) =>
     ? current === `list:${type}` || current.startsWith(`list:${type}:`)
     : current === `list:${type}:${key}`;
 
-/** Inbox, Recent and Tags. */
+/** Inbox, Recent, Attachments (when the vault has them) and Tags. */
 export function NavSection() {
   const inbox = useInbox();
   const tags = useTags();
+  const client = useClient();
+  const attachments = useTreeValue(attachmentsRow);
   // Which of these rows is the page on screen, as a string: opening a
   // note does not re-render the section.
   const current = useUI((s) => navKey(s.route));
@@ -60,6 +65,14 @@ export function NavSection() {
         active={listActive("recent")}
         onClick={() => navigate({ kind: "list", list: { type: "recent" } })}
       />
+      {attachments && client.attachments ? (
+        <Row
+          icon={<Paperclip strokeWidth={1.75} />}
+          label="Attachments"
+          active={current === "attachments"}
+          onClick={() => navigate({ kind: "attachments" })}
+        />
+      ) : null}
       <Row
         icon={<Hash strokeWidth={1.75} />}
         label="Tags"
