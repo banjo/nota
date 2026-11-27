@@ -37,7 +37,6 @@ and the device uses `nota remote add <url> --token <token>`.
   `Note (conflict 2026-11-22 1042 laptop).md` next to the note. To resolve, merge the conflict
   copy into the note with the user's approval, then `nota rm` the copy.
 - Deletes move files to `.trash/`, and an edit always beats a delete.
-- Empty folders do not sync; a folder reaches other devices once it holds a note.
 
 ## History and restore
 
@@ -49,4 +48,19 @@ nota history Plan --version 3       # The content of version 3.
 nota restore Plan 3                 # Makes version 3 the newest version and syncs it here.
 ```
 
-A restore adds a new version; nothing in the history is rewritten.
+A restore adds a new version; nothing in the history is rewritten. The app has the same as
+History in a note's "…" menu (⌘⇧H).
+
+## Sharing
+
+A synced note can be shared as a public web page on the server (`/s/…`), optionally behind a
+password, always showing the latest version with its images. It is done in the app only: Share…
+in the note's "…" menu or ⌘K "Share note…"; Stop sharing turns the link off. Moving or renaming
+keeps the link; deleting the note ends it. There is no CLI or MCP for it: point the user there.
+
+## Trash and empty folders
+
+- A delete syncs: every device moves the file to its own `.trash/`. Emptying the trash on one
+  device leaves the others, and the server keeps every version. A restored note syncs as new.
+- The web app has no `.trash/`: its Trash lists notes whose newest version is a delete.
+- Empty folders don't sync; a folder reaches other devices once it holds a note.
