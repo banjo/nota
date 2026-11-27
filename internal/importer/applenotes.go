@@ -82,6 +82,7 @@ func AppleNotesFiles(notes []AppleNote) []File {
 			Read:     func() ([]byte, error) { return []byte(md), nil },
 			Created:  n.Created,
 			Modified: n.Modified,
+			Titled:   true,
 		}
 		if left := n.Attachments - images; left > 0 {
 			f.Detail = fmt.Sprintf("%d %s left in Apple Notes", left, plural(left, "attachment"))

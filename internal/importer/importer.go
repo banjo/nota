@@ -39,6 +39,10 @@ type File struct {
 	Skip string
 	// Detail is a remark for the report, such as what of it is left out.
 	Detail string
+	// Titled is true for a note whose first line is its title already
+	// (Apple Notes); any other note gets its file name as a heading when
+	// its first line says something else (titleHeading).
+	Titled bool
 }
 
 // Options configure an import.
@@ -122,6 +126,8 @@ type plan struct {
 	// src is the cleaned source path, dest the vault path.
 	src, dest string
 	note      bool
+	// title is the note's name in the source, which is its title there.
+	title string
 }
 
 // Run imports files into v. Files are imported in the order given; a
@@ -194,6 +200,9 @@ func write(v *vault.Vault, pl *plan, links *linker, r *Report, max int64) error 
 		data, n = links.rewrite(pl, data)
 		r.Links += n
 		data = dates(data, pl.f.Created, pl.f.Modified)
+		if !pl.f.Titled {
+			data = titleHeading(data, pl.title)
+		}
 	}
 	// Planned as free; a file that appeared since is not replaced.
 	if v.FileExists(pl.dest) {
@@ -292,6 +301,7 @@ func (p *planner) place(f File, folder string) *plan {
 		}
 		ext = vault.Ext
 	}
+	pl.title = stem
 	if n := vault.Filename(stem); n != stem {
 		stem, reason = n, reasonName
 	}

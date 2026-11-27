@@ -21,9 +21,10 @@ To bring it into the vault you have instead:
 nota import obsidian ~/Documents/Obsidian
 ```
 
-or "Folder of Markdown notes" in the app. `.obsidian/` and `.trash/` stay behind. Obsidian's
-plugins (Dataview queries, Templater, canvases) are files Nota doesn't run; they come along as
-they are.
+or "Folder of Markdown notes" in the app. `.obsidian/` and `.trash/` stay behind. Obsidian titles a
+note by its file name and Nota by its first line, so a note that doesn't start with its name gets
+it as a heading on top. Obsidian's plugins (Dataview queries, Templater, canvases) are files Nota
+doesn't run; they come along as they are.
 
 ## Apple Notes
 

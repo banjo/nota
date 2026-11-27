@@ -33,17 +33,34 @@ describe("title split", () => {
     "",
     "\n\nText utan titel",
     "# Titel\n\n\n\nLångt ner\n",
+    "\n# Hejsan gänget\n\nText",
+    "  \n\t\nTitel efter blanka rader",
+    "\n\n",
   ])("round-trips %j", (body) => {
     expect(joinTitle(splitTitle(body))).toBe(body);
   });
   test("separates the heading marker", () => {
     expect(splitTitle("# Sync-protokoll\n\nText")).toEqual({
+      lead: "",
       prefix: "# ",
       title: "Sync-protokoll",
       sep: "\n",
       rest: "Text",
       newline: true,
     });
+  });
+  test("skips blank lines before the title, as vault.Title does", () => {
+    expect(splitTitle("\nHejsan gänget,\n\nNu är bokningen gjord!")).toEqual({
+      lead: "\n",
+      prefix: "",
+      title: "Hejsan gänget,",
+      sep: "\n",
+      rest: "Nu är bokningen gjord!",
+      newline: true,
+    });
+  });
+  test("a renamed title keeps the blank lines before it", () => {
+    expect(joinTitle({ ...splitTitle("\n# Gammal\n\nText"), title: "Ny" })).toBe("\n# Ny\n\nText");
   });
   test("a first line of text under a bare title gets a blank line", () => {
     expect(joinTitle({ ...splitTitle("Ringa elbolaget"), rest: "349 kr" })).toBe(

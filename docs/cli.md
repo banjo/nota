@@ -189,6 +189,10 @@ vault). `--dry-run` shows what would happen without writing; `--json` prints the
   (`date created`, `created_at`, Notion's `Created` and `Last edited time`, `modified` …, whose
   keys then go), else from the file's creation and modification times. A `created` or `updated`
   that isn't a date is left as it is, and so is a note whose frontmatter doesn't parse.
+- **Titles are kept.** Obsidian, Logseq and other apps that keep notes as files title a note by
+  its file name; Nota titles it by its first line. A note whose first line says something else (a
+  greeting, a section heading such as `# Setup`) gets its name as a `# heading` on top. A note that
+  starts with its name already, give or take case, punctuation and emoji, is left as it is.
 
 Apple Notes is read through its scripting: macOS asks once whether the terminal (or Nota) may
 control Notes. Each note becomes a note in its folder (the account first when there is more than

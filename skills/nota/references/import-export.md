@@ -46,6 +46,8 @@ What it does to the files:
   text (`[[Plan: Q1]]` becomes `[[Plan Q1|Plan: Q1]]`).
 - Dates become `created` and `updated` (RFC 3339) from other apps' keys (`date created`,
   `created_at`, Notion's `Created`/`Last edited time`, `modified` …) or from the file times.
+- A note whose first line isn't its file name (its title in Obsidian, Logseq …) gets the name as
+  a `# heading` on top, since Nota titles a note by its first line.
 - Apple Notes: each note becomes Markdown in its folder, titled as in Notes, with its images in
   `Attachments/` of the import. Locked notes and "Recently Deleted" are left out; Notes hands out
   images only, so the report flags notes with other attachments. If macOS denies access, the

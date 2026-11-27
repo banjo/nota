@@ -4,6 +4,8 @@ import type { NoteInfo, Tree } from "@nota/client";
 
 /** A note body split into its title line and the rest. */
 export interface TitleParts {
+  /** Blank lines before the title, which the title skips as vault.Title does. */
+  lead: string;
   /** The heading marker of the first line ("# ") or "". */
   prefix: string;
   title: string;
@@ -14,21 +16,23 @@ export interface TitleParts {
   newline: boolean;
 }
 
-/** Splits a body into title (first line) and rest, losslessly. */
+/** Splits a body into title (first non-blank line) and rest, losslessly. */
 export function splitTitle(body: string): TitleParts {
-  const nl = body.indexOf("\n");
-  const first = nl < 0 ? body : body.slice(0, nl);
+  const lead = /^(?:[ \t]*\n)*/.exec(body)![0];
+  const text = body.slice(lead.length);
+  const nl = text.indexOf("\n");
+  const first = nl < 0 ? text : text.slice(0, nl);
   const prefix = /^#{1,6}[ \t]+/.exec(first)?.[0] ?? "";
   const title = first.slice(prefix.length);
-  if (nl < 0) return { prefix, title, sep: "", rest: "", newline: false };
-  const after = body.slice(nl + 1);
+  if (nl < 0) return { lead, prefix, title, sep: "", rest: "", newline: false };
+  const after = text.slice(nl + 1);
   const sep = /^\n*/.exec(after)![0];
-  return { prefix, title, sep, rest: after.slice(sep.length), newline: true };
+  return { lead, prefix, title, sep, rest: after.slice(sep.length), newline: true };
 }
 
 /** The inverse of splitTitle; a first rest under a bare title gets a blank line. */
 export function joinTitle(p: TitleParts): string {
-  const head = p.prefix + p.title;
+  const head = p.lead + p.prefix + p.title;
   if (!p.newline && p.rest === "") return head;
   const sep = !p.newline && p.sep === "" ? "\n" : p.sep;
   return `${head}\n${sep}${p.rest}`;
