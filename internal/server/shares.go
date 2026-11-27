@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/pbkdf2"
@@ -17,6 +18,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -232,10 +234,18 @@ func (s *Server) shareRoutes() {
 	s.route("DELETE /v1/api/vaults/{vault}/shares/{path...}", ro, s.apiDeleteShare)
 	s.mux.HandleFunc("GET /s/{id}", s.public(s.sharePage))
 	s.mux.HandleFunc("POST /s/{id}", s.public(s.shareUnlock))
+	s.mux.HandleFunc("GET /s/{id}/og.png", s.public(s.shareCard))
 	s.mux.HandleFunc("GET /s/{id}/f/{path...}", s.public(s.shareFile))
 }
 
 func (s *Server) shareOut(r *http.Request, sh share) protocol.Share {
+	return protocol.Share{ID: sh.ID, Path: sh.Path, URL: s.baseURL(r) + "/s/" + sh.ID, Password: sh.PasswordHash != "",
+		Theme: sh.Theme, Created: sh.Created, Updated: sh.Updated}
+}
+
+// baseURL is where the server is reached: NOTA_SERVER_PUBLIC_URL, else
+// the request's host.
+func (s *Server) baseURL(r *http.Request) string {
 	base := strings.TrimRight(s.cfg.PublicURL, "/")
 	if base == "" {
 		scheme := "http"
@@ -244,8 +254,7 @@ func (s *Server) shareOut(r *http.Request, sh share) protocol.Share {
 		}
 		base = scheme + "://" + r.Host
 	}
-	return protocol.Share{ID: sh.ID, Path: sh.Path, URL: base + "/s/" + sh.ID, Password: sh.PasswordHash != "",
-		Theme: sh.Theme, Created: sh.Created, Updated: sh.Updated}
+	return base
 }
 
 func (s *Server) apiShares(w http.ResponseWriter, r *http.Request, p Principal) error {
@@ -362,10 +371,93 @@ func (s *Server) unlocked(r *http.Request, sh share) (bool, error) {
 	return hmac.Equal([]byte(c.Value), []byte(want)), nil
 }
 
-func (s *Server) writeLock(w http.ResponseWriter, sh share, status int, msg string) error {
+func (s *Server) writeLock(w http.ResponseWriter, r *http.Request, sh share, status int, msg string) error {
+	card := lockedCard(sh, s.site(r))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	return publish.WriteLock(w, publish.Lock{Theme: sh.Theme, Error: msg, Home: s.cfg.WebURL})
+	return publish.WriteLock(w, publish.Lock{Theme: sh.Theme, Error: msg, Home: s.cfg.WebURL,
+		Meta: s.shareMeta(r, sh, card)})
+}
+
+// The preview of a share's link: its title, the start of the note, and
+// a card drawn of them (GET /s/{id}/og.png). A protected note's preview
+// only says it is protected, since chats fetch it without the password.
+
+const lockedTitle = "Protected note"
+
+func lockedCard(sh share, site string) publish.Card {
+	return publish.Card{Title: lockedTitle, Excerpt: "Open the link and enter the password you were given to read it.",
+		Site: site, Theme: sh.Theme}
+}
+
+func noteCard(sh share, n *nvault.Note, body template.HTML, site string) publish.Card {
+	c := publish.Card{Title: n.Title, Excerpt: publish.Excerpt(body, 220), Site: site, Theme: sh.Theme}
+	if !n.ModTime.IsZero() {
+		c.Footer = "Updated " + n.ModTime.Format("2 January 2006")
+	}
+	return c
+}
+
+// site is the server's host, as the card shows it.
+func (s *Server) site(r *http.Request) string {
+	base := s.baseURL(r)
+	if u, err := url.Parse(base); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return base
+}
+
+// cardTag identifies what a card shows: its ETag, and the version in its
+// URL so chats fetch it again when the note changes.
+func cardTag(c publish.Card) string {
+	b, _ := json.Marshal(c)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:8])
+}
+
+func (s *Server) shareMeta(r *http.Request, sh share, c publish.Card) *publish.Meta {
+	desc := c.Excerpt
+	if desc == "" {
+		desc = "A note shared with Nota."
+	}
+	page := s.baseURL(r) + "/s/" + sh.ID
+	return &publish.Meta{Title: c.Title, Description: desc, URL: page, Image: page + "/og.png?v=" + cardTag(c)}
+}
+
+// shareCard serves the share's card as PNG.
+func (s *Server) shareCard(w http.ResponseWriter, r *http.Request) error {
+	sh, ws, err := s.openShare(r)
+	if err != nil {
+		return err
+	}
+	card := lockedCard(sh, s.site(r))
+	if ok, err := s.unlocked(r, sh); err != nil {
+		return err
+	} else if ok {
+		ws.mu.Lock()
+		n, _, body, err := s.render(r.Context(), ws, sh)
+		ws.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		card = noteCard(sh, n, body, card.Site)
+	}
+	tag := strconv.Quote(cardTag(card))
+	h := w.Header()
+	h.Set("ETag", tag)
+	if r.Header.Get("If-None-Match") == tag {
+		w.WriteHeader(http.StatusNotModified)
+		return nil
+	}
+	var b bytes.Buffer
+	if err := publish.WriteCard(&b, card); err != nil {
+		return err
+	}
+	h.Set("Content-Type", "image/png")
+	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	h.Set("Content-Length", strconv.Itoa(b.Len()))
+	_, err = w.Write(b.Bytes())
+	return err
 }
 
 // shareResolver resolves the links and images of a shared note: notes
@@ -444,7 +536,7 @@ func (s *Server) sharePage(w http.ResponseWriter, r *http.Request) error {
 	if ok, err := s.unlocked(r, sh); err != nil {
 		return err
 	} else if !ok {
-		return s.writeLock(w, sh, http.StatusUnauthorized, "")
+		return s.writeLock(w, r, sh, http.StatusUnauthorized, "")
 	}
 	ws.mu.Lock()
 	n, _, body, err := s.render(r.Context(), ws, sh)
@@ -459,6 +551,7 @@ func (s *Server) sharePage(w http.ResponseWriter, r *http.Request) error {
 		Modified: n.ModTime.Format("2 January 2006"),
 		Theme:    sh.Theme,
 		Home:     s.cfg.WebURL,
+		Meta:     s.shareMeta(r, sh, noteCard(sh, n, body, s.site(r))),
 	})
 }
 
@@ -477,17 +570,17 @@ func (s *Server) shareUnlock(w http.ResponseWriter, r *http.Request) error {
 		if ok, wait := s.shareLimit.allow(s.clientIP(r) + " " + sh.ID); !ok {
 			info(r).attrs = append(info(r).attrs, "rate_limited", true)
 			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
-			return s.writeLock(w, sh, http.StatusTooManyRequests,
+			return s.writeLock(w, r, sh, http.StatusTooManyRequests,
 				fmt.Sprintf("Too many tries. Wait %d seconds and try again.", int(wait.Seconds())+1))
 		}
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := r.ParseForm(); err != nil {
-		return s.writeLock(w, sh, http.StatusBadRequest, "Enter the password.")
+		return s.writeLock(w, r, sh, http.StatusBadRequest, "Enter the password.")
 	}
 	if !checkSharePassword(sh.PasswordHash, r.PostForm.Get("password")) {
 		info(r).attrs = append(info(r).attrs, "share_unlock", false)
-		return s.writeLock(w, sh, http.StatusUnauthorized, "That password isn't right.")
+		return s.writeLock(w, r, sh, http.StatusUnauthorized, "That password isn't right.")
 	}
 	v, err := s.unlockValue(r.Context(), sh)
 	if err != nil {

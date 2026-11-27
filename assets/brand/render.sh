@@ -19,6 +19,12 @@ cp $b/favicon.svg apps/web/public/favicon.svg
 cp $b/favicon.svg apps/landing/public/icon.svg
 rsvg-convert -w 180 -h 180 $b/touch-icon.svg -o apps/landing/public/apple-touch-icon.png
 
+# The lockup of shared notes' link previews (internal/publish/card.go):
+# the mark and the wordmark as separate masks, so they take the theme.
+for f in lockup-mark lockup-word; do
+  rsvg-convert -h 44 internal/publish/card/$f.svg -o internal/publish/card/$f.png
+done
+
 if [ $# -gt 0 ]; then
   out=$1
   mkdir -p "$out"

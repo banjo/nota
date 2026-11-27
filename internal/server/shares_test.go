@@ -108,6 +108,28 @@ func TestShares(t *testing.T) {
 		t.Errorf("headers %v", hdr)
 	}
 
+	// The link's preview: the title, the start of the note and a card.
+	card := e.ts.URL + "/s/" + plan.ID + "/og.png"
+	for _, want := range []string{`<meta property="og:title" content="Plan">`,
+		`<meta name="description" content="Se Mål och Privat. hemlig">`,
+		`<meta property="og:url" content="` + plan.URL + `">`,
+		`<meta property="og:image" content="` + card + `?v=`,
+		`<meta name="twitter:card" content="summary_large_image">`,
+		`<meta name="theme-color" content="#1c1c1e">`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("page: missing %s", want)
+		}
+	}
+	st, png, h := rd.get(card)
+	if st != 200 || h.Get("Content-Type") != "image/png" || !strings.HasPrefix(png, "\x89PNG") || h.Get("ETag") == "" {
+		t.Fatalf("card: %d %v", st, h)
+	}
+	req, _ := http.NewRequest("GET", card, nil)
+	req.Header.Set("If-None-Match", h.Get("ETag"))
+	if res, err := rd.client.Do(req); err != nil || res.StatusCode != 304 {
+		t.Errorf("card again: %v %v", res, err)
+	}
+
 	// A linked note that is shared too becomes a link.
 	var mal protocol.Share
 	b.call("PUT", api+"/shares/Projekt/Mål.md", protocol.ShareRequest{}, &mal)
@@ -158,6 +180,11 @@ func TestShares(t *testing.T) {
 	rd = newReader(t)
 	if st, page, _ := rd.get(plan.URL); st != 401 || !strings.Contains(page, "This note is protected") || strings.Contains(page, "Ny text") {
 		t.Fatalf("locked: %d %s", st, page)
+	} else if !strings.Contains(page, `<meta property="og:title" content="Protected note">`) || strings.Contains(page, "Plan") {
+		t.Errorf("locked preview tells what the note is: %s", page)
+	}
+	if st, _, h := rd.get(plan.URL + "/og.png"); st != 200 || h.Get("Content-Type") != "image/png" {
+		t.Errorf("locked card: %d", st)
 	}
 	if st, _, _ := rd.get(base + "Attachments/bild.png"); st != 404 {
 		t.Errorf("locked image: %d", st)

@@ -233,6 +233,14 @@ system.
 A link survives moves and renames. Deleting the note unshares it, so a
 note made later at the same path is not shown behind the old link.
 
+The page has a description and Open Graph and X card tags, so a link
+pasted in a chat or on a social site shows a preview: the note's title,
+the start of the note, and a 1200×630 card (`GET /s/{id}/og.png`) drawn
+with them in the share's theme. The card's URL has a `?v=` that changes
+with what it shows, so previews follow edits once a site fetches the
+page again. A protected note's preview says only that it is protected,
+since sites fetch it without the password.
+
 With a password, the page asks for it (a form `POST /s/{id}`). The right
 one sets a cookie for that share (30 days, `HttpOnly`) that is only good
 for that password: changing or removing it locks earlier readers out.

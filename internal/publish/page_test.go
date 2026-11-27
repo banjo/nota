@@ -41,6 +41,9 @@ func TestPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := b.String()
+	if strings.Contains(out, "og:") {
+		t.Error("page without Meta has a preview")
+	}
 	for _, want := range []string{`data-mode="dark"`, `--ink:#ff0000;`, `<title>Plan &lt;1&gt;</title>`, `<p>hej</p>`, `href="https://nota.example"`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("page: missing %s", want)
