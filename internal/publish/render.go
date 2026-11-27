@@ -387,6 +387,10 @@ func (t *transformer) image(n *ast.Image, folder string, src []byte) {
 	n.SetAttributeString("loading", []byte("lazy"))
 	if width != "" {
 		n.SetAttributeString("width", []byte(width))
+	} else if p, ok := n.Parent().(*ast.Paragraph); ok && n.PreviousSibling() == nil && n.NextSibling() == nil {
+		// An image alone in its paragraph, at its own size: the page
+		// lets it be wider than the text.
+		p.SetAttributeString("class", []byte("wide"))
 	}
 }
 
