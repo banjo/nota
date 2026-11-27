@@ -260,6 +260,21 @@ footer a:hover {
 .note p > img:only-child {
   display: block;
 }
+/* An image alone on a line may be wider than the text, up to the
+   window: the paragraph is as wide as the image (at least the column),
+   centred on the column, so a narrow one stays in line with the text. */
+.note > p.wide {
+  position: relative;
+  left: 50%;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(960px, 100vw - 40px);
+  transform: translateX(-50%);
+}
+.note > p.wide > img {
+  width: auto;
+  max-width: 100%;
+}
 .note table {
   display: block;
   max-width: 100%;
@@ -496,6 +511,12 @@ details[open] > summary.callout-title::after {
   .top,
   footer {
     display: none;
+  }
+  .note > p.wide {
+    position: static;
+    width: auto;
+    max-width: 100%;
+    transform: none;
   }
   article,
   .document article {

@@ -90,6 +90,22 @@ func TestRender(t *testing.T) {
 	}
 }
 
+func TestRenderWideImage(t *testing.T) {
+	out := string(Render([]byte("![[a.png]]\n\n![[b.png|300]]\n\nText ![[c.png]]\n\n> ![[d.png]]\n"), Options{Resolver: stub{}}))
+	for _, want := range []string{
+		`<p class="wide"><img src="/s/me/f/a.png"`,
+		`<p><img src="/s/me/f/b.png" alt="" loading="lazy" width="300" /></p>`,
+		`<p>Text <img src="/s/me/f/c.png"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %s in %s", want, out)
+		}
+	}
+	if strings.Count(out, `class="wide"`) != 2 {
+		t.Errorf("wide: %s", out)
+	}
+}
+
 func TestRenderNote(t *testing.T) {
 	title, body := RenderNote([]byte("---\na: 1\n---\n# Planen\n\nText.\n"), Options{Path: "P/Plan.md"})
 	if title != "Planen" || strings.Contains(string(body), "Planen") || !strings.Contains(string(body), "<p>Text.</p>") {
