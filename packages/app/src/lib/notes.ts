@@ -96,20 +96,34 @@ export function buildTree(tree: Tree): FolderNode {
   return root;
 }
 
+/**
+ * The attachments folder when it has a row of its own in the sidebar
+ * instead of in the tree: when it holds no notes (a note there keeps it
+ * in the tree, or the note would have nowhere to show).
+ */
+export function attachmentsRow(tree: Tree | undefined): string | undefined {
+  const dir = tree?.attachments;
+  if (!dir) return undefined;
+  return tree.folders.some((f) => f.path === dir && f.notes > 0) ? undefined : dir;
+}
+
 export type TreeRow =
   | { kind: "folder"; node: FolderNode; depth: number; open: boolean }
   | { kind: "note"; note: NoteInfo; depth: number };
 
-/** The visible rows of the tree, depth first; `skip` leaves a top folder out (the inbox). */
+/**
+ * The visible rows of the tree, depth first; `skip` leaves top folders out
+ * (the inbox and the attachments, which have rows of their own).
+ */
 export function flattenTree(
   root: FolderNode,
   isOpen: (path: string) => boolean,
-  skip?: string,
+  ...skip: (string | undefined)[]
 ): TreeRow[] {
   const rows: TreeRow[] = [];
   const walk = (node: FolderNode, depth: number) => {
     for (const f of node.folders) {
-      if (depth === 0 && f.path === skip) continue;
+      if (depth === 0 && skip.includes(f.path)) continue;
       const open = isOpen(f.path);
       rows.push({ kind: "folder", node: f, depth, open });
       if (open) walk(f, depth + 1);

@@ -33,6 +33,29 @@ var imageTypes = map[string]string{
 // extension, or "" for any other file.
 func ImageType(name string) string { return imageTypes[strings.ToLower(path.Ext(name))] }
 
+// AttachmentsFolder returns the vault's attachments folder as it is on
+// disk: AttachmentsDir, or a folder of another case (Obsidian's
+// "attachments") which is the same one. ok is false when there is none
+// yet; the name is AttachmentsDir then.
+func (v *Vault) AttachmentsFolder() (dir string, ok bool) {
+	r, err := v.resolve(AttachmentsDir)
+	if err != nil {
+		return AttachmentsDir, false
+	}
+	dir = AttachmentsDir
+	if !r.exists {
+		if r.collision == "" {
+			return AttachmentsDir, false
+		}
+		dir = r.collision
+	}
+	st, err := v.fs.Stat(dir)
+	if err != nil || !st.IsDir() {
+		return AttachmentsDir, false
+	}
+	return dir, true
+}
+
 // SaveAttachment writes an image to AttachmentsDir under its own name,
 // or with " 2", " 3" … when that is taken, and returns its vault path.
 // Only the base of name is used.
@@ -44,11 +67,7 @@ func (v *Vault) SaveAttachment(name string, data []byte) (string, error) {
 	if ImageType(base) == "" {
 		return "", &PathError{Op: "attach", Path: name, Err: ErrNotImage}
 	}
-	// An "attachments" folder of another case (Obsidian's) is the same one.
-	dir := AttachmentsDir
-	if r, err := v.resolve(dir); err == nil && !r.exists && r.collision != "" {
-		dir = r.collision
-	}
+	dir, _ := v.AttachmentsFolder()
 	p, err := v.FreeName(dir + "/" + base)
 	if err != nil {
 		return "", err

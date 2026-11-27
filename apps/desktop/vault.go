@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/banjo/nota/internal/attachments"
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/events"
 	"github.com/banjo/nota/internal/hooks"
@@ -87,10 +88,13 @@ type TreeFolder struct {
 
 // Tree is every folder and every note of the vault.
 type Tree struct {
-	Inbox   string       `json:"inbox"`
-	Folders []TreeFolder `json:"folders"`
-	Notes   []NoteInfo   `json:"notes"`
-	Cursor  int64        `json:"cursor"`
+	Inbox string `json:"inbox"`
+	// Attachments is the attachments folder as it is in the vault, ""
+	// when there is none: the app lists it on a page of its own.
+	Attachments string       `json:"attachments"`
+	Folders     []TreeFolder `json:"folders"`
+	Notes       []NoteInfo   `json:"notes"`
+	Cursor      int64        `json:"cursor"`
 }
 
 // ListQuery filters a note list. Where holds "key=value" or
@@ -359,7 +363,7 @@ func (s *Vault) Tree() (Tree, error) {
 			}
 		}
 	}
-	out := Tree{Inbox: s.v.Inbox(), Folders: []TreeFolder{}, Notes: noteInfos(es), Cursor: s.changes.seq()}
+	out := Tree{Inbox: s.v.Inbox(), Attachments: attachments.Folder(s.v), Folders: []TreeFolder{}, Notes: noteInfos(es), Cursor: s.changes.seq()}
 	for f, n := range counts {
 		out.Folders = append(out.Folders, TreeFolder{Path: f, Name: path.Base(f), Notes: n})
 	}

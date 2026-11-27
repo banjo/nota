@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/banjo/nota/internal/attachments"
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/plugins"
@@ -58,6 +59,7 @@ func (s *Server) apiRoutes() {
 	s.route("GET /v1/api/vaults/{vault}/trash/{path...}", ro, s.apiTrashNote)
 	s.route("POST /v1/api/vaults/{vault}/trash/restore", ro, s.apiTrashRestore)
 	s.route("GET /v1/api/vaults/{vault}/files/{path...}", ro, s.apiFile)
+	s.route("GET /v1/api/vaults/{vault}/attachments", ro, s.apiAttachments)
 	s.route("POST /v1/api/vaults/{vault}/attachments", ro, s.apiAttach)
 	s.route("GET /v1/api/vaults/{vault}/changes", ro, s.changes)
 	s.route("GET /v1/api/vaults/{vault}/events", ro, s.events)
@@ -228,9 +230,12 @@ type TreeFolder struct {
 
 // Tree is the body of GET …/tree: every folder and every note.
 type Tree struct {
-	Inbox   string       `json:"inbox"`
-	Folders []TreeFolder `json:"folders"`
-	Notes   []NoteInfo   `json:"notes"`
+	Inbox string `json:"inbox"`
+	// Attachments is the attachments folder as it is in the vault, ""
+	// when there is none: the app lists it on a page of its own.
+	Attachments string       `json:"attachments"`
+	Folders     []TreeFolder `json:"folders"`
+	Notes       []NoteInfo   `json:"notes"`
 	// Cursor is the vault's latest version when the tree was read.
 	Cursor int64 `json:"cursor"`
 }
@@ -266,7 +271,10 @@ func (s *Server) apiTree(w http.ResponseWriter, r *http.Request, p Principal) er
 			}
 		}
 	}
-	out := Tree{Inbox: ws.client.Inbox(), Folders: []TreeFolder{}, Notes: noteInfos(es)}
+	ws.mu.Lock()
+	att := attachments.Folder(ws.client)
+	ws.mu.Unlock()
+	out := Tree{Inbox: ws.client.Inbox(), Attachments: att, Folders: []TreeFolder{}, Notes: noteInfos(es)}
 	for f, n := range counts {
 		out.Folders = append(out.Folders, TreeFolder{Path: f, Name: path.Base(f), Notes: n})
 	}
@@ -1121,6 +1129,23 @@ func (s *Server) apiFile(w http.ResponseWriter, r *http.Request, p Principal) er
 	}
 	r.SetPathValue("path", found)
 	return s.getFile(w, r, p)
+}
+
+// apiAttachments is GET …/attachments: the files in the attachments
+// folder with the notes that use each one (attachments.Load).
+func (s *Server) apiAttachments(w http.ResponseWriter, r *http.Request, p Principal) error {
+	ws, err := s.openWS(r, p)
+	if err != nil {
+		return err
+	}
+	ws.mu.Lock()
+	l, err := attachments.Load(ws.client, ws.ix)
+	ws.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusOK, l)
+	return nil
 }
 
 // AttachResult is the answer to POST …/attachments.

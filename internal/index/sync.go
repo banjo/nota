@@ -45,6 +45,7 @@ type doc struct {
 	tags                      []string
 	aliases                   []string
 	links                     []markdown.Link
+	files                     []string
 }
 
 func parseDoc(e vault.Entry, raw []byte) *doc {
@@ -72,6 +73,7 @@ func parseDoc(e vault.Entry, raw []byte) *doc {
 	d.tags = mergeTags(propStrings(d.props["tags"], true), propStrings(d.props["tag"], true), parsed.Tags)
 	d.aliases = append(propStrings(d.props["aliases"], false), propStrings(d.props["alias"], false)...)
 	d.links = parsed.Links
+	d.files = parsed.Files
 	return d
 }
 
@@ -317,7 +319,7 @@ func (ix *Index) Rebuild(v *vault.Vault) (Stats, error) {
 		return Stats{}, err
 	}
 	defer tx.Rollback()
-	for _, t := range []string{"notes", "tags", "properties", "property_values", "aliases", "links", "fts"} {
+	for _, t := range []string{"notes", "tags", "properties", "property_values", "aliases", "links", "files", "fts"} {
 		if _, err := tx.Exec(`DELETE FROM ` + t); err != nil {
 			return Stats{}, fmt.Errorf("index: clear %s: %w", t, err)
 		}
@@ -403,6 +405,7 @@ type writer struct {
 	tx                                      *sql.Tx
 	insert, update, touch                   *sql.Stmt
 	tag, prop, propValue, alias, link, text *sql.Stmt
+	file                                    *sql.Stmt
 	deletes                                 []*sql.Stmt
 	all                                     []*sql.Stmt
 }
@@ -432,6 +435,7 @@ func newWriter(tx *sql.Tx) (*writer, error) {
 		{&w.alias, `INSERT INTO aliases(note_id, alias_key) VALUES (?,?)`},
 		{&w.link, `INSERT INTO links(note_id, target, target_key, heading, alias, embed, wiki) VALUES (?,?,?,?,?,?,?)`},
 		{&w.text, `INSERT INTO fts(rowid, title, body) VALUES (?,?,?)`},
+		{&w.file, `INSERT INTO files(note_id, path) VALUES (?,?)`},
 	}
 	for _, s := range stmts {
 		if err := prep(s.dst, s.q); err != nil {
@@ -439,7 +443,7 @@ func newWriter(tx *sql.Tx) (*writer, error) {
 			return nil, err
 		}
 	}
-	for _, t := range []string{"tags", "properties", "property_values", "aliases", "links"} {
+	for _, t := range []string{"tags", "properties", "property_values", "aliases", "links", "files"} {
 		var s *sql.Stmt
 		if err := prep(&s, `DELETE FROM `+t+` WHERE note_id = ?`); err != nil {
 			w.close()
@@ -538,6 +542,11 @@ func (w *writer) put(id int64, d *doc) error {
 	}
 	for _, l := range d.links {
 		if _, err := w.link.Exec(id, l.Target, pathKey(l.Target), l.Heading, l.Alias, l.Embed, l.Wiki); err != nil {
+			return err
+		}
+	}
+	for _, f := range d.files {
+		if _, err := w.file.Exec(id, f); err != nil {
 			return err
 		}
 	}

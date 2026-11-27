@@ -22,7 +22,7 @@ import (
 
 // SchemaVersion is bumped on every schema change; a database with another
 // version is dropped and rebuilt.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // FileName is the index file inside the vault's .nota directory.
 const FileName = "index.db"
@@ -96,6 +96,13 @@ var schema = []string{
 	)`,
 	`CREATE INDEX links_note ON links(note_id)`,
 	`CREATE INDEX links_target ON links(target_key)`,
+	// Markdown links to files that are not notes, by vault path (links
+	// holds wikilinks and links to notes).
+	`CREATE TABLE files (
+		note_id INTEGER NOT NULL,
+		path    TEXT NOT NULL
+	)`,
+	`CREATE INDEX files_note ON files(note_id)`,
 	`CREATE VIRTUAL TABLE fts USING fts5(title, body, tokenize = 'unicode61 remove_diacritics 0')`,
 }
 

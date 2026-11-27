@@ -39,6 +39,9 @@ type Link struct {
 type Parsed struct {
 	Tags  []string
 	Links []Link
+	// Files are the vault paths of markdown links to local files that
+	// are not notes (![](img.png), [pdf](doc.pdf)), which Links leaves out.
+	Files []string
 }
 
 var (
@@ -65,6 +68,8 @@ func Parse(body []byte, folder string) Parsed {
 	for _, r := range refs(body, src, folder) {
 		if !r.File {
 			p.Links = append(p.Links, r.Link)
+		} else {
+			p.Files = append(p.Files, r.Target)
 		}
 	}
 	return p

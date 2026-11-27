@@ -1,6 +1,7 @@
 import { NotaError, type NotesClient } from "./client.ts";
 import { zip, type ZipEntry } from "./zip.ts";
 import type {
+  AttachmentList,
   AuthApi,
   Base,
   ChangeEvent,
@@ -303,6 +304,7 @@ export function createHttpClient(options: HttpClientOptions): NotesClient {
       return path;
     },
     trash: async () => (await request<{ items: TrashItem[] }>("GET", "/trash")).items,
+    attachments: () => request<AttachmentList>("GET", "/attachments"),
     trashNote: async (id: string) =>
       (await request<{ content: string }>("GET", `/trash/${escapePath(id)}`)).content,
     restoreTrash: async (id: string, folder?: string) =>

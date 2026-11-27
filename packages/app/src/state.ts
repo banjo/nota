@@ -38,6 +38,8 @@ export type Route =
   | { kind: "note"; path: string; via?: "open"; anchor?: string; find?: FindPreset }
   | { kind: "inbox" }
   | { kind: "trash" }
+  /** The files in the attachments folder (images notes show). */
+  | { kind: "attachments" }
   /** Find and replace across notes. */
   | { kind: "replace" }
   /** A Markdown file from outside the vault (desktop), by its opener id. */
