@@ -1,5 +1,15 @@
 # @nota/desktop
 
+## 0.1.6
+
+### Patch Changes
+
+- [#69](https://github.com/banjo/nota/pull/69) [`a28f503`](https://github.com/banjo/nota/commit/a28f50385d09147c7ac5f41702b4782ee92fb834) - The attachments folder has its own row in the sidebar, opening a page of its images with the notes that use each one, so unused ones are easy to spot.
+
+- [#71](https://github.com/banjo/nota/pull/71) [`bd8ea78`](https://github.com/banjo/nota/commit/bd8ea78437ac832ada479e289d179d8ab6b9f00b) - Shared notes get a link preview: chats and social sites show the note's title, the start of the note and a card drawn in the note's theme. A protected note's preview only says that it is protected.
+
+- [#72](https://github.com/banjo/nota/pull/72) [`47b596f`](https://github.com/banjo/nota/commit/47b596f2dfa181e666942d16d42aaabd51b840a0) - On a shared note's page, an image alone on its line may be wider than the text (up to 960 px), so screenshots are readable. Images narrower than the text, and images with a width set, stay as they are.
+
 ## 0.1.5
 
 ### Patch Changes
