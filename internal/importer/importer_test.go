@@ -127,7 +127,7 @@ func TestImport(t *testing.T) {
 		t.Errorf("Möte.md links:\n%s", mote)
 	}
 	stamp := mod.Format(time.RFC3339)
-	if bad := read(t, v, "Obsidian/Bad name.md"); bad != "---\ncreated: "+stamp+"\nupdated: "+stamp+"\n---\nNo frontmatter.\n" {
+	if bad := read(t, v, "Obsidian/Bad name.md"); bad != "---\ncreated: "+stamp+"\nupdated: "+stamp+"\n---\n# Bad: name?\n\nNo frontmatter.\n" {
 		t.Errorf("Bad name.md:\n%s", bad)
 	}
 	if c := read(t, v, "Obsidian/Notes/created.md"); !strings.Contains(c, "created: tomorrow") || !strings.Contains(c, "updated: "+stamp) {
@@ -237,5 +237,23 @@ func TestFromFSLogseq(t *testing.T) {
 	}), false)
 	if err != nil || len(files) != 2 {
 		t.Fatalf("%v %+v", err, files)
+	}
+}
+
+func TestTitleHeading(t *testing.T) {
+	for _, c := range []struct{ name, in, want string }{
+		{"Egypten 2025", "\nHejsan gänget,\n\nText\n", "# Egypten 2025\n\nHejsan gänget,\n\nText\n"},
+		{"CSS", "---\ntags: [a]\n---\n# Reset\n", "---\ntags: [a]\n---\n# CSS\n\n# Reset\n"},
+		{"Plan", "# Plan\n\nText", "# Plan\n\nText"},
+		{"Plan", "\nplan:\nText", "\nplan:\nText"},
+		{"Spanien 2026 - Fuengirola", "# Spanien 2026 – Fuengirola 🇪🇸\n", "# Spanien 2026 – Fuengirola 🇪🇸\n"},
+		{"Guide", "# **Guide**\n", "# **Guide**\n"},
+		{"Tom", "---\ncreated: x\n---\n\n", "---\ncreated: x\n---\n\n"},
+		{"Kod", "\n    indented code\n", "# Kod\n\n    indented code\n"},
+		{"Win", "Hej\r\nText\r\n", "# Win\r\n\r\nHej\r\nText\r\n"},
+	} {
+		if got := string(titleHeading([]byte(c.in), c.name)); got != c.want {
+			t.Errorf("titleHeading(%q, %q) = %q, want %q", c.in, c.name, got, c.want)
+		}
 	}
 }
