@@ -225,5 +225,7 @@ func (v *Vault) RenameFolder(from, to string) (string, error) {
 			_ = v.fs.Remove(r.disk)
 		}
 	}
+	// The icons follow; the folder has moved even when they can't.
+	_ = v.moveFolderIcons(from, to)
 	return to, nil
 }

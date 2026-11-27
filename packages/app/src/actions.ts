@@ -1,4 +1,5 @@
 import {
+  type IconColor,
   type LinksUpdated,
   type NotesClient,
   NotaError,
@@ -7,10 +8,12 @@ import {
   type ReplaceQuery,
   type ReplaceResult,
   type Tree,
+  type ViewInfo,
 } from "@nota/client";
 import { toast } from "@nota/ui/sonner";
 import type { QueryClient } from "@tanstack/react-query";
 import { rememberFolder } from "./lib/folders.ts";
+import { type IconTarget, withLook } from "./lib/icons.ts";
 import {
   folderLabel,
   folderOf,
@@ -165,6 +168,43 @@ export async function renameFolder(
   } catch (e) {
     if (inline) inline.onError(message(e));
     else fail("Couldn't rename the folder", e);
+    return undefined;
+  }
+}
+
+/**
+ * Gives a folder or a saved view an icon and a colour; neither removes
+ * them. The row changes at once, before the change event's refetch.
+ */
+export async function setIcon(
+  client: NotesClient,
+  qc: QueryClient,
+  target: IconTarget,
+  icon?: string,
+  color?: IconColor,
+) {
+  try {
+    if (target.kind === "folder") {
+      const look = await client.setFolderIcon!(target.path, icon, color);
+      qc.setQueryData<Tree>(
+        keys.tree,
+        (t) =>
+          t && {
+            ...t,
+            folders: t.folders.map((f) => (f.path === target.path ? withLook(f, look) : f)),
+          },
+      );
+      void qc.invalidateQueries({ queryKey: keys.tree });
+      return look;
+    }
+    const look = await client.setViewIcon!(target.id, icon, color);
+    qc.setQueryData<ViewInfo[]>(keys.views, (vs) =>
+      vs?.map((v) => (v.id === target.id ? withLook(v, look) : v)),
+    );
+    void qc.invalidateQueries({ queryKey: keys.views });
+    return look;
+  } catch (e) {
+    fail("Couldn't change the icon", e);
     return undefined;
   }
 }

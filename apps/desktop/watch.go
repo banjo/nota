@@ -79,19 +79,20 @@ func (c *notifier) seq() int64 {
 	return c.n
 }
 
-// viewsDir holds the saved views and pluginsDir the plugins, the parts
-// of .nota/ the UI shows.
+// viewsDir holds the saved views, pluginsDir the plugins and folderIcons
+// the folders' icons: the parts of .nota/ the UI shows.
 const (
-	viewsDir   = vault.MetaDirName + "/views"
-	pluginsDir = plugins.Dir
+	viewsDir    = vault.MetaDirName + "/views"
+	pluginsDir  = plugins.Dir
+	folderIcons = vault.FolderIconsFile
 )
 
 // under reports whether p is dir or inside it.
 func under(p, dir string) bool { return p == dir || strings.HasPrefix(p, dir+"/") }
 
 // watchIgnored leaves out what never shows in the UI: .git, the trash,
-// and .nota/ apart from the views and plugins (the index and sync state
-// change on every write).
+// and .nota/ apart from the views, plugins and folder icons (the index
+// and sync state change on every write).
 func watchIgnored(p string, isDir bool) bool {
 	switch base := path.Base(p); {
 	case isDir && (base == ".git" || base == ".trash" || base == ".obsidian" || base == "node_modules"):
@@ -99,7 +100,7 @@ func watchIgnored(p string, isDir bool) bool {
 	case p == vault.MetaDirName:
 		return false
 	case strings.HasPrefix(p, vault.MetaDirName+"/"):
-		return !under(p, viewsDir) && !under(p, pluginsDir)
+		return !under(p, viewsDir) && !under(p, pluginsDir) && p != folderIcons
 	}
 	return false
 }
@@ -140,6 +141,8 @@ func (s *Vault) applyFileEvents(evs []mygo.FileEvent) {
 				views = true
 			case under(p, pluginsDir):
 				plugs = true
+			case p == folderIcons:
+				dirs = append(dirs, folderIcons)
 			case vault.IsNote(p):
 				paths = append(paths, vault.NFC(p))
 			case e.IsDir && p != ".":

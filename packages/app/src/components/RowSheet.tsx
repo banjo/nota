@@ -10,12 +10,13 @@ import { type MenuTarget, useRowActions } from "./RowMenu.tsx";
 // sheet for a note or a folder, opened by a row's "…" under a finger, a
 // long press on a row, or the note page's "…" on a phone. Every action
 // in it is also a ⌘K command (note.addToFolder, note.delete,
-// note.newInFolder, note.rename, folder.rename, folder.add, view.mode.*),
+// note.newInFolder, note.rename, folder.rename, folder.icon, folder.add, view.mode.*),
 // and the list comes from RowMenu, which the right-click menu uses too.
 
 export type RowTarget =
   | { kind: "note"; path: string; title: string; page?: boolean }
   | { kind: "folder"; path: string; name: string }
+  | { kind: "view"; id: string; name: string }
   | { kind: "empty" };
 
 export const useRowSheet = create<{ target: RowTarget | null }>(() => ({ target: null }));
@@ -71,7 +72,11 @@ export function RowSheet() {
       {t ? (
         <SheetContent
           title={
-            t.kind === "note" ? t.title || "Untitled" : t.kind === "folder" ? t.name : "Folders"
+            t.kind === "note"
+              ? t.title || "Untitled"
+              : t.kind === "folder" || t.kind === "view"
+                ? t.name
+                : "Folders"
           }
           onOpenAutoFocus={(e) => {
             acted.current = false;

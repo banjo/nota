@@ -19,3 +19,4 @@ export {
 } from "./http.ts";
 export { createMygoClient, type MygoBindings, type MygoEvent } from "./mygo.ts";
 export type * from "./types.ts";
+export { ICON_COLORS, ICON_SETS } from "./types.ts";

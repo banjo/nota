@@ -172,7 +172,7 @@ Every command prints JSON with --json.`,
 
 	root.AddCommand(
 		a.addCmd(), a.lsCmd(), a.searchCmd(), a.catCmd(), a.openCmd(), a.mvCmd(), a.folderCmd(),
-		a.rmCmd(), a.tagCmd(), a.setCmd(), a.pinCmd(), a.unpinCmd(), a.replaceCmd(), a.exportCmd(), a.importCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(), a.pluginsCmd(),
+		a.rmCmd(), a.tagCmd(), a.setCmd(), a.pinCmd(), a.unpinCmd(), a.replaceCmd(), a.exportCmd(), a.importCmd(), a.inboxCmd(), a.indexCmd(), a.viewsCmd(), a.iconsCmd(), a.pluginsCmd(),
 		a.backlinksCmd(), a.tagsCmd(), a.mcpCmd(), a.hooksCmd(), a.serveCmd(),
 		a.syncCmd(), a.remoteCmd(), a.loginCmd(), a.logoutCmd(), a.devicesCmd(),
 		a.historyCmd(), a.restoreCmd(), a.trashCmd(), a.settingsCmd(),
@@ -356,6 +356,15 @@ func (a *app) completeNotes(_ *cobra.Command, args []string, prefix string) ([]s
 func exactArgs(n int, names string) cobra.PositionalArgs {
 	return func(_ *cobra.Command, args []string) error {
 		if len(args) != n {
+			return usageErr("expected %s, got %d argument(s)", names, len(args))
+		}
+		return nil
+	}
+}
+
+func rangeArgs(lo, hi int, names string) cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		if len(args) < lo || len(args) > hi {
 			return usageErr("expected %s, got %d argument(s)", names, len(args))
 		}
 		return nil

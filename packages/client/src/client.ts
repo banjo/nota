@@ -30,6 +30,10 @@ import type {
   VaultInfo,
   ViewInfo,
   WriteResult,
+  IconColor,
+  IconLook,
+  IconMatch,
+  IconSet,
 } from "./types.ts";
 
 /**
@@ -71,6 +75,20 @@ export interface NotesClient {
   renameFolder(path: string, to: string): Promise<MoveResult>;
   /** Gives a note a new path. */
   rename(path: string, to: string): Promise<MoveResult>;
+  /**
+   * Gives a folder an icon and a colour (.nota/folders.yaml); both absent
+   * removes them. Resolves to what the folder has now. Rejects for an
+   * icon or colour Nota doesn't have, and a folder that isn't there.
+   * Absent for files outside a vault.
+   */
+  setFolderIcon?(path: string, icon?: string, color?: IconColor): Promise<IconLook>;
+  /** The same for a saved view: its file's `icon` and `color`. */
+  setViewIcon?(id: string, icon?: string, color?: IconColor): Promise<IconLook>;
+  /**
+   * Icons whose name has every word of query, best first, from every set
+   * or one. An empty query (and no set) gives a selection of common ones.
+   */
+  searchIcons?(query: string, set?: IconSet): Promise<IconMatch[]>;
   /** Moves a note to the trash; resolves to its id there, for restoreTrash. */
   remove(path: string): Promise<string>;
   /** The deleted notes, most recently deleted first. */

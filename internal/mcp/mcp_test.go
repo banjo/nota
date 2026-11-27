@@ -124,7 +124,7 @@ func TestTools(t *testing.T) {
 	}
 	slices.Sort(names)
 	want := []string{"append_to_note", "create_folder", "create_note", "get_backlinks", "list_folders", "list_notes", "list_tags", "list_trash", "list_views",
-		"move_note", "read_note", "replace_in_notes", "restore_note", "search_notes", "update_frontmatter", "update_note"}
+		"move_note", "read_note", "replace_in_notes", "restore_note", "search_icons", "search_notes", "set_folder_icon", "update_frontmatter", "update_note"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools %q, want %q", names, want)
 	}
@@ -247,6 +247,20 @@ func TestTools(t *testing.T) {
 	}
 	if msg := toolError(t, cs, "create_folder", map[string]any{"path": ".nota/x"}); !strings.Contains(msg, "hidden") {
 		t.Fatalf("create_folder hidden: %q", msg)
+	}
+
+	var io IconsOutput
+	call(t, cs, "search_icons", map[string]any{"query": "briefcase", "set": "lucide", "limit": 1}, &io)
+	if len(io.Icons) != 1 || io.Icons[0].ID != "lucide:briefcase" {
+		t.Fatalf("search_icons %+v", io)
+	}
+	var fio FolderIconOutput
+	call(t, cs, "set_folder_icon", map[string]any{"path": "Arkiv", "icon": io.Icons[0].ID, "color": "blue"}, &fio)
+	if fio.Path != "Arkiv" || fio.Icon != "lucide:briefcase" || fio.Color != "blue" {
+		t.Fatalf("set_folder_icon %+v", fio)
+	}
+	if msg := toolError(t, cs, "set_folder_icon", map[string]any{"path": "Arkiv", "icon": "lucide:nope"}); !strings.Contains(msg, "no icon") {
+		t.Fatalf("set_folder_icon unknown: %q", msg)
 	}
 	var fl FoldersOutput
 	call(t, cs, "list_folders", nil, &fl)

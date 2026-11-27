@@ -190,6 +190,27 @@ export interface HistoryEntry {
 }
 
 /**
+ * IconLook is how a folder or view is drawn: its icon and colour, and
+ * the icon as an <svg> (empty for an emoji).
+ */
+export interface IconLook {
+  icon?: string;
+  color?: string;
+  svg?: string;
+}
+
+/**
+ * IconMatch is an icon search found: its id ("lucide:house" or an
+ * emoji), set, name and SVG (empty for an emoji).
+ */
+export interface IconMatch {
+  id: string;
+  set: string;
+  name: string;
+  svg?: string;
+}
+
+/**
  * ImportSupport says what this system can import from besides folders
  * and zips.
  */
@@ -640,6 +661,13 @@ export interface TreeFolder {
   path: string;
   name: string;
   notes: number;
+  /**
+   * Icon, Color and SVG are its look (.nota/folders.yaml): the icon
+   * and colour as stored, and the icon drawn, empty for an emoji.
+   */
+  icon?: string;
+  color?: string;
+  svg?: string;
 }
 
 /** VaultInfo describes the open vault. */
@@ -661,7 +689,10 @@ export interface VaultResult {
 export interface ViewInfo {
   id: string;
   name: string;
+  /** Icon is as written in the file; Color and SVG as in TreeFolder. */
   icon?: string;
+  color?: string;
+  svg?: string;
   where?: Record<string, unknown>;
   tag?: string;
   folder?: string;
@@ -809,6 +840,18 @@ export const Vault = {
    * words must match, the last one as a prefix.
    */
   search: bind<[string, ListQuery], NoteInfo[]>("Vault.Search", (q: string, filter: ListQuery) => [q, filter]),
+  /**
+   * SearchIcons finds icons whose name has every word of q, best first, in
+   * one set ("lucide", "tabler", "emoji", "simple-icons") or all ("").
+   */
+  searchIcons: bind<[string, string], IconMatch[]>("Vault.SearchIcons", (q: string, set: string) => [q, set]),
+  /**
+   * SetFolderIcon gives a folder an icon and a colour (.nota/folders.yaml);
+   * both empty take them away.
+   */
+  setFolderIcon: bind<[string, string, string], IconLook>("Vault.SetFolderIcon", (path: string, icon: string, color: string) => [path, icon, color]),
+  /** SetViewIcon writes a saved view's icon and colour into its file. */
+  setViewIcon: bind<[string, string, string], IconLook>("Vault.SetViewIcon", (id: string, icon: string, color: string) => [id, icon, color]),
   /**
    * Share shares a note as a page of the sync server, or changes its
    * share (protocol.ShareRequest), and returns the link.

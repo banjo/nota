@@ -21,27 +21,28 @@ machines.
    `go install github.com/banjo/nota/cmd/nota@latest`. To connect MCP, see
    [references/mcp.md](references/mcp.md).
 
-| Task                 | MCP tool                                  | CLI                                              |
-| -------------------- | ----------------------------------------- | ------------------------------------------------ |
-| Find by content      | `search_notes`                            | `nota search <query> --json`                     |
-| Read                 | `read_note`                               | `nota cat <note> --json`                         |
-| List / filter        | `list_notes`                              | `nota ls --folder/--tag/--where/--view/--pinned` |
-| Unsorted notes       | `list_notes` with `folder: "Inbox"`       | `nota inbox --json`                              |
-| Create               | `create_note`                             | `nota add` (body on stdin with `-`)              |
-| Add to the end       | `append_to_note`                          | edit the file (see cli.md)                       |
-| Rewrite the body     | `update_note` with `expected_hash`        | edit the file (see cli.md)                       |
-| Replace across notes | `replace_in_notes` (dry run first)        | `nota replace <find> <with> --dry-run`           |
-| Properties           | `update_frontmatter`                      | `nota set <note> k=v --unset k`                  |
-| Tags                 | `update_frontmatter` (`tags` list)        | `nota tag <note> +a -b`                          |
-| Pin to the sidebar   | `update_frontmatter` (`pinned: true`)     | `nota pin <note>`, `nota unpin <note>`           |
-| File into a folder   | `move_note`                               | `nota mv <note> <folder>`                        |
-| Folders, tags, views | `list_folders`, `list_tags`, `list_views` | `nota folder ls`, `nota tags`, `nota views`      |
-| Who links here       | `get_backlinks`                           | `nota backlinks <note>`                          |
-| Add an image         | none                                      | copy into `Attachments/`, embed `![[name.png]]`  |
-| Export / import      | none                                      | `nota export`, `nota import` (dry run first)     |
-| Show the user a note | none                                      | `nota open --app <note or file.md>`              |
-| Delete               | none: ask the user                        | `nota rm <note>` (moves it to `.trash/`)         |
-| Undo a delete        | `list_trash`, then `restore_note`         | `nota trash ls`, `nota trash restore <note>`     |
+| Task                 | MCP tool                                  | CLI                                               |
+| -------------------- | ----------------------------------------- | ------------------------------------------------- |
+| Find by content      | `search_notes`                            | `nota search <query> --json`                      |
+| Read                 | `read_note`                               | `nota cat <note> --json`                          |
+| List / filter        | `list_notes`                              | `nota ls --folder/--tag/--where/--view/--pinned`  |
+| Unsorted notes       | `list_notes` with `folder: "Inbox"`       | `nota inbox --json`                               |
+| Create               | `create_note`                             | `nota add` (body on stdin with `-`)               |
+| Add to the end       | `append_to_note`                          | edit the file (see cli.md)                        |
+| Rewrite the body     | `update_note` with `expected_hash`        | edit the file (see cli.md)                        |
+| Replace across notes | `replace_in_notes` (dry run first)        | `nota replace <find> <with> --dry-run`            |
+| Properties           | `update_frontmatter`                      | `nota set <note> k=v --unset k`                   |
+| Tags                 | `update_frontmatter` (`tags` list)        | `nota tag <note> +a -b`                           |
+| Pin to the sidebar   | `update_frontmatter` (`pinned: true`)     | `nota pin <note>`, `nota unpin <note>`            |
+| File into a folder   | `move_note`                               | `nota mv <note> <folder>`                         |
+| Folders, tags, views | `list_folders`, `list_tags`, `list_views` | `nota folder ls`, `nota tags`, `nota views`       |
+| Folder icons         | `search_icons`, `set_folder_icon`         | `nota icons <words>`, `nota folder icon <f> <id>` |
+| Who links here       | `get_backlinks`                           | `nota backlinks <note>`                           |
+| Add an image         | none                                      | copy into `Attachments/`, embed `![[name.png]]`   |
+| Export / import      | none                                      | `nota export`, `nota import` (dry run first)      |
+| Show the user a note | none                                      | `nota open --app <note or file.md>`               |
+| Delete               | none: ask the user                        | `nota rm <note>` (moves it to `.trash/`)          |
+| Undo a delete        | `list_trash`, then `restore_note`         | `nota trash ls`, `nota trash restore <note>`      |
 
 ## The model
 
@@ -91,7 +92,8 @@ Read the reference that matches the task:
   Logseq: [references/import-export.md](references/import-export.md).
 - The user's app settings (`settings.toml`, theme, note mode):
   [references/settings.md](references/settings.md).
-- Saved views (`.nota/views/*.yaml`) and hooks that run scripts on note events
+- Saved views (`.nota/views/*.yaml`), folder icons (`.nota/folders.yaml`) and hooks that run
+  scripts on note events
   (`.nota/hooks.toml`): [references/views-and-hooks.md](references/views-and-hooks.md).
 - Colour themes as vault plugins (`.nota/plugins/<id>/manifest.json`):
   [references/themes.md](references/themes.md).

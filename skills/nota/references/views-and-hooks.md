@@ -11,7 +11,8 @@ CLI and `list_notes` with `view` over MCP. The id is the file name.
 ```yaml
 # .nota/views/drafts.yaml
 name: Drafts # required
-icon: pen
+icon: lucide:pen-line # as for folder icons, below
+color: blue
 where: { status: draft } # frontmatter values; case-insensitive, list items match
 tag: projects # nested tags included
 folder: Projects
@@ -21,6 +22,18 @@ limit: 50
 
 Every field except `name` is optional. Check it with `nota views --json` (each view with its
 note count) and `nota ls --view drafts --json`.
+
+## Folder icons
+
+A folder's icon in the sidebar, and its colour, are in `.nota/folders.yaml` by folder path. Set
+them with `nota folder icon <folder> <icon> [--color <colour>]` (`--remove` to clear) or
+`set_folder_icon`, not by hand: they check the icon and keep the file sorted.
+
+- Icon: `<set>:<name>` from `lucide`, `tabler` or `simple-icons` (brand logos), or an emoji. A bare
+  name is Lucide's. Find one with `nota icons <words> --json` or `search_icons`.
+- Colour: `accent`, `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink`, `gray`; the app
+  draws each from the theme.
+- Renaming a folder with Nota carries its icon along; `mv` in a shell does not.
 
 ## Hooks
 

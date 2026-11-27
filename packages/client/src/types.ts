@@ -116,7 +116,57 @@ export interface Base {
   hash: string;
 }
 
-export interface TreeFolder {
+/**
+ * The colours a folder or view icon can have; the app draws each from the
+ * theme (`--icon-<colour>`, accent is `--ink`). Absent is the text's colour.
+ */
+export const ICON_COLORS = [
+  "accent",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "purple",
+  "pink",
+  "gray",
+] as const;
+export type IconColor = (typeof ICON_COLORS)[number];
+
+/** The icon sets the icon picker searches, in their order. */
+export const ICON_SETS = [
+  { prefix: "lucide", name: "Lucide" },
+  { prefix: "tabler", name: "Tabler" },
+  { prefix: "emoji", name: "Emoji" },
+  { prefix: "simple-icons", name: "Simple Icons" },
+] as const;
+export type IconSet = (typeof ICON_SETS)[number]["prefix"];
+
+/** One icon from searchIcons. */
+export interface IconMatch {
+  /** What a folder or view stores: "lucide:house", or an emoji ("🏠"). */
+  id: string;
+  /** One of ICON_SETS' prefixes. */
+  set: string;
+  /** The icon's name ("house") or the emoji's ("house with garden"). */
+  name: string;
+  /** The icon as an <svg> in currentColor, 1em square; absent for an emoji. */
+  svg?: string;
+}
+
+/**
+ * How a folder or a view looks: an icon (an id as in IconMatch) and its
+ * colour. `svg` is the icon drawn, absent for an emoji (`icon` is the
+ * emoji then) and when there is no icon.
+ */
+export interface IconLook {
+  icon?: string;
+  /** One of ICON_COLORS; a colour this app doesn't know is drawn as none. */
+  color?: string;
+  svg?: string;
+}
+
+export interface TreeFolder extends IconLook {
   path: string;
   name: string;
   /** Notes in the folder, subfolders included. */
@@ -154,11 +204,13 @@ export interface TagCount {
   count: number;
 }
 
-/** A saved view from .nota/views/*.yaml (a virtual folder). */
-export interface ViewInfo {
+/**
+ * A saved view from .nota/views/*.yaml (a virtual folder). `icon` is as
+ * written in the file; `svg` draws it (IconLook).
+ */
+export interface ViewInfo extends IconLook {
   id: string;
   name: string;
-  icon?: string;
   where?: Properties;
   tag?: string;
   folder?: string;

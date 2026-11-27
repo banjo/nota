@@ -20,6 +20,7 @@ import (
 
 	"github.com/banjo/nota/internal/edit"
 	"github.com/banjo/nota/internal/frontmatter"
+	"github.com/banjo/nota/internal/icons"
 	"github.com/banjo/nota/internal/index"
 	"github.com/banjo/nota/internal/markdown"
 	"github.com/banjo/nota/internal/plugins"
@@ -608,7 +609,144 @@ nota folder rename Work Archive/2026 to move it as well.`,
 		},
 	}
 	rename.Flags().BoolVar(&keepLinks, "no-update-links", false, "leave links into the folder as they are")
-	cmd.AddCommand(add, ls, rename)
+	cmd.AddCommand(add, ls, rename, a.folderIconCmd())
+	return cmd
+}
+
+// folderIconOutput is the JSON of nota folder icon.
+type folderIconOutput struct {
+	Path  string `json:"path"`
+	Icon  string `json:"icon,omitempty"`
+	Color string `json:"color,omitempty"`
+}
+
+func (a *app) folderIconCmd() *cobra.Command {
+	var color string
+	var remove bool
+	cmd := &cobra.Command{
+		Use:   "icon <folder> [icon]",
+		Short: "Show, set or remove a folder's icon and colour",
+		Long: `Give a folder an icon in the sidebar, and a colour for it. The icon is
+"<set>:<name>" from Lucide, Tabler or Simple Icons (lucide:briefcase,
+tabler:home, simple-icons:github; a bare name is Lucide's), or an emoji.
+Find one with "nota icons <words>". The colour is one of ` + strings.Join(icons.Colors, ", ") + `;
+the app draws it from the theme. --color alone colours the folder's
+own icon. The icons are kept in .nota/folders.yaml, which syncs, and
+follow a folder that is renamed. Without an icon or a flag it prints
+what the folder has.`,
+		Example: `  nota folder icon Work lucide:briefcase --color blue
+  nota folder icon Personal 🏠
+  nota folder icon Work --remove`,
+		Args: rangeArgs(1, 2, "a folder and an icon"),
+		RunE: func(c *cobra.Command, args []string) error {
+			if err := a.openVault(false); err != nil {
+				return err
+			}
+			folder, err := vault.CleanPath(args[0])
+			if err != nil {
+				return err
+			}
+			all, err := a.vault.FolderIcons()
+			if err != nil {
+				return err
+			}
+			fi := all[folder]
+			switch {
+			case remove:
+				if len(args) > 1 || c.Flags().Changed("color") {
+					return usageErr("--remove takes no icon or colour")
+				}
+				fi = vault.FolderIcon{}
+			case len(args) > 1 || c.Flags().Changed("color"):
+				if len(args) > 1 {
+					fi.Icon = args[1]
+				}
+				if c.Flags().Changed("color") {
+					fi.Color = color
+				}
+			default:
+				dirs, err := a.vault.Folders()
+				if err != nil {
+					return err
+				}
+				if !slices.Contains(dirs, folder) {
+					return &vault.PathError{Op: "icon", Path: folder, Err: vault.ErrNotFound}
+				}
+				return a.printFolderIcon(folder, fi)
+			}
+			if folder, err = a.vault.SetFolderIcon(folder, fi); err != nil {
+				return err
+			}
+			all, err = a.vault.FolderIcons()
+			if err != nil {
+				return err
+			}
+			return a.printFolderIcon(folder, all[folder])
+		},
+	}
+	cmd.Flags().StringVar(&color, "color", "", "the icon's colour: "+strings.Join(icons.Colors, ", ")+`, or "" for none`)
+	cmd.Flags().BoolVar(&remove, "remove", false, "take the icon and colour away")
+	return cmd
+}
+
+func (a *app) printFolderIcon(folder string, fi vault.FolderIcon) error {
+	if a.json {
+		return a.printJSON(folderIconOutput{Path: folder, Icon: fi.Icon, Color: fi.Color})
+	}
+	if fi == (vault.FolderIcon{}) {
+		fmt.Fprintf(a.stdout, "%s\tno icon\n", folder)
+		return nil
+	}
+	return table(a.stdout, [][]string{{folder, fi.Icon, fi.Color}})
+}
+
+func (a *app) iconsCmd() *cobra.Command {
+	var set string
+	var limit int
+	cmd := &cobra.Command{
+		Use:   "icons [words...]",
+		Short: "Find icons for folders and views",
+		Long: `List the icons whose name has every word given, best match first: Lucide,
+Tabler, emoji and Simple Icons (brand logos). Without words it lists a
+selection of common ones. The first column is what "nota folder icon"
+and a view's icon: take.`,
+		Example: `  nota icons house
+  nota icons --set simple-icons github
+  nota icons --json arrow down`,
+		RunE: func(_ *cobra.Command, args []string) error {
+			if set != "" && !slices.ContainsFunc(icons.Sets, func(s icons.Set) bool { return s.Prefix == set }) {
+				var names []string
+				for _, s := range icons.Sets {
+					names = append(names, s.Prefix)
+				}
+				return usageErr("--set %q: want one of %s", set, strings.Join(names, ", "))
+			}
+			found, err := icons.Search(strings.Join(args, " "), set, limit)
+			if err != nil {
+				return err
+			}
+			a.attrs = append(a.attrs, "icons", len(found))
+			if a.json {
+				type out struct {
+					ID   string `json:"id"`
+					Set  string `json:"set"`
+					Name string `json:"name"`
+				}
+				res := make([]out, len(found))
+				for i, ic := range found {
+					res[i] = out{ic.ID, ic.Set, ic.Name}
+				}
+				return a.printJSON(res)
+			}
+			rows := make([][]string, len(found))
+			for i, ic := range found {
+				rows[i] = []string{ic.ID, ic.Name}
+			}
+			return table(a.stdout, rows)
+		},
+	}
+	cmd.Flags().StringVar(&set, "set", "", "search one set: lucide, tabler, emoji or simple-icons")
+	cmd.Flags().IntVar(&limit, "limit", 40, "show at most this many")
 	return cmd
 }
 

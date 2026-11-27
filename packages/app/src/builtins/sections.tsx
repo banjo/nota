@@ -13,6 +13,10 @@ import {
   Star,
 } from "lucide-react";
 import { FolderTree } from "../components/FolderTree.tsx";
+import { IconGlyph } from "../components/IconGlyph.tsx";
+import { openRowSheet } from "../components/RowSheet.tsx";
+import { lookOf } from "../lib/icons.ts";
+import { useLongPress } from "../lib/longPress.ts";
 import { attachmentsRow } from "../lib/notes.ts";
 import { useClient } from "../context.ts";
 import { FoldersHeaderActions } from "../components/FoldersHeader.tsx";
@@ -119,12 +123,27 @@ function ViewRow({ view }: { view: ViewInfo }) {
   );
   const navigate = useUI((s) => s.navigate);
   const notes = useList({ view: view.id }, open);
+  // Without an svg (an older backend, or a name it doesn't know): the
+  // names views have always had.
   const Icon = VIEW_ICONS[view.icon ?? ""] ?? Layers;
+  // The view's only row action is its icon (RowMenu).
+  const menu = !!useClient().setViewIcon;
+  const longPress = useLongPress(() =>
+    openRowSheet({ kind: "view", id: view.id, name: view.name }),
+  );
   return (
     <>
       <Row
+        {...(menu
+          ? {
+              "data-ctx-kind": "view",
+              "data-ctx-path": view.id,
+              "data-ctx-title": view.name,
+              ...longPress,
+            }
+          : {})}
         chevron={open}
-        icon={<Icon strokeWidth={1.75} />}
+        icon={<IconGlyph look={lookOf(view)} fallback={<Icon strokeWidth={1.75} />} />}
         label={view.name}
         count={view.count}
         active={active}

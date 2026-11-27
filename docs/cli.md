@@ -24,6 +24,8 @@ nota replace "Anna S" "Anna B" --dry-run      # Every match, as [-old-]{+new+}; 
 nota folder add Projects/Ideas                  # Empty folders, nested paths too.
 nota folder ls                                 # Every folder with its note count.
 nota folder rename Projects Work                # Moves every note in it; path links follow.
+nota folder icon Work lucide:briefcase --color blue  # The folder's icon in the sidebar.
+nota icons house                               # Find an icon: Lucide, Tabler, emoji, Simple Icons.
 nota inbox
 nota ls --view drafts                          # .nota/views/drafts.yaml
 nota plugins                                   # .nota/plugins: themes, or why one is broken
@@ -115,6 +117,34 @@ pointing at the same note:
 
 `--no-update-links` turns this off for one command. Without it, the command says on stderr how
 many links changed, and `--json` lists them under `links`.
+
+## Folder icons
+
+`nota folder icon <folder> <icon> [--color <colour>]` gives a folder an icon in the app's
+sidebar; the app and `set_folder_icon` over MCP do the same. Without an icon it prints what the
+folder has, and `--remove` takes it away.
+
+- **An icon** is `<set>:<name>` from Lucide (`lucide:briefcase`), Tabler (`tabler:home`) or Simple
+  Icons, which are brand logos (`simple-icons:github`); a bare name is Lucide's. An emoji (`🏠`)
+  works too. `nota icons <words>` finds one by name, best match first (`--set` searches one set,
+  `--json` for scripts). Nota carries these sets with it, so they work offline.
+- **A colour** is one of `accent`, `red`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink` and
+  `gray`. The app takes each from the theme, so it suits light and dark. `--color` alone colours
+  the folder's own icon.
+- **They live in `.nota/folders.yaml`**, by folder path, and sync with the vault. A folder renamed
+  with Nota (`nota folder rename`, the app) takes its icon along; one renamed by another program
+  loses it, and the old entry stays until it is set again.
+
+```yaml
+# .nota/folders.yaml
+Work:
+  icon: lucide:briefcase
+  color: blue
+Personal:
+  icon: 🏠
+```
+
+A saved view takes the same `icon` and `color` keys ([hooks.md](hooks.md#views)).
 
 ## Find and replace
 

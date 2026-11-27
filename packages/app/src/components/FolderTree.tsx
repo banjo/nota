@@ -1,3 +1,4 @@
+import type { IconLook } from "@nota/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder, FolderOpen } from "lucide-react";
 import {
@@ -17,6 +18,7 @@ import { attachmentsRow, buildTree, flattenTree } from "../lib/notes.ts";
 import { useTree } from "../queries.ts";
 import { useContributions } from "../registry.ts";
 import { type Route, useUI } from "../state.ts";
+import { IconGlyph } from "./IconGlyph.tsx";
 import { FolderActions, NewFolderRow, useFolderDraft } from "./NewFolder.tsx";
 import { NoteRow } from "./NoteRow.tsx";
 import { Row } from "./Row.tsx";
@@ -30,13 +32,16 @@ const FolderRow = memo(function FolderRow({
   open,
   depth,
   count,
+  icon,
+  color,
+  svg,
 }: {
   path: string;
   name: string;
   open: boolean;
   depth: number;
   count?: ReactNode;
-}) {
+} & IconLook) {
   const toggle = useUI((s) => s.toggle);
   const longPress = useLongPress(() => openRowSheet({ kind: "folder", path, name }));
   const renaming = useRenaming("folder", path);
@@ -49,7 +54,12 @@ const FolderRow = memo(function FolderRow({
         data-ctx-kind="folder"
         data-ctx-path={path}
         chevron={open}
-        icon={open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />}
+        icon={
+          <IconGlyph
+            look={{ icon, color, svg }}
+            fallback={open ? <FolderOpen strokeWidth={1.75} /> : <Folder strokeWidth={1.75} />}
+          />
+        }
         label={name}
         // Room for the row's "…", which is always shown under a finger.
         className="pointer-coarse:pr-12"
@@ -202,6 +212,8 @@ export function FolderTree() {
                 name={row.node.name}
                 open={row.open}
                 depth={row.depth}
+                // As strings, so the memo holds across tree refetches.
+                {...row.node.look}
                 count={
                   decorators
                     .map((d) =>

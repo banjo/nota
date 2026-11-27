@@ -44,6 +44,8 @@ args to pick a vault other than the default.
 | `move_note` | files a note into a folder and rewrites the links that would break |
 | `create_folder` | an empty folder (`a/b` makes both); fails if it exists |
 | `list_folders` | every folder, empty ones too, with note counts |
+| `set_folder_icon` | a folder's icon and colour in the sidebar |
+| `search_icons` | icons by name, for `set_folder_icon` |
 | `list_tags` | every tag with its count |
 | `list_views` | the saved views in `.nota/views` |
 | `get_backlinks` | the notes that link to a note |

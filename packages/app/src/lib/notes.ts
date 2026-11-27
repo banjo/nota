@@ -1,4 +1,5 @@
-import type { NoteInfo, Tree } from "@nota/client";
+import type { IconLook, NoteInfo, Tree } from "@nota/client";
+import { lookOf } from "./icons.ts";
 
 // Pure helpers about notes, titles and the folder tree.
 
@@ -73,6 +74,8 @@ export interface FolderNode {
   notes: NoteInfo[];
   /** Notes inside, subfolders included. */
   count: number;
+  /** Its icon and colour, if it has any. */
+  look?: IconLook;
 }
 
 const collator = new Intl.Collator("sv", { sensitivity: "base", numeric: true });
@@ -91,7 +94,11 @@ export function buildTree(tree: Tree): FolderNode {
     nodes.set(path, node);
     return node;
   };
-  for (const f of tree.folders) ensure(f.path).count = f.notes;
+  for (const f of tree.folders) {
+    const node = ensure(f.path);
+    node.count = f.notes;
+    if (f.icon || f.color) node.look = lookOf(f);
+  }
   for (const n of tree.notes) ensure(n.folder).notes.push(n);
   for (const node of nodes.values()) {
     node.folders.sort((a, b) => compareNames(a.name, b.name));

@@ -58,7 +58,7 @@ func workPath(p string) bool {
 		return false
 	}
 	if rest, ok := strings.CutPrefix(p, nvault.MetaDirName+"/"); ok {
-		return rest == "hooks.toml" || strings.HasPrefix(rest, "views/") || strings.HasPrefix(rest, "plugins/")
+		return rest == "hooks.toml" || rest == "folders.yaml" || strings.HasPrefix(rest, "views/") || strings.HasPrefix(rest, "plugins/")
 	}
 	return true
 }

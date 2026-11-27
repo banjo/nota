@@ -14,6 +14,8 @@ export function currentShareTheme(): ShareTheme {
   const style = getComputedStyle(document.documentElement);
   const tokens: Record<string, string> = {};
   for (const t of THEME_TOKENS) {
+    // A shared page has no folder icons, and an older server refuses them.
+    if (t.startsWith("icon-")) continue;
     const v = style.getPropertyValue(`--${t}`).trim();
     if (COLOR.test(v)) tokens[t] = v;
   }
